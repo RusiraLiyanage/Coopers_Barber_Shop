@@ -1,50 +1,49 @@
-// src/components/HeaderNav.tsx
-import { Layout, Menu, Dropdown, Avatar } from "antd";
-import { UserOutlined } from "@ant-design/icons";
+import { Avatar, Dropdown, Menu } from "antd";
+import { Header } from "antd/es/layout/layout";
 import { useState } from "react";
+import { UserOutlined } from "@ant-design/icons";
 import UserAuthModal from "../Models/userAuth";
 import MakeAppointmentModal from "../Models/makeAppointment";
-const { Header } = Layout;
 
-export default function HeaderNav() {
-  const [authModalOpen, setAuthModalOpen] = useState(false); // 👈 state for modal
-  const [createAppointmentModalOpen, setCreateAppointmentModalOpen] =
-    useState(false); // 👈 state for modal
-  const [isAuthenticated] = useState(true); // toggle manually for now
+interface HeaderNavProps {
+  isAuthenticated: boolean;
+  setIsAuthenticated: (val: boolean) => void;
+  openAuthModal: boolean;
+  setOpenAuthModal: (val: boolean) => void;
+  openAppointmentModal: boolean;
+  setOpenAppointmentModal: (val: boolean) => void;
+}
+
+export default function HeaderNav({
+  isAuthenticated,
+  setIsAuthenticated,
+  openAuthModal,
+  setOpenAuthModal,
+  openAppointmentModal,
+  setOpenAppointmentModal,
+}: HeaderNavProps) {
   const [selectedKey, setSelectedKey] = useState<string | undefined>(undefined);
 
   const handleMenuClick = (e: { key: string }) => {
-    if (e.key === "login_register") {
-      setAuthModalOpen(true); // 👈 open modal
-    } else if (e.key === "logout") {
-      console.log("Logout clicked");
-      // TODO: hook up logout logic
-    }
+    if (e.key === "login_register") setOpenAuthModal(true);
+    else if (e.key === "logout") setIsAuthenticated(false);
   };
 
   const handleNavClick = (e: { key: string }) => {
     setSelectedKey(e.key);
     if (e.key === "create") {
-      if (!isAuthenticated) {
-        setAuthModalOpen(true); // show login modal instead of navigating
-      } else {
-        setCreateAppointmentModalOpen(true);
-        // TODO: use navigate("/user-id/make-an-appointment")
-      }
-    } else if (e.key === "appointments") {
-      console.log("Navigate to /user-id/my-appointments");
-      // TODO: use navigate("/user-id/my-appointments")
+      if (!isAuthenticated) setOpenAuthModal(true);
+      else setOpenAppointmentModal(true);
     }
   };
 
-  // clear highlight when modals close
   const closeAuthModal = () => {
-    setAuthModalOpen(false);
+    setOpenAuthModal(false);
     setSelectedKey(undefined);
   };
 
   const closeAppointmentModal = () => {
-    setCreateAppointmentModalOpen(false);
+    setOpenAppointmentModal(false);
     setSelectedKey(undefined);
   };
 
@@ -59,7 +58,7 @@ export default function HeaderNav() {
     ...(isAuthenticated
       ? [{ key: "appointments", label: "My Appointments" }]
       : []),
-    { key: "create", label: "Create Appointment" },
+    { key: "create", label: "New Appointment" },
   ];
 
   return (
@@ -75,7 +74,7 @@ export default function HeaderNav() {
           alignItems: "center",
           background: "#fff",
           boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-          height: 64, // 👈 consistent with AntD default
+          height: 64,
           paddingBottom: 10,
         }}
       >
@@ -87,7 +86,7 @@ export default function HeaderNav() {
           mode="horizontal"
           items={navItems}
           onClick={handleNavClick}
-          selectedKeys={selectedKey ? [selectedKey] : []} // 👈 when undefined → []
+          selectedKeys={selectedKey ? [selectedKey] : []}
           style={{
             flex: 1,
             justifyContent: "right",
@@ -106,11 +105,20 @@ export default function HeaderNav() {
         </Dropdown>
       </Header>
 
-      <UserAuthModal open={authModalOpen} onClose={() => closeAuthModal()} />
+      {/* Modals */}
+      <UserAuthModal
+        open={openAuthModal}
+        onClose={closeAuthModal}
+        onAuthSuccess={() => {
+          closeAuthModal();
+          setIsAuthenticated(true);
+          setOpenAppointmentModal(true);
+        }}
+      />
 
       <MakeAppointmentModal
-        open={createAppointmentModalOpen}
-        onClose={() => closeAppointmentModal()}
+        open={openAppointmentModal}
+        onClose={closeAppointmentModal}
       />
     </>
   );

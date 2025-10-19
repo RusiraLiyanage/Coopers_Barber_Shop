@@ -2,20 +2,20 @@
 import { Button, Card } from "antd";
 
 interface HomePageProps {
-  onRequireAuth?: () => void; // 👈 optional callback
+  onMakeAppointment: () => void; // ✅ renamed to match new App.tsx
 }
 
-const HomePage: React.FC<HomePageProps> = ({ onRequireAuth }) => {
+const HomePage: React.FC<HomePageProps> = ({ onMakeAppointment }) => {
   return (
     <div
       style={{
         height: "100vh",
         width: "100%",
-        backgroundImage: "url('Coopers_barber_background.png')", // full path from public/
-        backgroundSize: "cover", // ensures full width/height cover
-        backgroundPosition: "center", // center the image
+        backgroundImage: "url('Coopers_barber_background.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
-        backgroundAttachment: "fixed", // 👈 creates parallax scroll effect
+        backgroundAttachment: "fixed",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -32,7 +32,6 @@ const HomePage: React.FC<HomePageProps> = ({ onRequireAuth }) => {
             fontSize: "2.25rem",
             marginBottom: "20px",
             color: "white",
-            alignItems: "left",
           }}
         >
           We provide top-notch barber services tailored to your style.
@@ -42,11 +41,11 @@ const HomePage: React.FC<HomePageProps> = ({ onRequireAuth }) => {
             fontSize: "2.25rem",
             marginBottom: "20px",
             color: "white",
-            alignItems: "left",
           }}
         >
           Book your appointments with ease.
         </p>
+
         <div
           style={{
             display: "flex",
@@ -78,60 +77,35 @@ const HomePage: React.FC<HomePageProps> = ({ onRequireAuth }) => {
                 textAlign: "left",
               }}
             >
-              <li
-                style={{
-                  fontSize: "1.2rem",
-                  marginBottom: "10px",
-                  color: "#555",
-                }}
-              >
-                💈 Hair Cut
-              </li>
-              <li
-                style={{
-                  fontSize: "1.2rem",
-                  marginBottom: "10px",
-                  color: "#555",
-                }}
-              >
-                💇 Hair Styling
-              </li>
-              <li
-                style={{
-                  fontSize: "1.2rem",
-                  marginBottom: "10px",
-                  color: "#555",
-                }}
-              >
-                🎨 Hair Coloring
-              </li>
-              <li
-                style={{
-                  fontSize: "1.2rem",
-                  marginBottom: "10px",
-                  color: "#555",
-                }}
-              >
-                🧑‍💼 Consultation
-              </li>
-              <li
-                style={{
-                  fontSize: "1.2rem",
-                  marginBottom: "10px",
-                  color: "#555",
-                }}
-              >
-                💆 Deep Conditioning Treatment
-              </li>
+              {[
+                "💈 Hair Cut",
+                "💇 Hair Styling",
+                "🎨 Hair Coloring",
+                "🧑‍💼 Consultation",
+                "💆 Deep Conditioning Treatment",
+              ].map((service, index) => (
+                <li
+                  key={index}
+                  style={{
+                    fontSize: "1.2rem",
+                    marginBottom: "10px",
+                    color: "#555",
+                  }}
+                >
+                  {service}
+                </li>
+              ))}
             </ul>
           </Card>
         </div>
+
         <br />
         <br />
+
         <Button
           type="primary"
           size="large"
-          onClick={onRequireAuth} // 👈 triggers modal
+          onClick={onMakeAppointment} // ✅ uses new prop name
         >
           Make your Appointment
         </Button>
