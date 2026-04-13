@@ -105,7 +105,6 @@ export default function HeaderNav({
         </Dropdown>
       </Header>
 
-      {/* Modals */}
       <UserAuthModal
         open={openAuthModal}
         onClose={closeAuthModal}
