@@ -5,13 +5,17 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Appointment } from './entities/appointment.entity';
 import { Service } from '../services/entities/service.entity';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { StaffService } from '../staff/staff.service';
 import { Staff } from '../staff/entities/staff.entity';
 
+const WORKDAY_START = '09:00';
+const WORKDAY_END = '17:00';
+const LUNCH_START = '12:00';
+const LUNCH_END = '13:00';
 @Injectable()
 export class AppointmentsService {
   constructor(
@@ -23,6 +27,193 @@ export class AppointmentsService {
     @InjectRepository(Staff) private staffRepo: Repository<Staff>,
   ) {}
 
+  private addMinutes(date: Date, minutes: number): Date {
+    return new Date(date.getTime() + minutes * 60000);
+  }
+
+  private rangesOverlap(
+    startA: Date,
+    endA: Date,
+    startB: Date,
+    endB: Date,
+  ): boolean {
+    return startA < endB && startB < endA;
+  }
+
+  private getWeekdayNumber(date: string): number {
+    const jsDay = new Date(`${date}T00:00:00Z`).getUTCDay();
+    return jsDay === 0 ? 7 : jsDay;
+  }
+
+  private getTimeZoneOffsetMinutes(timeZone: string, instant: Date): number {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      timeZoneName: 'shortOffset',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).formatToParts(instant);
+
+    const offsetName = parts.find(
+      (part) => part.type === 'timeZoneName',
+    )?.value;
+
+    if (!offsetName || offsetName === 'GMT') {
+      return 0;
+    }
+
+    const match = offsetName.match(/^GMT([+-])(\d{1,2})(?::?(\d{2}))?$/);
+    if (!match) {
+      throw new BadRequestException(
+        `Unsupported timezone offset: ${offsetName}`,
+      );
+    }
+
+    const [, sign, hours, minutes] = match;
+    const totalMinutes =
+      parseInt(hours, 10) * 60 + parseInt(minutes ?? '0', 10);
+
+    return sign === '+' ? totalMinutes : -totalMinutes;
+  }
+
+  private toStaffDateTime(date: string, time: string, timeZone: string): Date {
+    const [year, month, day] = date.split('-').map(Number);
+    const [hour, minute] = time.split(':').map(Number);
+
+    const utcGuess = new Date(Date.UTC(year, month - 1, day, hour, minute));
+    const offsetAtGuess = this.getTimeZoneOffsetMinutes(timeZone, utcGuess);
+    const instant = new Date(
+      Date.UTC(year, month - 1, day, hour, minute) - offsetAtGuess * 60000,
+    );
+    const correctedOffset = this.getTimeZoneOffsetMinutes(timeZone, instant);
+
+    if (correctedOffset === offsetAtGuess) {
+      return instant;
+    }
+
+    return new Date(
+      Date.UTC(year, month - 1, day, hour, minute) - correctedOffset * 60000,
+    );
+  }
+
+  private formatTime(date: Date, timeZone: string): string {
+    return date.toLocaleTimeString('en-AU', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone,
+    });
+  }
+
+  private formatDateTime(date: Date, timeZone: string): string {
+    return date.toLocaleString('en-AU', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone,
+    });
+  }
+
+  private getStaffScheduleForDate(staff: Staff, date: string) {
+    const weekday = this.getWeekdayNumber(date);
+    if (weekday > 5) {
+      return null;
+    }
+
+    const workStart = this.toStaffDateTime(date, WORKDAY_START, staff.timezone);
+    const workEnd = this.toStaffDateTime(date, WORKDAY_END, staff.timezone);
+    const lunchStart = this.toStaffDateTime(date, LUNCH_START, staff.timezone);
+    const lunchEndWithBuffer = this.addMinutes(
+      this.toStaffDateTime(date, LUNCH_END, staff.timezone),
+      staff.bufferAfterMinutes,
+    );
+
+    return {
+      workStart,
+      workEnd,
+      breaks: [{ start: lunchStart, end: lunchEndWithBuffer }],
+    };
+  }
+
+  private async getBlockedIntervals(
+    staff: Staff,
+    workStart: Date,
+    workEnd: Date,
+  ) {
+    const appointments = await this.appointmentsRepo.find({
+      where: {
+        staff: { id: staff.id },
+        status: 'booked',
+      },
+    });
+
+    return appointments
+      .map((appointment) => ({
+        start: appointment.startAt,
+        end: this.addMinutes(appointment.endAt, staff.bufferAfterMinutes),
+      }))
+      .filter((interval) =>
+        this.rangesOverlap(interval.start, interval.end, workStart, workEnd),
+      );
+  }
+
+  private async calculateAvailability(
+    service: Service,
+    staff: Staff,
+    date: string,
+  ): Promise<string[]> {
+    const schedule = this.getStaffScheduleForDate(staff, date);
+    if (!schedule) {
+      return [];
+    }
+
+    const blocked = [
+      ...(await this.getBlockedIntervals(
+        staff,
+        schedule.workStart,
+        schedule.workEnd,
+      )),
+      ...schedule.breaks,
+    ].sort((left, right) => left.start.getTime() - right.start.getTime());
+
+    const available: string[] = [];
+    let slotStart = new Date(schedule.workStart);
+
+    while (slotStart < schedule.workEnd) {
+      const slotEnd = this.addMinutes(slotStart, service.durationMinutes);
+      if (slotEnd > schedule.workEnd) {
+        break;
+      }
+
+      const overlappingIntervals = blocked.filter((interval) =>
+        this.rangesOverlap(slotStart, slotEnd, interval.start, interval.end),
+      );
+
+      if (overlappingIntervals.length === 0) {
+        available.push(
+          `${this.formatTime(slotStart, staff.timezone)}-${this.formatTime(
+            slotEnd,
+            staff.timezone,
+          )}`,
+        );
+        slotStart = this.addMinutes(slotEnd, staff.bufferAfterMinutes);
+        continue;
+      }
+
+      const nextAvailableStart = overlappingIntervals.reduce(
+        (latestEnd, interval) =>
+          interval.end > latestEnd ? interval.end : latestEnd,
+        overlappingIntervals[0].end,
+      );
+
+      slotStart = new Date(nextAvailableStart);
+    }
+
+    return available;
+  }
+
   // Booking an appointment -----------------------------------------------------------
   async book(user: { userId: string }, dto: CreateAppointmentDto) {
     const service = await this.servicesRepo.findOneBy({ id: dto.serviceId });
@@ -30,26 +221,26 @@ export class AppointmentsService {
       throw new NotFoundException(`Service with ID ${dto.serviceId} not found`);
     }
 
-    // Parse slot into start and end
-    const [start, end] = dto.slot.split('-');
-    const startAt = new Date(`${dto.date}T${start}:00+10:00`);
-    const endAt = new Date(`${dto.date}T${end}:00+10:00`);
+    const staff = await this.staffService.getDefaultStaff();
+    const availableSlots = await this.calculateAvailability(
+      service,
+      staff,
+      dto.date,
+    );
 
-    // Check conflicts (existing bookings + buffer)
-    const overlap = await this.appointmentsRepo.findOne({
-      where: [
-        { startAt: Between(startAt, endAt), status: 'booked' },
-        { endAt: Between(startAt, endAt), status: 'booked' },
-      ],
-    });
-
-    // if the time slot fully or partially overlaps with an existing booking, reject it.
-    if (overlap) {
+    if (!availableSlots.includes(dto.slot)) {
       throw new ConflictException(
-        `The slot ${dto.slot} on ${dto.date} is already booked`,
+        `The slot ${dto.slot} on ${dto.date} is not available`,
       );
     }
-    const staff = await this.staffService.getDefaultStaff();
+
+    // Parse slot into start and end
+    const [start, end] = dto.slot.split('-');
+    if (!start || !end) {
+      throw new BadRequestException('Invalid slot format');
+    }
+    const startAt = this.toStaffDateTime(dto.date, start, staff.timezone);
+    const endAt = this.toStaffDateTime(dto.date, end, staff.timezone);
 
     // Save booking
     const appointment = this.appointmentsRepo.create({
@@ -64,23 +255,12 @@ export class AppointmentsService {
     const saved = this.appointmentsRepo.save(appointment);
 
     // Format startAt / endAt before returning
-    const formatDateTime = (d: Date) =>
-      d.toLocaleString('en-AU', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-        timeZone: 'Australia/Sydney',
-      });
-
     return {
       id: (await saved).id,
       service: (await saved).service,
       staff: (await saved).staff,
-      startAt: formatDateTime((await saved).startAt),
-      endAt: formatDateTime((await saved).endAt),
+      startAt: this.formatDateTime((await saved).startAt, staff.timezone),
+      endAt: this.formatDateTime((await saved).endAt, staff.timezone),
       status: (await saved).status,
     };
   }
@@ -90,26 +270,17 @@ export class AppointmentsService {
     const appointments = await this.appointmentsRepo.find({
       where: { customer: { id: userId } },
       relations: ['service', 'staff'],
-      order: { startAt: 'ASC' },
+      order: { startAt: 'DESC' },
     });
 
-    const formatDateTime = (d: Date) =>
-      d.toLocaleString('en-AU', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-        timeZone: 'Australia/Sydney',
-      });
+    const staff = await this.staffService.getDefaultStaff();
 
     return appointments.map((appt) => ({
       id: appt.id,
       service: appt.service,
       staff: appt.staff,
-      startAt: formatDateTime(appt.startAt),
-      endAt: formatDateTime(appt.endAt),
+      startAt: this.formatDateTime(appt.startAt, staff.timezone),
+      endAt: this.formatDateTime(appt.endAt, staff.timezone),
       status: appt.status,
     }));
   }
@@ -124,73 +295,6 @@ export class AppointmentsService {
     const staff = await this.staffRepo.findOne({ where: {} });
     if (!staff) throw new BadRequestException('No staff available');
 
-    // Service duration and staff buffer time - as defined in the service.
-    const serviceDuration = service.durationMinutes;
-    const buffer = staff.bufferAfterMinutes;
-
-    // Staff working hours
-    const workStart = new Date(`${date}T09:00:00+10:00`); // work start at 9 AM in the morning (timestamped)
-    const workEnd = new Date(`${date}T17:00:00+10:00`); // work end at 5 PM in the evening (timestamped)
-
-    // Lunch break with 15 min buffer after - allowing staff a bit of adjustment time.
-    const breakStart = new Date(`${date}T12:00:00+10:00`); // break start at 12 PM
-    // break end at 1 PM + 15 min buffer time as an adjustment for the staff member.
-    const breakEnd = new Date(
-      new Date(`${date}T13:00:00+10:00`).getTime() + buffer * 60000, // break + extra buffer time.
-    );
-    // Existing bookings - retrieve all appointments.
-    const appts = await this.appointmentsRepo.find({
-      where: { startAt: Between(workStart, workEnd), status: 'booked' },
-    });
-
-    const blocked = appts.map((a) => ({
-      start: a.startAt,
-      end: new Date(a.endAt.getTime() + buffer * 60000),
-    }));
-    blocked.push({ start: breakStart, end: breakEnd });
-
-    const available: string[] = []; // the empty available slots array to be filled.
-    let slotStart = workStart;
-
-    const fmt = (d: Date) =>
-      d.toLocaleTimeString('en-AU', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      });
-
-    while (slotStart < workEnd) {
-      const slotEnd = new Date(slotStart.getTime() + serviceDuration * 60000);
-      if (slotEnd > workEnd) break;
-
-      const overlaps = blocked.some(
-        (b) =>
-          (slotStart >= b.start && slotStart < b.end) || // slotStart is greater or equals than interval start AND slotStart is less than break end time.
-          (slotEnd > b.start && slotEnd <= b.end) || // SlotEnd is greater than break start AND slotEnd is less or equls than break ends.
-          (slotStart <= b.start && slotEnd >= b.end), // SlotStart is less or equals than break start AND Slotend is greater or equals than break ends.
-      ); // either of these cases, the time slot will be taken overlapping.
-
-      // If no overlap, add to available slots.
-      if (!overlaps) {
-        console.log(`Slot OK: ${fmt(slotStart)}-${fmt(slotEnd)}`);
-        available.push(`${fmt(slotStart)}-${fmt(slotEnd)}`);
-        // If overlaps, reject this slot.
-      } else {
-        console.log(
-          `Slot rejected: ${fmt(slotStart)}-${fmt(slotEnd)} (overlaps block)`,
-        );
-        // If this slot overlaps with lunch, jump to breakEnd
-        if (slotStart < breakEnd && slotEnd > breakStart) {
-          slotStart = new Date(breakEnd.getTime());
-          continue; // skip normal increment
-        }
-      }
-
-      // Move forward: slotEnd + buffer (normal increment)
-      slotStart = new Date(slotEnd.getTime() + buffer * 60000); // add 15 buffer minutes to make sure no back-to-back bookings.
-    }
-
-    console.log('--- Final Available Slots ---', available);
-    return available;
+    return this.calculateAvailability(service, staff, date);
   }
 }

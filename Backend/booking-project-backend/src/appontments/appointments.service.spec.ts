@@ -5,10 +5,13 @@ import { Appointment } from './entities/appointment.entity';
 import { Service } from '../services/entities/service.entity';
 import { Staff } from '../staff/entities/staff.entity';
 import { StaffService } from '../staff/staff.service';
+import { ConflictException } from '@nestjs/common';
 
 // Mock repositories
 const mockAppointmentsRepo = {
   find: jest.fn(),
+  create: jest.fn(),
+  save: jest.fn(),
 };
 
 const mockServicesRepo = {
@@ -68,6 +71,9 @@ describe('AppointmentsService', () => {
     const slots = await service.getAvailability('svc1', '2025-09-24');
 
     expect(slots).toContain('09:00-09:30');
+    expect(slots).not.toContain('09:15-09:45');
+    expect(slots).not.toContain('09:30-10:00');
+    expect(slots).toContain('09:45-10:15');
     expect(slots).toContain('13:15-13:45'); // after lunch buffer
     expect(slots.some((s) => s.startsWith('12'))).toBe(false); // no lunch slots
   });
@@ -187,5 +193,37 @@ describe('AppointmentsService', () => {
     // Last valid slot must end exactly at 17:00
     expect(slots).toContain('15:00-16:30');
     expect(slots).not.toContain('16:00-17:30');
+  });
+
+  it('should reject booking a slot that falls inside an existing appointment plus buffer', async () => {
+    mockServicesRepo.findOneBy.mockResolvedValue({
+      id: 'svc1',
+      name: 'Haircut',
+      durationMinutes: 30,
+    });
+    mockAppointmentsRepo.find.mockResolvedValue([
+      {
+        startAt: new Date('2025-09-24T09:00:00+10:00'),
+        endAt: new Date('2025-09-24T09:45:00+10:00'),
+        status: 'booked',
+      },
+    ]);
+    mockStaffService.getDefaultStaff.mockResolvedValue({
+      id: '11111111-1111-1111-1111-111111111111',
+      displayName: 'Main Staff',
+      timezone: 'Australia/Sydney',
+      bufferAfterMinutes: 15,
+    });
+
+    await expect(
+      service.book(
+        { userId: 'user-1' },
+        {
+          serviceId: 'svc1',
+          date: '2025-09-24',
+          slot: '09:15-09:45',
+        },
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 });

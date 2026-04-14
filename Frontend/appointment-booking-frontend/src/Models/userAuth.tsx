@@ -1,47 +1,82 @@
 import { Button, Checkbox, Form, Input, Modal, Tabs, message } from "antd";
 import { useEffect, useState } from "react";
+import { login, register } from "../lib/api";
 
 interface UserAuthModalProps {
   open: boolean;
   onClose: () => void;
-  onAuthSuccess: () => void; // 👈 new prop
+  onAuthSuccess: (token: string) => void;
 }
 
 type FieldType = {
-  username?: string;
+  email?: string;
   password?: string;
-  remember?: string;
+  remember?: boolean;
 };
 
-const UserAuthModal: React.FC<UserAuthModalProps> = ({
+export default function UserAuthModal({
   open,
   onClose,
   onAuthSuccess,
-}) => {
+}: UserAuthModalProps) {
   const [confirmLoading, setConfirmLoading] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();
+  const [loginForm] = Form.useForm<FieldType>();
+  const [registerForm] = Form.useForm<FieldType>();
 
-  // 👇 create form instances for both login and register
-  const [loginForm] = Form.useForm();
-  const [registerForm] = Form.useForm();
-
-  // 👇 reset all forms when modal opens
   useEffect(() => {
     if (open) {
       loginForm.resetFields();
       registerForm.resetFields();
     }
-  }, [open, loginForm, registerForm]); // the page will be recreated when these values got changed.
+  }, [open, loginForm, registerForm]);
 
-  const handleOk = (): Promise<void> => {
+  const handleLogin = async (values: FieldType) => {
+    if (!values.email || !values.password) {
+      return;
+    }
+
     setConfirmLoading(true);
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        onClose();
-        setConfirmLoading(false);
-        resolve(); // ✅ tells await it's done
-      }, 2000);
-    });
+
+    try {
+      const response = await login(values.email, values.password);
+      messageApi.success({
+        content: "Successful Login!",
+        style: {
+          outlineColor: "#E6F7FF",
+          color: "#0050b3",
+          borderRadius: 8,
+          paddingBottom: 5,
+        },
+      });
+      onAuthSuccess(response.access_token);
+    } catch (error) {
+      messageApi.error(
+        error instanceof Error ? error.message : "Login failed",
+      );
+    } finally {
+      setConfirmLoading(false);
+    }
+  };
+
+  const handleRegister = async (values: FieldType) => {
+    if (!values.email || !values.password) {
+      return;
+    }
+
+    setConfirmLoading(true);
+
+    try {
+      const response = await register(values.email, values.password);
+      messageApi.success("Successfully Registered!");
+      onAuthSuccess(response.access_token);
+    } catch (error) {
+      messageApi.error(
+        error instanceof Error ? error.message : "Registration failed",
+      );
+    } finally {
+      setConfirmLoading(false);
+    }
   };
 
   return (
@@ -51,7 +86,6 @@ const UserAuthModal: React.FC<UserAuthModalProps> = ({
         title=""
         open={open}
         confirmLoading={confirmLoading}
-        onOk={handleOk}
         onCancel={onClose}
         style={{ top: 150 }}
         footer={[
@@ -60,15 +94,14 @@ const UserAuthModal: React.FC<UserAuthModalProps> = ({
           </Button>,
         ]}
         width={{
-          xs: "36%", // Mobile
-          sm: "36%", // Small tablets
-          md: "36%", // Tablets
-          lg: "36%", // Small desktop
-          xl: "36%", // Large desktop
-          xxl: "37%", // Extra-large screens
+          xs: "36%",
+          sm: "36%",
+          md: "36%",
+          lg: "36%",
+          xl: "36%",
+          xxl: "37%",
         }}
       >
-        {/* Replace this with actual login/register forms later */}
         <center>
           <h1>Sign in or Sign up to continue</h1>
         </center>
@@ -93,33 +126,20 @@ const UserAuthModal: React.FC<UserAuthModalProps> = ({
                       wrapperCol={{ span: 16 }}
                       style={{ maxWidth: 600 }}
                       initialValues={{ remember: true }}
-                      onFinish={async (values) => {
-                        console.log("Success:", values);
-                        await handleOk(); // ✅ only runs if validation passes
-                        messageApi.success({
-                          content: "Successful Login!",
-                          style: {
-                            outlineColor: "#E6F7FF",
-                            color: "#0050b3",
-                            borderRadius: 8,
-                            paddingBottom: 5,
-                          },
-                        }); // ✅ show after close
-                        onAuthSuccess();
-                      }}
-                      onFinishFailed={(errorInfo) => {
-                        console.log("Validation Failed:", errorInfo);
-                        // handleOk() will NOT run here
-                      }}
+                      onFinish={handleLogin}
                       autoComplete="off"
                     >
                       <Form.Item<FieldType>
-                        label="Username"
-                        name="username"
+                        label="Email"
+                        name="email"
                         rules={[
                           {
                             required: true,
-                            message: "Please input your username!",
+                            message: "Please input your email!",
+                          },
+                          {
+                            type: "email",
+                            message: "Please input a valid email!",
                           },
                         ]}
                       >
@@ -172,25 +192,20 @@ const UserAuthModal: React.FC<UserAuthModalProps> = ({
                       wrapperCol={{ span: 16 }}
                       style={{ maxWidth: 600 }}
                       initialValues={{ remember: true }}
-                      onFinish={async (values) => {
-                        console.log("Success:", values);
-                        await handleOk(); // ✅ only runs if validation passes
-                        messageApi.success("Successfully Registered!"); // ✅ show after close
-                        onAuthSuccess();
-                      }}
-                      onFinishFailed={(errorInfo) => {
-                        console.log("Validation Failed:", errorInfo);
-                        // handleOk() will NOT run here
-                      }}
+                      onFinish={handleRegister}
                       autoComplete="off"
                     >
                       <Form.Item<FieldType>
-                        label="Username"
-                        name="username"
+                        label="Email"
+                        name="email"
                         rules={[
                           {
                             required: true,
-                            message: "Please input your username!",
+                            message: "Please input your email!",
+                          },
+                          {
+                            type: "email",
+                            message: "Please input a valid email!",
                           },
                         ]}
                       >
@@ -204,6 +219,11 @@ const UserAuthModal: React.FC<UserAuthModalProps> = ({
                           {
                             required: true,
                             message: "Please input your password!",
+                          },
+                          {
+                            min: 6,
+                            message:
+                              "Password must be at least 6 characters long!",
                           },
                         ]}
                       >
@@ -237,6 +257,4 @@ const UserAuthModal: React.FC<UserAuthModalProps> = ({
       </Modal>
     </>
   );
-};
-
-export default UserAuthModal;
+}
