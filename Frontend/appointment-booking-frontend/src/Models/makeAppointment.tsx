@@ -42,6 +42,12 @@ export default function MakeAppointmentModal({
   const [slots, setSlots] = useState<string[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [form] = Form.useForm<AppointmentFormValues>();
+  const selectedServiceId = Form.useWatch("serviceId", form);
+  const selectedAppointmentDate = Form.useWatch("appointmentDate", form);
+  const showNoAvailabilityMessage =
+    Boolean(selectedServiceId && selectedAppointmentDate) &&
+    !slotsLoading &&
+    slots.length === 0;
 
   useEffect(() => {
     if (!open || !authToken) {
@@ -222,6 +228,10 @@ export default function MakeAppointmentModal({
             >
               {slotsLoading ? (
                 <Spin />
+              ) : showNoAvailabilityMessage ? (
+                <div style={{ color: "#8c8c8c" }}>
+                  No appointments available for the selected service and date.
+                </div>
               ) : (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
                   {slots.map((slot) => (

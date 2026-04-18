@@ -27,7 +27,7 @@ export class UsersService {
     if (!user.role) {
       user.role = UserRole.CUSTOMER;
     }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
     const existing = await this.usersRepo.findOne({
       where: { email: user.email },
     });

@@ -34,7 +34,6 @@ export class UsersController {
     const existing = await this.usersService.findByEmail(dto.email);
     if (existing) throw new BadRequestException('Email already registered');
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const crypto = await import('crypto');
     // Hash the password using SHA-256
     const passwordHash = crypto

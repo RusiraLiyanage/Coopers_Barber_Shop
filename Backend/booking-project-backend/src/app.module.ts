@@ -13,7 +13,6 @@ import { APP_GUARD } from '@nestjs/core';
 
 @Module({
   imports: [
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     ThrottlerModule.forRoot([
       {
         ttl: 300, // time-to-live in seconds
@@ -31,7 +30,7 @@ import { APP_GUARD } from '@nestjs/core';
     AppService,
     {
       provide: APP_GUARD,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
       useClass: ThrottlerGuard, // In ThrottlerGuard to avoid Spammers/brute force attacks
     },
   ],
