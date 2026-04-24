@@ -7,9 +7,10 @@ import {
   Modal,
   Spin,
   Tag,
+  Tabs,
   Typography,
 } from "antd";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getAppointments, type AppointmentRecord } from "../lib/api";
 
 interface MyAppointmentsProps {
@@ -31,6 +32,82 @@ function formatAppointmentWindow(appointment: AppointmentRecord) {
   return `${appointment.startAt} - ${appointment.endAt}`;
 }
 
+function getAppointmentDateKey(appointment: AppointmentRecord) {
+  return appointment.startAt.split(", ")[0] ?? "";
+}
+
+function getTodayDateKey() {
+  return new Intl.DateTimeFormat("en-AU", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function AppointmentsList({
+  appointments,
+  emptyDescription,
+  emptyActionLabel,
+  onMakeAppointment,
+}: {
+  appointments: AppointmentRecord[];
+  emptyDescription: string;
+  emptyActionLabel: string;
+  onMakeAppointment: () => void;
+}) {
+  if (appointments.length === 0) {
+    return (
+      <Empty
+        description={emptyDescription}
+        image={Empty.PRESENTED_IMAGE_SIMPLE}
+      >
+        <Button type="primary" onClick={onMakeAppointment}>
+          {emptyActionLabel}
+        </Button>
+      </Empty>
+    );
+  }
+
+  return (
+    <List
+      dataSource={appointments}
+      renderItem={(appointment) => (
+        <List.Item>
+          <Card style={{ width: "100%", borderRadius: 8 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 16,
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
+                <Typography.Title level={4} style={{ marginTop: 0 }}>
+                  {appointment.service.name}
+                </Typography.Title>
+                <Typography.Paragraph style={{ marginBottom: 8 }}>
+                  {formatAppointmentWindow(appointment)}
+                </Typography.Paragraph>
+                <Typography.Text type="secondary">
+                  Staff: {appointment.staff.displayName}
+                </Typography.Text>
+              </div>
+
+              <Tag
+                color={appointment.status === "booked" ? "green" : "default"}
+                style={{ alignSelf: "flex-start" }}
+              >
+                {appointment.status.toUpperCase()}
+              </Tag>
+            </div>
+          </Card>
+        </List.Item>
+      )}
+    />
+  );
+}
+
 export default function MyAppointments({
   open,
   authToken,
@@ -41,6 +118,21 @@ export default function MyAppointments({
   const [appointments, setAppointments] = useState<AppointmentRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const todayDateKey = useMemo(() => getTodayDateKey(), []);
+  const todaysAppointments = useMemo(
+    () =>
+      appointments.filter(
+        (appointment) => getAppointmentDateKey(appointment) === todayDateKey,
+      ),
+    [appointments, todayDateKey],
+  );
+  const otherAppointments = useMemo(
+    () =>
+      appointments.filter(
+        (appointment) => getAppointmentDateKey(appointment) !== todayDateKey,
+      ),
+    [appointments, todayDateKey],
+  );
 
   useEffect(() => {
     if (!open) {
@@ -110,51 +202,35 @@ export default function MyAppointments({
         </div>
       ) : error ? (
         <Alert type="error" message={error} showIcon />
-      ) : appointments.length === 0 ? (
-        <Empty
-          description="No appointments found for this account yet."
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-        >
-          <Button type="primary" onClick={onMakeAppointment}>
-            Book Your First Appointment
-          </Button>
-        </Empty>
       ) : (
-        <List
-          dataSource={appointments}
-          renderItem={(appointment) => (
-            <List.Item>
-              <Card style={{ width: "100%", borderRadius: 12 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 16,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <div>
-                    <Typography.Title level={4} style={{ marginTop: 0 }}>
-                      {appointment.service.name}
-                    </Typography.Title>
-                    <Typography.Paragraph style={{ marginBottom: 8 }}>
-                      {formatAppointmentWindow(appointment)}
-                    </Typography.Paragraph>
-                    <Typography.Text type="secondary">
-                      Staff: {appointment.staff.displayName}
-                    </Typography.Text>
-                  </div>
-
-                  <Tag
-                    color={appointment.status === "booked" ? "green" : "default"}
-                    style={{ alignSelf: "flex-start" }}
-                  >
-                    {appointment.status.toUpperCase()}
-                  </Tag>
-                </div>
-              </Card>
-            </List.Item>
-          )}
+        <Tabs
+          defaultActiveKey="today"
+          items={[
+            {
+              key: "today",
+              label: `Today (${todaysAppointments.length})`,
+              children: (
+                <AppointmentsList
+                  appointments={todaysAppointments}
+                  emptyDescription="No appointments scheduled for today."
+                  emptyActionLabel="Book an Appointment"
+                  onMakeAppointment={onMakeAppointment}
+                />
+              ),
+            },
+            {
+              key: "other",
+              label: `Other Appointments (${otherAppointments.length})`,
+              children: (
+                <AppointmentsList
+                  appointments={otherAppointments}
+                  emptyDescription="No other appointments found for this account yet."
+                  emptyActionLabel="Book Your First Appointment"
+                  onMakeAppointment={onMakeAppointment}
+                />
+              ),
+            },
+          ]}
         />
       )}
     </Modal>
