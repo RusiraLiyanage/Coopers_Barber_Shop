@@ -40,6 +40,24 @@ The UI shown in the current build is organized around four recruiter-visible flo
 - **Appointment booking**: a focused booking modal for service selection, date selection, available slot selection, and booking confirmation.
 - **Appointment management**: a customer appointments modal with Today and Other Appointments views, appointment details, staff display, and booking status.
 
+## Application Screenshots
+
+### Home and Services
+
+![Cooper's Barber Shop home screen with services and appointment call to action](docs/screenshots/home-services.png)
+
+### Authentication
+
+![Login and registration modal for customer authentication](docs/screenshots/auth-modal.png)
+
+### New Appointment Booking
+
+![New appointment modal with service, date, and available time slot selection](docs/screenshots/new-appointment.png)
+
+### My Appointments
+
+![My Appointments modal showing today's bookings and other appointments](docs/screenshots/my-appointments.png)
+
 ## Implemented User Stories
 
 - As a customer, I can log in with predefined credentials so I can book and manage my appointments.
