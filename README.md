@@ -1,132 +1,274 @@
-# Fullstack developer Challenge - Appointment Booking System
+# Cooper's Barber Shop Appointment Booking Platform
 
-Dear Developer,
+Cooper's Barber Shop is a full-stack appointment booking application I built to model a practical service-business scheduling flow. The project focuses on the full customer journey: browsing barber services, authenticating, checking real-time appointment availability, booking a slot, and reviewing upcoming appointments linked to the logged-in account.
 
-Welcome to the Full-Stack Developer Candidate Test. This test aims to assess your full-stack development skills, approach to complex scheduling logic, and ability to write clean, maintainable code. Below, you will find the details and requirements for this test.
+The core engineering goal is to make booking feel simple on the frontend while keeping the backend responsible for the difficult scheduling rules: staff hours, lunch breaks, service duration, buffer time, existing bookings, and double-booking prevention.
 
-## **The Challenge**
+## Project Snapshot
 
-Your task is to develop a complete online appointment booking system with a robust backend scheduling engine and functional frontend interface. You should analyse and implement the following user stories into a working application:
+- **Product**: Online appointment booking system for a barber shop
+- **Frontend**: React, TypeScript, Vite, Ant Design, Framer Motion
+- **Backend**: Node.js, NestJS, TypeScript, TypeORM
+- **Database**: PostgreSQL
+- **Authentication**: JWT-based login and registration
+- **Scheduling model**: Single-staff availability engine with service-specific durations and mandatory buffers
+- **Testing**: Jest unit tests for backend services
 
-## **User Stories:**
+## Main Features
 
-* As a customer, I want to log into my account using pre-defined credentials, so that I can book appointments and manage my bookings.
-* As a customer, I want to view available services from a pre-defined list, so that I can choose what type of appointment to book.
-* As a customer, I want to select a service and see available time slots for a specific date, so that I can choose when to book my appointment.
-* As a customer, I want to confirm and book an appointment, so that I can secure my desired time slot.
-* As a customer, I want to view my upcoming appointments, so that I can manage my schedule.
-* As a system, I want to prevent double-bookings and overlapping appointments, so that scheduling conflicts are avoided.
-* As a system, I want to calculate real-time availability based on staff working hours, existing appointments, service duration, and mandatory buffer times.
+The current application experience targets the following product features:
 
-## **Optional User Stories (if you want to implement registration):**
+- **Branded barber shop landing page** with service highlights and a clear appointment call to action.
+- **Customer authentication modal** with login and registration tabs.
+- **Protected booking flow** that requires customers to sign in before booking.
+- **Service selection** from predefined barber shop services.
+- **Date picker with business-day restrictions** so customers cannot select weekends or past dates.
+- **Real-time slot lookup** based on selected service and appointment date.
+- **Selectable appointment time slots** rendered only when the backend confirms availability.
+- **Appointment creation** with conflict checking before persistence.
+- **My Appointments modal** showing bookings for the current customer only.
+- **Today and Other Appointments tabs** to make booking history easier to scan.
+- **Booking status indicators** for confirmed appointments.
+- **Responsive UI foundation** using Ant Design components.
 
-* As a new customer, I want to register for an account, so that I can create appointments beyond the test accounts.
+## Product Experience
 
-## **Core Requirements:**
+The UI shown in the current build is organized around four recruiter-visible flows:
 
-* **Staff Working Hours**: The system must account for a single staff member's fixed schedule (e.g., 9 AM - 5 PM) and pre-defined breaks.
-* **Existing Appointments**: Prevent overlaps and double-bookings by checking all confirmed appointments.
-* **Service Duration**: Consider the specific length of each service when calculating availability.
-* **Buffer Time**: Add mandatory buffer periods (e.g., 15 minutes) after each service.
-* **Real-time Availability**: Dynamically calculate and display only genuinely available time slots.
+- **Home and service discovery**: a branded Cooper's Barber Shop landing screen with the main service list and appointment call to action.
+- **Authentication gate**: a login/register modal that keeps booking and account-specific appointment data behind authentication.
+- **Appointment booking**: a focused booking modal for service selection, date selection, available slot selection, and booking confirmation.
+- **Appointment management**: a customer appointments modal with Today and Other Appointments views, appointment details, staff display, and booking status.
 
-## **You need to develop this test using the following technologies:**
+## Implemented User Stories
 
-* **Backend**: Node.js with NestJS framework
-* **Frontend**: React with TypeScript
-* **Database**: PostgreSQL or any relational database of your choice
-* **UI Library**: Ant Design (antd) for consistent UI components
-* **Version Control**: Git for source code management
+- As a customer, I can log in with predefined credentials so I can book and manage my appointments.
+- As a new customer, I can register for an account and immediately use the booking flow.
+- As a customer, I can view available barber services before choosing an appointment type.
+- As a customer, I can select a service and date to see available time slots.
+- As a customer, I can book an available appointment slot.
+- As a customer, I can view my upcoming appointments for my account.
+- As the system, it prevents double bookings and overlapping appointments.
+- As the system, it calculates availability using staff working hours, lunch breaks, service duration, existing appointments, and buffer time.
 
+## Architecture
 
-## **Database Schema (Postgresql or Other relational database):**
+```text
+SA-Fullstack-Challenge-Rusira/
+├── Backend/
+│   ├── db/
+│   │   ├── schema.sql
+│   │   └── Booking-ER-Rusira.drawio.png
+│   └── booking-project-backend/
+│       └── src/
+│           ├── appontments/
+│           ├── auth/
+│           ├── common/
+│           ├── database/
+│           ├── services/
+│           ├── staff/
+│           └── users/
+└── Frontend/
+    └── appointment-booking-frontend/
+        └── src/
+            ├── Models/
+            ├── components/
+            ├── lib/
+            └── pages/
+```
 
-## **Frontend Requirements:**
+## Scheduling Approach
 
-* Authentication pages (Login/Registration)
-* Booking page with service selection, date picker, and time slot selection
-* "My Appointments" page for viewing upcoming bookings
-* Responsive design using Ant Design components
+The appointment engine is implemented in the NestJS backend so availability is not trusted to the browser.
 
-## **Pre-defined Data Setup:**
+The flow is:
 
-To focus on the core scheduling logic, you can pre-populate the database with the following data:
+1. Load the selected service and its duration.
+2. Resolve the default staff member and configured timezone.
+3. Build the staff working window for the requested date.
+4. Exclude weekends and non-working days.
+5. Add unavailable intervals such as lunch break and confirmed appointments.
+6. Extend each existing appointment with the staff buffer time.
+7. Walk through the workday and return only slots that fit the service duration without overlapping a blocked interval.
+8. Re-check the selected slot during booking before saving the appointment.
 
-### **Test User Accounts:**
-* **Customer 1**:
-    - Email: `customer1@sampleassist.com`
-    - Password: `password@123`
-* **Customer 2**:
-    - Email: `customer2@sampleassist.com`
-    - Password: `password@123`
-* **Customer 3**:
-    - Email: `admin@sampleassist.com`
-    - Password: `admin@123`
+PostgreSQL also includes an exclusion constraint on booked appointment ranges to protect against overlapping records at the database layer.
 
-### **Pre-defined Services:**
-* **Haircut** - 30 minutes
-* **Hair Styling** - 45 minutes
-* **Hair Coloring** - 90 minutes
-* **Consultation** - 15 minutes
-* **Deep Conditioning Treatment** - 60 minutes
+## Database Design
 
-### **Staff Schedule (Single Staff Member):**
-* **Working Hours**: Monday to Friday, 9:00 AM - 5:00 PM
-* **Lunch Break**: 12:00 PM - 1:00 PM (unavailable for bookings)
-* **Buffer Time**: 15 minutes after each appointment
+The schema includes:
 
-*Note: You can seed this data using database migrations, fixtures, or a simple seeding script. Include the seeding process in your setup instructions.*
+- `users` for customer and admin accounts
+- `services` for predefined barber services and durations
+- `staff` for the bookable staff member and buffer rules
+- `staff_working_hours` for weekday working windows
+- `staff_breaks` for unavailable breaks
+- `appointments` for customer bookings
 
-## **Scope Exclusions (What NOT to Build):**
+The database setup lives in:
 
-* Multiple staff members (single staff member only)
-* Admin or staff dashboards for managing services or schedules
-* Payment processing
-* Email notifications
-* Profile editing functionality
-* Dynamic service creation (services are pre-defined)
+```text
+Backend/db/schema.sql
+```
 
-## **Instructions**
+An ER diagram is included at:
 
-**To begin the test, fork this repository, create a branch with your full name, and send us the link to your completed test (link to your repository). If you only clone the repository, you won't be able to push changes, making the pull request more complicated.**
+```text
+Backend/db/Booking-ER-Rusira.drawio.png
+```
 
-* Set up database with the required schema
-* **Seed the database with pre-defined users and services** (use the test data provided above)
-* Implement the core scheduling functions for availability calculation
-* Create a functional React frontend that demonstrates the complete booking flow
-* **Authentication can use the pre-defined test accounts** - no need to implement registration if you prefer to focus on scheduling logic
-* Update the README file with clear setup instructions and your approach to the scheduling functions
-* Include database seeding instructions and test account credentials
-* Paste the branch name into the system and indicate the completion of the test
-* Feel free to provide us with feedback regarding the test
+## Seed Data
 
-## **Our Evaluation Criteria**
+### Test Accounts
 
-We will assess the following aspects of your solution:
+| Role | Email | Password |
+| --- | --- | --- |
+| Customer | `customer1@sampleassist.com` | `password@123` |
+| Customer | `customer2@sampleassist.com` | `password@123` |
+| Seeded test account | `admin@sampleassist.com` | `admin@123` |
 
-* **Core Scheduling Logic**: Accuracy and efficiency of the availability calculation functions
-* **Full-Stack Integration**: Seamless communication between frontend and backend
-* **Code Quality**: Clean, maintainable, and well-structured code
-* **Database Design**: Proper schema design and query optimisation
-* **API Design**: RESTful endpoints with proper error handling
-* **Frontend UX**: Intuitive user interface and smooth user experience
-* **Error Handling**: Comprehensive error handling strategies
-* **Documentation**: Quality of README and code comments
-* **Testing**: Implementation of unit tests (bonus points)
-* **Git History**: Clean commit history and meaningful commit messages
+### Services
 
-## **Deliverables**
+| Service | Duration |
+| --- | ---: |
+| Haircut | 30 minutes |
+| Hair Styling | 45 minutes |
+| Hair Coloring | 90 minutes |
+| Consultation | 15 minutes |
+| Deep Conditioning Treatment | 60 minutes |
 
-1. A link to a Git repository containing the complete source code
-2. A comprehensive README.md file including:
-    * Clear setup and installation instructions
-    * **Database seeding/migration instructions for pre-defined data**
-    * Database schema setup guide
-    * Explanation of your scheduling functions approach
-    * API documentation
-    * **List of pre-defined test accounts and services**
-    * Any assumptions or design decisions made
+### Staff Schedule
 
-**Time Allocation Suggestion**: Focus 60% of your effort on the backend scheduling logic and API, 30% on the frontend implementation, and 10% on documentation and testing.
+| Rule | Value |
+| --- | --- |
+| Staff | Main Staff |
+| Timezone | Australia/Sydney |
+| Working days | Monday to Friday |
+| Working hours | 09:00 to 17:00 |
+| Lunch break | 12:00 to 13:00 |
+| Buffer after appointment | 15 minutes |
 
-Good luck, and we look forward to reviewing your solution!
+## API Overview
+
+| Method | Endpoint | Auth | Purpose |
+| --- | --- | --- | --- |
+| `POST` | `/auth/login` | No | Log in and receive a JWT |
+| `POST` | `/auth/register` | No | Register a customer and receive a JWT |
+| `GET` | `/services` | No | List active services |
+| `GET` | `/services/:id` | No | Get one service |
+| `GET` | `/appointments/availability?serviceId=:id&date=YYYY-MM-DD` | Yes | Return available slots |
+| `POST` | `/appointments` | Yes | Book an appointment |
+| `GET` | `/appointments/all` | Yes | Return appointments for the logged-in user |
+
+Example booking payload:
+
+```json
+{
+  "serviceId": "service-uuid",
+  "date": "2026-04-28",
+  "slot": "09:30-09:45"
+}
+```
+
+## Local Setup
+
+### Prerequisites
+
+- Node.js
+- npm
+- PostgreSQL
+
+### 1. Create and Seed the Database
+
+Create a PostgreSQL database that matches the backend defaults, or update the backend environment variables.
+
+Default backend database configuration:
+
+```text
+DB_HOST=localhost
+DB_PORT=5432
+DB_USERNAME=booking_user
+DB_PASSWORD=rusira123
+DB_DATABASE=booking_db
+```
+
+Run the schema and seed script:
+
+```bash
+psql -U booking_user -d booking_db -f Backend/db/schema.sql
+```
+
+### 2. Start the Backend
+
+```bash
+cd Backend/booking-project-backend
+npm install
+npm run start:dev
+```
+
+The API runs on:
+
+```text
+http://localhost:3000
+```
+
+### 3. Start the Frontend
+
+```bash
+cd Frontend/appointment-booking-frontend
+npm install
+npm run dev
+```
+
+If needed, configure the frontend API URL:
+
+```text
+VITE_API_URL=http://localhost:3000
+```
+
+## Quality and Verification
+
+Backend commands:
+
+```bash
+cd Backend/booking-project-backend
+npm run test
+npm run test:cov
+npm run lint
+```
+
+Frontend commands:
+
+```bash
+cd Frontend/appointment-booking-frontend
+npm run build
+npm run lint
+```
+
+## Current Scale-Up Plan
+
+The first version intentionally focuses on a clear single-staff booking workflow. I am now using the original scope exclusions as a roadmap for scaling the platform into a more complete service-business product.
+
+Planned and in-progress enhancements:
+
+- **Multiple staff members**: allow customers to choose a barber, then calculate availability per staff member.
+- **Admin/staff dashboard**: manage services, working hours, breaks, staff profiles, and appointments.
+- **Dynamic service management**: create, update, deactivate, and price services from the admin UI.
+- **Appointment cancellation and rescheduling**: allow customers and staff to move bookings safely without creating conflicts.
+- **Email notifications**: send booking confirmations, reminders, and cancellation updates.
+- **Customer profile management**: support profile editing and saved customer details.
+- **Payment-ready workflow**: introduce a payment step or deposit flow for selected services.
+- **Improved observability**: add structured logging, request tracing, and production-ready error reporting.
+- **Deployment hardening**: add environment-specific configuration, database migrations, and CI checks.
+
+## Design Decisions
+
+- I kept scheduling rules on the backend to avoid client-side trust issues.
+- I used PostgreSQL range constraints as a second layer of protection against overlapping bookings.
+- I kept services seeded and predefined for the first version so the booking engine remained the main focus.
+- I used JWT authentication so the frontend can request account-specific appointments without storing session state on the server.
+- I used Ant Design to move quickly with accessible, consistent forms, modals, tabs, date pickers, and status tags.
+
+## Repository Goal
+
+This repository is structured to demonstrate how I approach full-stack product development: clear user flows, practical backend rules, relational data modeling, API integration, and a frontend experience that presents complex scheduling logic in a simple booking interface.
