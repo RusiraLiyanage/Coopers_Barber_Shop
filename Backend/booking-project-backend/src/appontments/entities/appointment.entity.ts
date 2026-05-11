@@ -39,7 +39,11 @@ export class Appointment {
   status: string;
 
   // timestamps for creation.
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({
+    name: 'created_at',
+    type: 'timestamptz',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
   createdAt: Date;
 
   // many-to-one relationship with staff. - many appointments, one staff member.

@@ -28,7 +28,11 @@ export class Staff {
   bufferAfterMinutes: number;
 
   // timestamps for creation.
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({
+    name: 'created_at',
+    type: 'timestamptz',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
   createdAt: Date;
 
   // one-to-many relationship with appointments. - one staff member, many appointments.
