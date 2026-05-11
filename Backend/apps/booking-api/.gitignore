@@ -5,4 +5,6 @@
 
 # dotenv environment variable files
 .env
-
+.turbo
+dist
+coverage
