@@ -1,12 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { ServicesService } from './services.service';
-import { Service } from './entities/service.entity';
+import { Service } from '@coopers/entities';
 
 describe('ServicesService', () => {
   let service: ServicesService;
-  let repo: Repository<Service>;
 
   const mockServiceRepo = {
     find: jest.fn(),
@@ -25,7 +23,6 @@ describe('ServicesService', () => {
     }).compile();
 
     service = module.get<ServicesService>(ServicesService);
-    repo = module.get<Repository<Service>>(getRepositoryToken(Service));
   });
 
   afterEach(() => {
@@ -42,8 +39,9 @@ describe('ServicesService', () => {
 
     const result = await service.findAll();
     expect(result).toEqual(mockServices);
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(repo.find).toHaveBeenCalledWith({ where: { isActive: true } });
+    expect(mockServiceRepo.find).toHaveBeenCalledWith({
+      where: { isActive: true },
+    });
   });
 
   // testing findOne() ==========================================================
@@ -53,8 +51,9 @@ describe('ServicesService', () => {
 
     const result = await service.findOne('1');
     expect(result).toEqual(mockService);
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(repo.findOne).toHaveBeenCalledWith({ where: { id: '1' } });
+    expect(mockServiceRepo.findOne).toHaveBeenCalledWith({
+      where: { id: '1' },
+    });
   });
 
   // edge case: service not found

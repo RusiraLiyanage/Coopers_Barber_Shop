@@ -7,7 +7,7 @@ import {
   Post,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { User, UserRole } from './entities/user.entity';
+import { User, UserRole } from '@coopers/entities';
 import { CreateUserDto } from './dto/create-user.dto';
 
 // This controller handles HTTP requests related to user management.

@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { UsersService } from './users.service';
-import { User, UserRole } from './entities/user.entity';
+import { User, UserRole } from '@coopers/entities';
 import { Repository } from 'typeorm';
 
 describe('UsersService', () => {
@@ -65,8 +65,7 @@ describe('UsersService', () => {
     // calling the service method
     const result = await service.findAll();
     expect(result).toEqual(mockUsers);
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(repo.find).toHaveBeenCalled();
+    expect(repo.find.mock.calls).toHaveLength(1);
   });
 
   // testing findByEmail() ==========================================================
@@ -77,10 +76,11 @@ describe('UsersService', () => {
     // calling the service method
     const result = await service.findByEmail('alice@example.com');
     expect(result).toEqual(mockUsers[0]);
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(repo.findOne).toHaveBeenCalledWith({
-      where: { email: 'alice@example.com' },
-    });
+    expect(repo.findOne.mock.calls).toContainEqual([
+      {
+        where: { email: 'alice@example.com' },
+      },
+    ]);
   });
 
   // edge case: user not found
@@ -102,13 +102,13 @@ describe('UsersService', () => {
     const result = await service.create(input);
 
     expect(result.role).toBe(UserRole.CUSTOMER);
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(repo.create).toHaveBeenCalledWith({
-      ...input,
-      role: UserRole.CUSTOMER,
-    });
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(repo.save).toHaveBeenCalledWith(createdUser);
+    expect(repo.create.mock.calls).toContainEqual([
+      {
+        ...input,
+        role: UserRole.CUSTOMER,
+      },
+    ]);
+    expect(repo.save.mock.calls).toContainEqual([createdUser]);
   });
 
   // testing create() with provided role
@@ -126,9 +126,7 @@ describe('UsersService', () => {
     const result = await service.create(input);
 
     expect(result.role).toBe(UserRole.ADMIN);
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(repo.create).toHaveBeenCalledWith(input);
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(repo.save).toHaveBeenCalledWith(createdUser);
+    expect(repo.create.mock.calls).toContainEqual([input]);
+    expect(repo.save.mock.calls).toContainEqual([createdUser]);
   });
 });

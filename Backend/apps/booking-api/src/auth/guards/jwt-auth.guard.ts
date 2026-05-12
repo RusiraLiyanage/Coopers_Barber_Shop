@@ -1,12 +1,19 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 
+function isPassportErrorInfo(info: unknown): info is { name?: string } {
+  return typeof info === 'object' && info !== null && 'name' in info;
+}
+
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
-  handleRequest(err: any, user: any, info: any) {
+  handleRequest<TUser = unknown>(
+    err: unknown,
+    user: TUser | false | null,
+    info: unknown,
+  ): TUser {
     // info contains details from passport-jwt
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (info?.name === 'TokenExpiredError') {
+    if (isPassportErrorInfo(info) && info.name === 'TokenExpiredError') {
       throw new UnauthorizedException('Session expired. Please login again.');
     }
 
@@ -14,7 +21,6 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       throw new UnauthorizedException('Invalid token.');
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return user;
   }
 }

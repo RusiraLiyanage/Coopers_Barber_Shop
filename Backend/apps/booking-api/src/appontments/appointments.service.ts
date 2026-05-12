@@ -1,30 +1,92 @@
 import {
+  Inject,
   Injectable,
   BadRequestException,
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Appointment } from './entities/appointment.entity';
-import { Service } from '../services/entities/service.entity';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { DeepPartial, Repository } from 'typeorm';
+import { Appointment, Service, Staff } from '@coopers/entities';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { StaffService } from '../staff/staff.service';
-import { Staff } from '../staff/entities/staff.entity';
+import { EntityClassOrSchema } from '@nestjs/typeorm/dist/interfaces/entity-class-or-schema.type';
 
 const WORKDAY_START = '09:00';
 const WORKDAY_END = '17:00';
 const LUNCH_START = '12:00';
 const LUNCH_END = '13:00';
+
+interface BookingUser {
+  userId: string;
+}
+
+interface TimeInterval {
+  start: Date;
+  end: Date;
+}
+
+interface AppointmentIntervalRow {
+  startAt: Date;
+  endAt: Date;
+}
+
+interface StaffSchedule {
+  workStart: Date;
+  workEnd: Date;
+  breaks: TimeInterval[];
+}
+
+interface StaffScheduleInput {
+  timezone: string;
+  bufferAfterMinutes: number;
+}
+
+interface BlockedIntervalStaffInput {
+  id: string;
+  bufferAfterMinutes: number;
+}
+
+interface AvailabilityServiceInput {
+  durationMinutes: number;
+}
+
+interface AvailabilityStaffInput {
+  id: string;
+  timezone: string;
+  bufferAfterMinutes: number;
+}
+
+interface AppointmentResponseInput {
+  id: string;
+  service: { id: string; name: string };
+  staff: { id: string; displayName: string };
+  startAt: Date;
+  endAt: Date;
+  status: string;
+}
+
+export interface AppointmentResponse {
+  id: string;
+  serviceId: string;
+  serviceName: string;
+  staffId: string;
+  staffName: string;
+  startAt: string;
+  endAt: string;
+  status: string;
+}
+
 @Injectable()
 export class AppointmentsService {
   constructor(
-    @InjectRepository(Appointment)
+    @Inject(getRepositoryToken(Appointment as EntityClassOrSchema))
     private appointmentsRepo: Repository<Appointment>,
-    @InjectRepository(Service)
+    @Inject(getRepositoryToken(Service as EntityClassOrSchema))
     private servicesRepo: Repository<Service>,
     private staffService: StaffService,
-    @InjectRepository(Staff) private staffRepo: Repository<Staff>,
+    @Inject(getRepositoryToken(Staff as EntityClassOrSchema))
+    private staffRepo: Repository<Staff>,
   ) {}
 
   private addMinutes(date: Date, minutes: number): Date {
@@ -61,23 +123,67 @@ export class AppointmentsService {
       return 0;
     }
 
-    const match = offsetName.match(/^GMT([+-])(\d{1,2})(?::?(\d{2}))?$/);
+    const match: RegExpMatchArray | null = offsetName.match(
+      /^GMT([+-])(\d{1,2})(?::?(\d{2}))?$/,
+    );
     if (!match) {
       throw new BadRequestException(
         `Unsupported timezone offset: ${offsetName}`,
       );
     }
 
-    const [, sign, hours, minutes] = match;
+    const sign: string | undefined = match[1];
+    const hours: string | undefined = match[2];
+    const minutes: string = match[3] ?? '0';
+    if (!sign || !hours) {
+      throw new BadRequestException(
+        `Unsupported timezone offset: ${offsetName}`,
+      );
+    }
+
     const totalMinutes =
-      parseInt(hours, 10) * 60 + parseInt(minutes ?? '0', 10);
+      Number.parseInt(hours, 10) * 60 + Number.parseInt(minutes, 10);
 
     return sign === '+' ? totalMinutes : -totalMinutes;
   }
 
+  private parseDateParts(date: string): [number, number, number] {
+    const parts: string[] = date.split('-');
+    const year = Number(parts[0]);
+    const month = Number(parts[1]);
+    const day = Number(parts[2]);
+
+    if (
+      !Number.isInteger(year) ||
+      !Number.isInteger(month) ||
+      !Number.isInteger(day) ||
+      parts.length !== 3
+    ) {
+      throw new BadRequestException('Invalid date format');
+    }
+
+    return [year, month, day];
+  }
+
+  private parseTimeParts(time: string): [number, number] {
+    const parts: string[] = time.split(':');
+    const hour = Number(parts[0]);
+    const minute = Number(parts[1]);
+
+    if (
+      !Number.isInteger(hour) ||
+      !Number.isInteger(minute) ||
+      parts.length !== 2
+    ) {
+      throw new BadRequestException('Invalid time format');
+    }
+
+    return [hour, minute];
+  }
+
   private toStaffDateTime(date: string, time: string, timeZone: string): Date {
-    const [year, month, day] = date.split('-').map(Number);
-    const [hour, minute] = time.split(':').map(Number);
+    const [year, month, day] = this.parseDateParts(date);
+    const [hour, minute] = this.parseTimeParts(time);
 
     const utcGuess = new Date(Date.UTC(year, month - 1, day, hour, minute));
     const offsetAtGuess = this.getTimeZoneOffsetMinutes(timeZone, utcGuess);
@@ -116,18 +222,44 @@ export class AppointmentsService {
     });
   }
 
-  private getStaffScheduleForDate(staff: Staff, date: string) {
+  private toAppointmentResponse(
+    appointment: AppointmentResponseInput,
+    timeZone: string,
+  ): AppointmentResponse {
+    const { id, service, staff, startAt, endAt, status } = appointment;
+
+    if (!service || !staff) {
+      throw new BadRequestException('Appointment is missing service or staff');
+    }
+
+    return {
+      id,
+      serviceId: service.id,
+      serviceName: service.name,
+      staffId: staff.id,
+      staffName: staff.displayName,
+      startAt: this.formatDateTime(startAt, timeZone),
+      endAt: this.formatDateTime(endAt, timeZone),
+      status,
+    };
+  }
+
+  private getStaffScheduleForDate(
+    staff: StaffScheduleInput,
+    date: string,
+  ): StaffSchedule | null {
     const weekday = this.getWeekdayNumber(date);
     if (weekday > 5) {
       return null;
     }
 
-    const workStart = this.toStaffDateTime(date, WORKDAY_START, staff.timezone);
-    const workEnd = this.toStaffDateTime(date, WORKDAY_END, staff.timezone);
-    const lunchStart = this.toStaffDateTime(date, LUNCH_START, staff.timezone);
+    const { timezone, bufferAfterMinutes } = staff;
+    const workStart = this.toStaffDateTime(date, WORKDAY_START, timezone);
+    const workEnd = this.toStaffDateTime(date, WORKDAY_END, timezone);
+    const lunchStart = this.toStaffDateTime(date, LUNCH_START, timezone);
     const lunchEndWithBuffer = this.addMinutes(
-      this.toStaffDateTime(date, LUNCH_END, staff.timezone),
-      staff.bufferAfterMinutes,
+      this.toStaffDateTime(date, LUNCH_END, timezone),
+      bufferAfterMinutes,
     );
 
     return {
@@ -138,30 +270,35 @@ export class AppointmentsService {
   }
 
   private async getBlockedIntervals(
-    staff: Staff,
+    staff: BlockedIntervalStaffInput,
     workStart: Date,
     workEnd: Date,
-  ) {
-    const appointments = await this.appointmentsRepo.find({
-      where: {
-        staff: { id: staff.id },
-        status: 'booked',
-      },
-    });
+  ): Promise<TimeInterval[]> {
+    const { id: staffId, bufferAfterMinutes } = staff;
+    const appointmentIntervals = await this.appointmentsRepo
+      .createQueryBuilder('appointment')
+      .select('appointment.startAt', 'startAt')
+      .addSelect('appointment.endAt', 'endAt')
+      .innerJoin('appointment.staff', 'staff')
+      .where('staff.id = :staffId', { staffId })
+      .andWhere('appointment.status = :status', { status: 'booked' })
+      .getRawMany<AppointmentIntervalRow>();
 
-    return appointments
-      .map((appointment) => ({
-        start: appointment.startAt,
-        end: this.addMinutes(appointment.endAt, staff.bufferAfterMinutes),
-      }))
-      .filter((interval) =>
-        this.rangesOverlap(interval.start, interval.end, workStart, workEnd),
-      );
+    const blockedIntervals: TimeInterval[] = appointmentIntervals.map(
+      (interval: AppointmentIntervalRow): TimeInterval => ({
+        start: interval.startAt,
+        end: this.addMinutes(interval.endAt, bufferAfterMinutes),
+      }),
+    );
+
+    return blockedIntervals.filter((interval: TimeInterval): boolean =>
+      this.rangesOverlap(interval.start, interval.end, workStart, workEnd),
+    );
   }
 
   private async calculateAvailability(
-    service: Service,
-    staff: Staff,
+    service: AvailabilityServiceInput,
+    staff: AvailabilityStaffInput,
     date: string,
   ): Promise<string[]> {
     const schedule = this.getStaffScheduleForDate(staff, date);
@@ -176,7 +313,10 @@ export class AppointmentsService {
         schedule.workEnd,
       )),
       ...schedule.breaks,
-    ].sort((left, right) => left.start.getTime() - right.start.getTime());
+    ].sort(
+      (left: TimeInterval, right: TimeInterval): number =>
+        left.start.getTime() - right.start.getTime(),
+    );
 
     const available: string[] = [];
     let slotStart = new Date(schedule.workStart);
@@ -187,8 +327,9 @@ export class AppointmentsService {
         break;
       }
 
-      const overlappingIntervals = blocked.filter((interval) =>
-        this.rangesOverlap(slotStart, slotEnd, interval.start, interval.end),
+      const overlappingIntervals: TimeInterval[] = blocked.filter(
+        (interval: TimeInterval): boolean =>
+          this.rangesOverlap(slotStart, slotEnd, interval.start, interval.end),
       );
 
       if (overlappingIntervals.length === 0) {
@@ -203,7 +344,7 @@ export class AppointmentsService {
       }
 
       const nextAvailableStart = overlappingIntervals.reduce(
-        (latestEnd, interval) =>
+        (latestEnd: Date, interval: TimeInterval): Date =>
           interval.end > latestEnd ? interval.end : latestEnd,
         overlappingIntervals[0].end,
       );
@@ -215,14 +356,19 @@ export class AppointmentsService {
   }
 
   // Booking an appointment -----------------------------------------------------------
-  async book(user: { userId: string }, dto: CreateAppointmentDto) {
-    const service = await this.servicesRepo.findOneBy({ id: dto.serviceId });
+  async book(
+    user: BookingUser,
+    dto: CreateAppointmentDto,
+  ): Promise<AppointmentResponse> {
+    const service: Service | null = await this.servicesRepo.findOneBy({
+      id: dto.serviceId,
+    });
     if (!service) {
       throw new NotFoundException(`Service with ID ${dto.serviceId} not found`);
     }
 
-    const staff = await this.staffService.getDefaultStaff();
-    const availableSlots = await this.calculateAvailability(
+    const staff: Staff = await this.staffService.getDefaultStaff();
+    const availableSlots: string[] = await this.calculateAvailability(
       service,
       staff,
       dto.date,
@@ -234,39 +380,32 @@ export class AppointmentsService {
       );
     }
 
-    // Parse slot into start and end
     const [start, end] = dto.slot.split('-');
     if (!start || !end) {
       throw new BadRequestException('Invalid slot format');
     }
-    const startAt = this.toStaffDateTime(dto.date, start, staff.timezone);
-    const endAt = this.toStaffDateTime(dto.date, end, staff.timezone);
 
-    // Save booking
-    const appointment = this.appointmentsRepo.create({
+    const startAt: Date = this.toStaffDateTime(dto.date, start, staff.timezone);
+    const endAt: Date = this.toStaffDateTime(dto.date, end, staff.timezone);
+
+    const appointmentInput: DeepPartial<Appointment> = {
       customer: { id: user.userId },
       service,
       staff,
       startAt,
       endAt,
       status: 'booked',
-    });
-
-    const saved = this.appointmentsRepo.save(appointment);
-
-    // Format startAt / endAt before returning
-    return {
-      id: (await saved).id,
-      service: (await saved).service,
-      staff: (await saved).staff,
-      startAt: this.formatDateTime((await saved).startAt, staff.timezone),
-      endAt: this.formatDateTime((await saved).endAt, staff.timezone),
-      status: (await saved).status,
     };
+
+    const appointment: Appointment =
+      this.appointmentsRepo.create(appointmentInput);
+    const saved: Appointment = await this.appointmentsRepo.save(appointment);
+
+    return this.toAppointmentResponse(saved, staff.timezone);
   }
 
   // To show upcoming booked appointments for the login user.
-  async findAllForUser(userId: string) {
+  async findAllForUser(userId: string): Promise<AppointmentResponse[]> {
     const appointments = await this.appointmentsRepo.find({
       where: { customer: { id: userId } },
       relations: ['service', 'staff'],
@@ -275,18 +414,14 @@ export class AppointmentsService {
 
     const staff = await this.staffService.getDefaultStaff();
 
-    return appointments.map((appt) => ({
-      id: appt.id,
-      service: appt.service,
-      staff: appt.staff,
-      startAt: this.formatDateTime(appt.startAt, staff.timezone),
-      endAt: this.formatDateTime(appt.endAt, staff.timezone),
-      status: appt.status,
-    }));
+    return appointments.map(
+      (appointment: AppointmentResponseInput): AppointmentResponse =>
+        this.toAppointmentResponse(appointment, staff.timezone),
+    );
   }
 
   // To get a list of available time slots for a specific service on a given date.
-  async getAvailability(serviceId: string, date: string) {
+  async getAvailability(serviceId: string, date: string): Promise<string[]> {
     // retrieve service details based on the service id.
     const service = await this.servicesRepo.findOneBy({ id: serviceId });
     if (!service) throw new BadRequestException('Service not found');

@@ -1,0 +1,9 @@
+node_modules
+dist
+buid
+.turbo
+coverage
+.env
+.env.*
+!.env.example
+.DS_Store

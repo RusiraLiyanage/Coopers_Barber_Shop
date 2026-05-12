@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
+import type { JwtPayload, JwtRequestUser } from '../auth.types';
 
 // This is where the JWT based authentication strategy is defined.
 
@@ -20,7 +21,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   // the JWT payload is passed to the validate method.
-  validate(payload: { sub: string; email: string; role: string }) {
+  validate(payload: JwtPayload): JwtRequestUser {
     if (!payload) {
       throw new UnauthorizedException('Invalid token');
     }

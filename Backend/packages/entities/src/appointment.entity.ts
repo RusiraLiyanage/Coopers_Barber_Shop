@@ -6,9 +6,9 @@ import {
   CreateDateColumn,
   JoinColumn,
 } from 'typeorm';
-import { User } from '../../users/entities/user.entity';
-import { Service } from '../../services/entities/service.entity';
-import { Staff } from '../../staff/entities/staff.entity';
+import { User } from './user.entity';
+import { Service } from './service.entity';
+import { Staff } from './staff.entity';
 
 @Entity({ name: 'appointments' })
 export class Appointment {

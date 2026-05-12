@@ -1,6 +1,7 @@
 import * as nodeCrypto from 'node:crypto';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
+import { ConfigService } from '@nestjs/config';
 
 // Some Nest/TypeORM builds assume `crypto` exists globally.
 // Define it explicitly for Node runtimes where that global is missing.
@@ -32,6 +33,7 @@ async function bootstrap() {
       transform: true, // auto-transform DTOs
     }),
   );
-  await app.listen(process.env.PORT ?? 3000);
+  const config = app.get(ConfigService);
+  await app.listen(config.get<number>('API_PORT', 3000));
 }
-bootstrap();
+void bootstrap();

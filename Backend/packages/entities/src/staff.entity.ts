@@ -5,10 +5,10 @@ import {
   OneToMany,
   CreateDateColumn,
 } from 'typeorm';
-import { Appointment } from '../../appontments/entities/appointment.entity';
+
+import { Appointment } from './appointment.entity';
 
 // The structure of the staff data table is defined as follows,
-
 @Entity({ name: 'staff' })
 export class Staff {
   // the primary key is a UUID type.

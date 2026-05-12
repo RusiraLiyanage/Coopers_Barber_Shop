@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-local';
 import { AuthService } from '../auth.service';
+import type { AuthenticatedUser } from '../auth.types';
 
 // This is where the passport based login strategy is defined.
 
@@ -11,13 +12,11 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
     super({ usernameField: 'email' }); // default is 'username'
   }
 
-  async validate(email: string, password: string) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  async validate(email: string, password: string): Promise<AuthenticatedUser> {
     const user = await this.authService.validateUser(email, password);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return user;
   }
 }

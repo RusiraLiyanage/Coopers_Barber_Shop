@@ -3,10 +3,16 @@ import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { BadRequestException } from '@nestjs/common';
-import { UserRole } from '../users/entities/user.entity';
-
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { UserRole } from '@coopers/entities';
 jest.mock('bcrypt');
+
+const mockedBcryptCompare = bcrypt.compare as jest.MockedFunction<
+  (data: string, encrypted: string) => Promise<boolean>
+>;
+const mockedBcryptHash = bcrypt.hash as jest.MockedFunction<
+  (data: string, saltOrRounds: string | number) => Promise<string>
+>;
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -53,10 +59,8 @@ describe('AuthService', () => {
       updatedAt: new Date(),
     };
     usersService.findByEmail.mockResolvedValue(mockUser);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+    mockedBcryptCompare.mockResolvedValue(true);
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const result = await service.validateUser('test@example.com', 'password');
 
     expect(result).toMatchObject({
@@ -66,13 +70,12 @@ describe('AuthService', () => {
     });
   });
 
-  it('should return null when credentials are invalid', async () => {
+  it('should throw UnauthorizedException when credentials are invalid', async () => {
     usersService.findByEmail.mockResolvedValue(null);
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const result = await service.validateUser('wrong@example.com', 'password');
-
-    expect(result).toBeNull();
+    await expect(
+      service.validateUser('wrong@example.com', 'password'),
+    ).rejects.toThrow(UnauthorizedException);
   });
 
   // testing login() =============================================
@@ -87,18 +90,25 @@ describe('AuthService', () => {
     const result = service.login(mockUser);
 
     expect(result).toEqual({ access_token: 'mocked.jwt.token' });
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(jwtService.sign).toHaveBeenCalledWith({
-      sub: 'user1',
-      email: 'test@example.com',
-      role: UserRole.CUSTOMER,
-    });
+    expect(jwtService.sign.mock.calls).toContainEqual([
+      {
+        sub: 'user1',
+        email: 'test@example.com',
+        role: UserRole.CUSTOMER,
+      },
+    ]);
   });
 
   // testing register() functionality ================================
   it('should throw error if email is already in use', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    usersService.findByEmail.mockResolvedValue({ id: 'user1' } as any);
+    usersService.findByEmail.mockResolvedValue({
+      id: 'user1',
+      email: 'test@example.com',
+      passwordHash: 'hashedpw',
+      role: UserRole.CUSTOMER,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
 
     await expect(
       service.register({ email: 'test@example.com', password: '123456' }),
@@ -107,8 +117,7 @@ describe('AuthService', () => {
 
   it('should register a new user and return an access token', async () => {
     usersService.findByEmail.mockResolvedValue(null);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    (bcrypt.hash as jest.Mock).mockResolvedValue('hashedpw');
+    mockedBcryptHash.mockResolvedValue('hashedpw');
 
     const mockUser = {
       id: 'user2',
@@ -127,11 +136,12 @@ describe('AuthService', () => {
     });
 
     expect(result).toEqual({ access_token: 'mocked.jwt.token' });
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(usersService.create).toHaveBeenCalledWith({
-      email: 'new@example.com',
-      passwordHash: 'hashedpw',
-      role: UserRole.CUSTOMER,
-    });
+    expect(usersService.create.mock.calls).toContainEqual([
+      {
+        email: 'new@example.com',
+        passwordHash: 'hashedpw',
+        role: UserRole.CUSTOMER,
+      },
+    ]);
   });
 });

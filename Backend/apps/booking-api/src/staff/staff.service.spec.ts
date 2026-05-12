@@ -1,12 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { StaffService } from './staff.service';
-import { Staff } from './entities/staff.entity';
+import { Staff } from '@coopers/entities';
 
 describe('StaffService', () => {
   let service: StaffService;
-  let repo: Repository<Staff>;
 
   const mockStaffRepo = {
     find: jest.fn(),
@@ -25,7 +23,6 @@ describe('StaffService', () => {
     }).compile();
 
     service = module.get<StaffService>(StaffService);
-    repo = module.get<Repository<Staff>>(getRepositoryToken(Staff));
   });
 
   afterEach(() => {
@@ -42,8 +39,7 @@ describe('StaffService', () => {
 
     const result = await service.findAll();
     expect(result).toEqual(mockStaff);
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(repo.find).toHaveBeenCalled();
+    expect(mockStaffRepo.find).toHaveBeenCalled();
   });
 
   // testing findOne() ==========================================================
@@ -57,8 +53,9 @@ describe('StaffService', () => {
 
     const result = await service.findOne('1');
     expect(result).toEqual(mockStaff);
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(repo.findOne).toHaveBeenCalledWith({ where: { id: '1' } });
+    expect(mockStaffRepo.findOne).toHaveBeenCalledWith({
+      where: { id: '1' },
+    });
   });
 
   // edge case: staff not found
@@ -80,8 +77,7 @@ describe('StaffService', () => {
 
     const result = await service.getDefaultStaff();
     expect(result).toEqual(mockStaff);
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(repo.findOne).toHaveBeenCalledWith({ where: {} });
+    expect(mockStaffRepo.findOne).toHaveBeenCalledWith({ where: {} });
   });
 
   it('should throw an error if no staff is available', async () => {

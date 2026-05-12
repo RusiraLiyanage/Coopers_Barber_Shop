@@ -1,6 +1,6 @@
 import { Controller, Get, Param } from '@nestjs/common';
 import { ServicesService } from './services.service';
-import { Service } from './entities/service.entity';
+import { Service } from '@coopers/entities';
 
 // Controller to handle service-related API endpoints.
 

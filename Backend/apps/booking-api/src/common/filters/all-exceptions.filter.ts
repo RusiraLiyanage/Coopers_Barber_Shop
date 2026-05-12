@@ -7,6 +7,12 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 
+function hasMessageProperty(
+  response: object,
+): response is { message: string | string[] } {
+  return 'message' in response;
+}
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
@@ -16,19 +22,19 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     // Default values
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
-    let message = 'Something went wrong';
+    let message: string | string[] = 'Something went wrong';
 
     // Handle known NestJS HTTP errors
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const errorResponse = exception.getResponse();
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       message =
         typeof errorResponse === 'string'
           ? errorResponse
-          : // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-            (errorResponse as any).message || message;
+          : hasMessageProperty(errorResponse)
+            ? errorResponse.message
+            : message;
     }
 
     // For debugging purposes.

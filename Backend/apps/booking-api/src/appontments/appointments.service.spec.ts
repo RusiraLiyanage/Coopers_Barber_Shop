@@ -1,17 +1,27 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppointmentsService } from './appointments.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Appointment } from './entities/appointment.entity';
-import { Service } from '../services/entities/service.entity';
-import { Staff } from '../staff/entities/staff.entity';
+import { Appointment } from '@coopers/entities';
+import { Service } from '@coopers/entities';
+import { Staff } from '@coopers/entities';
 import { StaffService } from '../staff/staff.service';
 import { ConflictException } from '@nestjs/common';
 
 // Mock repositories
 const mockAppointmentsRepo = {
   find: jest.fn(),
+  createQueryBuilder: jest.fn(),
   create: jest.fn(),
   save: jest.fn(),
+};
+
+const mockAppointmentsQueryBuilder = {
+  select: jest.fn(),
+  addSelect: jest.fn(),
+  innerJoin: jest.fn(),
+  where: jest.fn(),
+  andWhere: jest.fn(),
+  getRawMany: jest.fn(),
 };
 
 const mockServicesRepo = {
@@ -36,6 +46,25 @@ describe('AppointmentsService', () => {
   let service: AppointmentsService;
 
   beforeEach(async () => {
+    mockAppointmentsRepo.createQueryBuilder.mockReturnValue(
+      mockAppointmentsQueryBuilder,
+    );
+    mockAppointmentsQueryBuilder.select.mockReturnValue(
+      mockAppointmentsQueryBuilder,
+    );
+    mockAppointmentsQueryBuilder.addSelect.mockReturnValue(
+      mockAppointmentsQueryBuilder,
+    );
+    mockAppointmentsQueryBuilder.innerJoin.mockReturnValue(
+      mockAppointmentsQueryBuilder,
+    );
+    mockAppointmentsQueryBuilder.where.mockReturnValue(
+      mockAppointmentsQueryBuilder,
+    );
+    mockAppointmentsQueryBuilder.andWhere.mockReturnValue(
+      mockAppointmentsQueryBuilder,
+    );
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AppointmentsService,
@@ -63,7 +92,7 @@ describe('AppointmentsService', () => {
       name: 'Haircut',
       durationMinutes: 30,
     });
-    mockAppointmentsRepo.find.mockResolvedValue([]);
+    mockAppointmentsQueryBuilder.getRawMany.mockResolvedValue([]);
     mockStaffRepo.findOne.mockResolvedValue({
       bufferAfterMinutes: 15,
     });
@@ -85,7 +114,7 @@ describe('AppointmentsService', () => {
       name: 'Haircut',
       durationMinutes: 30,
     });
-    mockAppointmentsRepo.find.mockResolvedValue([
+    mockAppointmentsQueryBuilder.getRawMany.mockResolvedValue([
       {
         startAt: new Date('2025-09-24T09:00:00+10:00'),
         endAt: new Date('2025-09-24T09:30:00+10:00'),
@@ -109,7 +138,7 @@ describe('AppointmentsService', () => {
       name: 'Haircut',
       durationMinutes: 30,
     });
-    mockAppointmentsRepo.find.mockResolvedValue([]);
+    mockAppointmentsQueryBuilder.getRawMany.mockResolvedValue([]);
     mockStaffRepo.findOne.mockResolvedValue({
       bufferAfterMinutes: 15,
     });
@@ -127,7 +156,7 @@ describe('AppointmentsService', () => {
       name: 'Haircut',
       durationMinutes: 30,
     });
-    mockAppointmentsRepo.find.mockResolvedValue([]);
+    mockAppointmentsQueryBuilder.getRawMany.mockResolvedValue([]);
     mockStaffRepo.findOne.mockResolvedValue({
       bufferAfterMinutes: 15,
     });
@@ -146,7 +175,7 @@ describe('AppointmentsService', () => {
       durationMinutes: 30,
     });
 
-    mockAppointmentsRepo.find.mockResolvedValue([
+    mockAppointmentsQueryBuilder.getRawMany.mockResolvedValue([
       {
         startAt: new Date('2025-09-24T09:00:00+10:00'),
         endAt: new Date('2025-09-24T09:30:00+10:00'),
@@ -179,7 +208,7 @@ describe('AppointmentsService', () => {
       durationMinutes: 90,
     });
 
-    mockAppointmentsRepo.find.mockResolvedValue([]); // no bookings
+    mockAppointmentsQueryBuilder.getRawMany.mockResolvedValue([]); // no bookings
     mockStaffRepo.findOne.mockResolvedValue({ bufferAfterMinutes: 15 });
 
     const slots = await service.getAvailability('svc2', '2025-09-24');
@@ -201,7 +230,7 @@ describe('AppointmentsService', () => {
       name: 'Haircut',
       durationMinutes: 30,
     });
-    mockAppointmentsRepo.find.mockResolvedValue([
+    mockAppointmentsQueryBuilder.getRawMany.mockResolvedValue([
       {
         startAt: new Date('2025-09-24T09:00:00+10:00'),
         endAt: new Date('2025-09-24T09:45:00+10:00'),

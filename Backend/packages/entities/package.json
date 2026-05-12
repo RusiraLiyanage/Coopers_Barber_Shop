@@ -1,0 +1,29 @@
+{
+  "name": "@coopers/entities",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "pre": "pnpm build",
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint \"src/**/*.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts\" --fix"
+  },
+  "dependencies": {
+    "typeorm": "^0.3.27"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "@coopers/tsconfig": "workspace:*",
+    "@coopers/eslint-config": "workspace:*",
+    "eslint": "^9.18.0"
+  }
+}

@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
-import { DatabaseModule } from './database/database.module';
+import { DatabaseModule } from '@coopers/database';
+import { ConfigModule } from '@nestjs/config';
+import { createAppConfigOptions } from '@coopers/common';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { ServicesModule } from './services/services.module';
@@ -17,7 +19,8 @@ import { APP_GUARD } from '@nestjs/core';
         limit: 10, // max requests per ttl
       },
     ]),
-    DatabaseModule,
+    ConfigModule.forRoot(createAppConfigOptions()),
+    DatabaseModule.forRoot(),
     UsersModule,
     AuthModule,
     ServicesModule,
