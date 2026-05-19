@@ -1,6 +1,7 @@
 {
   "extends": "@coopers/tsconfig/nestjs.json",
   "compilerOptions": {
+    "ignoreDeprecations": "6.0",
     "rootDir": "src",
     "outDir": "dist"
   },
