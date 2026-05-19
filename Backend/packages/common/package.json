@@ -18,12 +18,17 @@
     "lint:fix": "eslint \"src/**/*.ts\" --fix"
   },
   "dependencies": {
-    "@nestjs/config": "^4.0.2"
+    "@coopers/entities": "workspace:*",
+    "@nestjs/common": "^11.1.19",
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/jwt": "^11.0.2",
+    "bcrypt": "^6.0.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.3",
-    "@coopers/tsconfig": "workspace:*",
     "@coopers/eslint-config": "workspace:*",
-    "eslint": "^9.18.0"
+    "@coopers/tsconfig": "workspace:*",
+    "@types/bcrypt": "^6.0.0",
+    "eslint": "^9.18.0",
+    "typescript": "^6.0.3"
   }
 }

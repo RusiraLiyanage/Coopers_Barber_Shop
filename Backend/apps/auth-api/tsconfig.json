@@ -1,0 +1,18 @@
+{
+  "extends": "@coopers/tsconfig/nestjs.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "declaration": false,
+    "ignoreDeprecations": "6.0",
+    "baseUrl": "./",
+    "paths": {
+      "@coopers/entities": ["../../packages/entities/dist/index.d.ts"],
+      "@coopers/database": ["../../packages/database/dist/index.d.ts"],
+      "@coopers/common": ["../../packages/common/dist/index.d.ts"]
+    },
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "**/*.spec.ts"]
+}

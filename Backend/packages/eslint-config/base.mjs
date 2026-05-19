@@ -11,6 +11,7 @@ export default tseslint.config(
       'node_modules/**',
       '.turbo/**',
       'eslint.config.mjs',
+      '**/*.d.ts',
     ],
   },
   eslint.configs.recommended,

@@ -11,7 +11,8 @@
     "format:check": "prettier --check \"**/*.{ts,js,json,md,yml,yaml}\"",
     "pre": "turbo run build",
     "booking:api": "turbo dev --filter @coopers/booking.api",
-    "booking:guard": "turbo dev --filter @coopers/booking.guard"
+    "booking:guard": "turbo dev --filter @coopers/booking.guard",
+    "auth:api": "turbo dev --filter @coopers/auth.api"
   },
   "devDependencies": {
     "prettier": "^3.4.2",
