@@ -29,3 +29,11 @@ export interface JwtAuthenticatedRequest {
 export interface AccessTokenResponse {
   access_token: string;
 }
+
+export interface RefreshTokenResponse {
+  refresh_token: string;
+}
+
+export interface AuthTokensResponse
+  extends AccessTokenResponse,
+    RefreshTokenResponse {}
