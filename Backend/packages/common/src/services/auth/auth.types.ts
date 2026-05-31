@@ -37,3 +37,7 @@ export interface RefreshTokenResponse {
 export interface AuthTokensResponse
   extends AccessTokenResponse,
     RefreshTokenResponse {}
+
+export interface LogoutResponse {
+  success: boolean;
+}

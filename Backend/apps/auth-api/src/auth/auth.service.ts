@@ -7,10 +7,12 @@ import { UserRole } from '@coopers/entities';
 import { UsersService } from '../users/users.service';
 import { RegisterDto } from './dto/register.dto';
 import {
-  AccessTokenResponse,
   AuthenticatedUser,
+  AuthTokensResponse,
   JwtTokenService,
+  LogoutResponse,
   PasswordService,
+  SessionService,
 } from '@coopers/common';
 
 @Injectable()
@@ -19,6 +21,7 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly passwordService: PasswordService,
     private readonly jwtTokenService: JwtTokenService,
+    private readonly sessionService: SessionService,
   ) {}
 
   async validateUser(
@@ -47,11 +50,11 @@ export class AuthService {
     };
   }
 
-  login(user: AuthenticatedUser): AccessTokenResponse {
-    return this.jwtTokenService.signAccessToken(user);
+  async login(user: AuthenticatedUser): Promise<AuthTokensResponse> {
+    return this.createSessionTokens(user);
   }
 
-  async register(dto: RegisterDto): Promise<AccessTokenResponse> {
+  async register(dto: RegisterDto): Promise<AuthTokensResponse> {
     const existingUser = await this.usersService.findByEmail(dto.email);
 
     if (existingUser) {
@@ -71,5 +74,47 @@ export class AuthService {
       email: user.email,
       role: user.role,
     });
+  }
+
+  async refresh(refreshToken: string): Promise<AuthTokensResponse> {
+    const currentSession =
+      await this.sessionService.findActiveSession(refreshToken);
+    const user = currentSession.user;
+
+    const authenticatedUser: AuthenticatedUser = {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    };
+
+    const tokens = this.jwtTokenService.createAuthTokens(authenticatedUser);
+
+    await this.sessionService.rotateSession({
+      currentRefreshToken: refreshToken,
+      newRefreshToken: tokens.refresh_token,
+    });
+
+    return tokens;
+  }
+
+  async logout(refreshToken: string): Promise<LogoutResponse> {
+    await this.sessionService.revokeSession(refreshToken);
+
+    return {
+      success: true,
+    };
+  }
+
+  private async createSessionTokens(
+    user: AuthenticatedUser,
+  ): Promise<AuthTokensResponse> {
+    const tokens = this.jwtTokenService.createAuthTokens(user);
+
+    await this.sessionService.createSession({
+      userId: user.id,
+      refreshToken: tokens.refresh_token,
+    });
+
+    return tokens;
   }
 }
