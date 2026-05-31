@@ -6,6 +6,6 @@ import type { HealthResponse } from '@coopers/common';
 export class HealthController {
   @Get()
   check(): HealthResponse {
-    return createHealthResponse('auth-api');
+    return createHealthResponse('booking-api');
   }
 }

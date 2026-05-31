@@ -1,14 +1,11 @@
-import * as nodeCrypto from 'node:crypto';
-import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import helmet from 'helmet';
+import {
+  configureApiSecurity,
+  createFrontendCorsOptions,
+  ensureNodeCryptoGlobal,
+} from '@coopers/common';
 
-if (typeof globalThis.crypto === 'undefined') {
-  Object.defineProperty(globalThis, 'crypto', {
-    value: nodeCrypto,
-    configurable: true,
-  });
-}
+ensureNodeCryptoGlobal();
 
 async function bootstrap() {
   const [{ NestFactory }, { AppModule }] = await Promise.all([
@@ -17,20 +14,25 @@ async function bootstrap() {
   ]);
 
   const app = await NestFactory.create(AppModule);
-
-  app.enableCors();
-  app.use(helmet());
-
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
-
   const config = app.get(ConfigService);
-  await app.listen(config.get<number>('AUTH_API_PORT', 3002));
+
+  const rawFrontendUrl = config.get<string>('FRONTEND_URL');
+  const frontendUrl: string =
+    typeof rawFrontendUrl === 'string'
+      ? rawFrontendUrl
+      : 'http://localhost:5173';
+
+  const rawAuthApiPort = config.get<number>('AUTH_API_PORT');
+  const authApiPort: number =
+    typeof rawAuthApiPort === 'number' ? rawAuthApiPort : 3002;
+
+  const corsOptions = createFrontendCorsOptions(frontendUrl);
+
+  configureApiSecurity(app, {
+    cors: corsOptions,
+  });
+
+  await app.listen(authApiPort);
 }
 
 void bootstrap();
