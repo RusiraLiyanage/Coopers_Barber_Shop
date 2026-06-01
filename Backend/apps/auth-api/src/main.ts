@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import {
   configureApiSecurity,
+  configureSwagger,
   createFrontendCorsOptions,
   ensureNodeCryptoGlobal,
 } from '@coopers/common';
@@ -30,6 +31,12 @@ async function bootstrap() {
 
   configureApiSecurity(app, {
     cors: corsOptions,
+  });
+  configureSwagger(app, {
+    title: "Cooper's Barbershop Auth API",
+    description:
+      'Authentication, token refresh, logout, and session endpoints.',
+    tags: ['health', 'auth'],
   });
 
   await app.listen(authApiPort);

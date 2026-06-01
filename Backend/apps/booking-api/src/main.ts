@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import {
   configureApiSecurity,
+  configureSwagger,
   createFrontendCorsOptions,
   ensureNodeCryptoGlobal,
 } from '@coopers/common';
@@ -19,6 +20,11 @@ async function bootstrap() {
     cors: createFrontendCorsOptions(
       config.get<string>('FRONTEND_URL', 'http://localhost:5173'),
     ),
+  });
+  configureSwagger(app, {
+    title: "Cooper's Barbershop Booking API",
+    description: 'Booking, staff, services, users, and appointment endpoints.',
+    tags: ['health', 'auth', 'users', 'services', 'staff', 'appointments'],
   });
 
   await app.listen(config.get<number>('API_PORT', 3000));
