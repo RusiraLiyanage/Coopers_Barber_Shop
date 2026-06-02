@@ -14,6 +14,8 @@ const REQUIRED_ENV_KEYS = [
   'API_PORT',
   'GUARD_PORT',
   'FRONTEND_URL',
+  'BOOKING_API_URL',
+  'AUTH_API_URL',
 ] as const;
 
 export const getAppEnvironment = (): AppEnvironment => {

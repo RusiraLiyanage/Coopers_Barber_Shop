@@ -1,5 +1,5 @@
 export * from './bootstrap';
-export * from './configs/app.config';
+export * from './configs';
 export * from './filters';
 export * from './health';
 export * from './middlewares';
