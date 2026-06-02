@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Layout } from "antd";
 import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import HeaderNav from "./components/HeaderNav";
@@ -6,30 +6,84 @@ import Home from "./pages/HomePage";
 import MyAppointments from "./pages/MyAppointments";
 import UserAuthModal from "./Models/userAuth";
 import MakeAppointmentModal from "./Models/makeAppointment";
+import { logout, type AuthSession } from "./lib/api";
 
 const { Content, Footer } = Layout;
-const AUTH_TOKEN_KEY = "booking_auth_token";
+const AUTH_SESSION_KEY = "booking_auth_session";
+const LEGACY_AUTH_TOKEN_KEY = "booking_auth_token";
+
+function isAuthSession(value: unknown): value is AuthSession {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const session = value as Partial<AuthSession>;
+
+  return (
+    typeof session.accessToken === "string" &&
+    typeof session.refreshToken === "string"
+  );
+}
+
+function readStoredAuthSession(): AuthSession | null {
+  const storedSession = localStorage.getItem(AUTH_SESSION_KEY);
+
+  if (storedSession) {
+    try {
+      const parsedSession = JSON.parse(storedSession) as unknown;
+
+      if (isAuthSession(parsedSession)) {
+        return parsedSession;
+      }
+    } catch {
+      localStorage.removeItem(AUTH_SESSION_KEY);
+    }
+  }
+
+  const legacyAccessToken = localStorage.getItem(LEGACY_AUTH_TOKEN_KEY);
+
+  if (legacyAccessToken) {
+    return {
+      accessToken: legacyAccessToken,
+      refreshToken: "",
+    };
+  }
+
+  return null;
+}
 
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [authToken, setAuthTokenState] = useState<string | null>(() =>
-    localStorage.getItem(AUTH_TOKEN_KEY),
+  const [authSession, setAuthSessionState] = useState<AuthSession | null>(() =>
+    readStoredAuthSession(),
   );
   const [openAuthModal, setOpenAuthModal] = useState(false);
   const [openAppointmentModal, setOpenAppointmentModal] = useState(false);
   const [appointmentsRefreshKey, setAppointmentsRefreshKey] = useState(0);
 
-  const isAuthenticated = Boolean(authToken);
+  const isAuthenticated = Boolean(authSession?.accessToken);
 
-  const setAuthToken = (token: string | null) => {
-    if (token) {
-      localStorage.setItem(AUTH_TOKEN_KEY, token);
+  const setAuthSession = useCallback((session: AuthSession | null) => {
+    if (session) {
+      localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
     } else {
-      localStorage.removeItem(AUTH_TOKEN_KEY);
+      localStorage.removeItem(AUTH_SESSION_KEY);
     }
 
-    setAuthTokenState(token);
+    localStorage.removeItem(LEGACY_AUTH_TOKEN_KEY);
+    setAuthSessionState(session);
+  }, []);
+
+  const handleLogout = () => {
+    const currentSession = authSession;
+
+    setAuthSession(null);
+    navigate("/");
+
+    if (currentSession?.refreshToken) {
+      void logout(currentSession).catch(() => undefined);
+    }
   };
 
   const openBookingFlow = () => {
@@ -45,10 +99,7 @@ function App() {
     <Layout style={{ minHeight: "100vh" }}>
       <HeaderNav
         isAuthenticated={isAuthenticated}
-        onLogout={() => {
-          setAuthToken(null);
-          navigate("/");
-        }}
+        onLogout={handleLogout}
         onOpenAuthModal={() => setOpenAuthModal(true)}
         onOpenAppointmentModal={() => setOpenAppointmentModal(true)}
       />
@@ -67,7 +118,8 @@ function App() {
 
         <MyAppointments
           open={location.pathname === "/appointments"}
-          authToken={authToken}
+          authSession={authSession}
+          onAuthSessionRefresh={setAuthSession}
           refreshKey={appointmentsRefreshKey}
           onClose={() => navigate("/")}
           onMakeAppointment={openBookingFlow}
@@ -77,8 +129,8 @@ function App() {
       <UserAuthModal
         open={openAuthModal}
         onClose={() => setOpenAuthModal(false)}
-        onAuthSuccess={(token) => {
-          setAuthToken(token);
+        onAuthSuccess={(session) => {
+          setAuthSession(session);
           setOpenAuthModal(false);
           setOpenAppointmentModal(true);
         }}
@@ -86,7 +138,8 @@ function App() {
 
       <MakeAppointmentModal
         open={openAppointmentModal}
-        authToken={authToken}
+        authSession={authSession}
+        onAuthSessionRefresh={setAuthSession}
         onClose={() => setOpenAppointmentModal(false)}
         onBooked={() => {
           setOpenAppointmentModal(false);

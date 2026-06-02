@@ -12,6 +12,7 @@ export function createFrontendCorsOptions(frontendUrl: string): CorsOptions {
   return {
     origin: frontendUrl,
     credentials: true,
+    exposedHeaders: ['x-access-token', 'x-refresh-token'],
   };
 }
 

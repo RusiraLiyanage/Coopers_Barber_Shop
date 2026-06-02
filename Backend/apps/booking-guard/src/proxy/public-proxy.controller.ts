@@ -11,8 +11,10 @@ type LoginRequestBody = {
   password: string;
 };
 
-type RegisterRequestBody = LoginRequestBody & {
-  name: string;
+type RegisterRequestBody = LoginRequestBody;
+
+type RefreshTokenRequestBody = {
+  refresh_token: string;
 };
 
 function writeStatus(response: StatusResponse, statusCode: number): void {
@@ -56,9 +58,8 @@ export class PublicProxyController {
   @ApiBody({
     schema: {
       type: 'object',
-      required: ['name', 'email', 'password'],
+      required: ['email', 'password'],
       properties: {
-        name: { type: 'string', example: 'Cooper Customer' },
         email: { type: 'string', example: 'customer@example.com' },
         password: { type: 'string', example: 'password123' },
       },
@@ -73,6 +74,60 @@ export class PublicProxyController {
       target: 'auth',
       method: 'POST',
       path: '/auth/register',
+      body,
+    });
+
+    writeStatus(response, result.statusCode);
+
+    return result.body;
+  }
+
+  @ApiOperation({ summary: 'Proxy token refresh to auth-api' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['refresh_token'],
+      properties: {
+        refresh_token: { type: 'string', example: 'refresh-token-value' },
+      },
+    },
+  })
+  @Post('auth/refresh')
+  async refresh(
+    @Body() body: RefreshTokenRequestBody,
+    @Res({ passthrough: true }) response: StatusResponse,
+  ): Promise<unknown> {
+    const result = await this.proxyService.forward({
+      target: 'auth',
+      method: 'POST',
+      path: '/auth/refresh',
+      body,
+    });
+
+    writeStatus(response, result.statusCode);
+
+    return result.body;
+  }
+
+  @ApiOperation({ summary: 'Proxy logout to auth-api' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['refresh_token'],
+      properties: {
+        refresh_token: { type: 'string', example: 'refresh-token-value' },
+      },
+    },
+  })
+  @Post('auth/logout')
+  async logout(
+    @Body() body: RefreshTokenRequestBody,
+    @Res({ passthrough: true }) response: StatusResponse,
+  ): Promise<unknown> {
+    const result = await this.proxyService.forward({
+      target: 'auth',
+      method: 'POST',
+      path: '/auth/logout',
       body,
     });
 

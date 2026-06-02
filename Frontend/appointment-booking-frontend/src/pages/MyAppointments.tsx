@@ -11,11 +11,16 @@ import {
   Typography,
 } from "antd";
 import { useEffect, useMemo, useState } from "react";
-import { getAppointments, type AppointmentRecord } from "../lib/api";
+import {
+  getAppointments,
+  type AppointmentRecord,
+  type AuthSession,
+} from "../lib/api";
 
 interface MyAppointmentsProps {
   open: boolean;
-  authToken: string | null;
+  authSession: AuthSession | null;
+  onAuthSessionRefresh: (session: AuthSession) => void;
   refreshKey: number;
   onClose: () => void;
   onMakeAppointment: () => void;
@@ -84,13 +89,13 @@ function AppointmentsList({
             >
               <div>
                 <Typography.Title level={4} style={{ marginTop: 0 }}>
-                  {appointment.service.name}
+                  {appointment.serviceName}
                 </Typography.Title>
                 <Typography.Paragraph style={{ marginBottom: 8 }}>
                   {formatAppointmentWindow(appointment)}
                 </Typography.Paragraph>
                 <Typography.Text type="secondary">
-                  Staff: {appointment.staff.displayName}
+                  Staff: {appointment.staffName}
                 </Typography.Text>
               </div>
 
@@ -110,7 +115,8 @@ function AppointmentsList({
 
 export default function MyAppointments({
   open,
-  authToken,
+  authSession,
+  onAuthSessionRefresh,
   refreshKey,
   onClose,
   onMakeAppointment,
@@ -139,7 +145,7 @@ export default function MyAppointments({
       return;
     }
 
-    if (!authToken) {
+    if (!authSession) {
       setAppointments([]);
       setError(null);
       return;
@@ -148,7 +154,7 @@ export default function MyAppointments({
     setLoading(true);
     setError(null);
 
-    getAppointments(authToken)
+    getAppointments(authSession, onAuthSessionRefresh)
       .then((response) => {
         setAppointments(response);
       })
@@ -162,7 +168,7 @@ export default function MyAppointments({
       .finally(() => {
         setLoading(false);
       });
-  }, [authToken, open, refreshKey]);
+  }, [authSession, onAuthSessionRefresh, open, refreshKey]);
 
   return (
     <Modal
@@ -189,7 +195,7 @@ export default function MyAppointments({
         },
       }}
     >
-      {!authToken ? (
+      {!authSession ? (
         <Alert
           type="info"
           message="Log in to view your appointments"

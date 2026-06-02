@@ -12,12 +12,14 @@ import {
   createAppointment,
   getAvailability,
   getServices,
+  type AuthSession,
   type ServiceOption,
 } from "../lib/api";
 
 interface MakeAppointmentModalProps {
   open: boolean;
-  authToken: string | null;
+  authSession: AuthSession | null;
+  onAuthSessionRefresh: (session: AuthSession) => void;
   onClose: () => void;
   onBooked: () => void;
 }
@@ -30,7 +32,8 @@ type AppointmentFormValues = {
 
 export default function MakeAppointmentModal({
   open,
-  authToken,
+  authSession,
+  onAuthSessionRefresh,
   onClose,
   onBooked,
 }: MakeAppointmentModalProps) {
@@ -50,7 +53,7 @@ export default function MakeAppointmentModal({
     slots.length === 0;
 
   useEffect(() => {
-    if (!open || !authToken) {
+    if (!open || !authSession) {
       return;
     }
 
@@ -71,10 +74,10 @@ export default function MakeAppointmentModal({
       .finally(() => {
         setServicesLoading(false);
       });
-  }, [authToken, form, messageApi, open]);
+  }, [authSession, form, messageApi, open]);
 
   const loadAvailability = async () => {
-    if (!authToken) {
+    if (!authSession) {
       messageApi.error("Please log in to book an appointment");
       return;
     }
@@ -93,9 +96,10 @@ export default function MakeAppointmentModal({
 
     try {
       const response = await getAvailability(
-        authToken,
+        authSession,
         serviceId,
         appointmentDate.format("YYYY-MM-DD"),
+        onAuthSessionRefresh,
       );
       setSlots(response);
     } catch (error) {
@@ -111,7 +115,7 @@ export default function MakeAppointmentModal({
   };
 
   const handleSubmit = async (values: AppointmentFormValues) => {
-    if (!authToken || !values.serviceId || !values.appointmentDate) {
+    if (!authSession || !values.serviceId || !values.appointmentDate) {
       messageApi.error("Please log in and complete the form");
       return;
     }
@@ -119,11 +123,15 @@ export default function MakeAppointmentModal({
     setConfirmLoading(true);
 
     try {
-      await createAppointment(authToken, {
-        serviceId: values.serviceId,
-        date: values.appointmentDate.format("YYYY-MM-DD"),
-        slot: values.appointmentTime || "",
-      });
+      await createAppointment(
+        authSession,
+        {
+          serviceId: values.serviceId,
+          date: values.appointmentDate.format("YYYY-MM-DD"),
+          slot: values.appointmentTime || "",
+        },
+        onAuthSessionRefresh,
+      );
       messageApi.success("Appointment created successfully");
       form.resetFields();
       setSlots([]);

@@ -1,11 +1,11 @@
 import { Button, Checkbox, Form, Input, Modal, Tabs, message } from "antd";
 import { useEffect, useState } from "react";
-import { login, register } from "../lib/api";
+import { login, register, toAuthSession, type AuthSession } from "../lib/api";
 
 interface UserAuthModalProps {
   open: boolean;
   onClose: () => void;
-  onAuthSuccess: (token: string) => void;
+  onAuthSuccess: (session: AuthSession) => void;
 }
 
 type FieldType = {
@@ -49,7 +49,7 @@ export default function UserAuthModal({
           paddingBottom: 5,
         },
       });
-      onAuthSuccess(response.access_token);
+      onAuthSuccess(toAuthSession(response));
     } catch (error) {
       messageApi.error(
         error instanceof Error ? error.message : "Login failed",
@@ -69,7 +69,7 @@ export default function UserAuthModal({
     try {
       const response = await register(values.email, values.password);
       messageApi.success("Successfully Registered!");
-      onAuthSuccess(response.access_token);
+      onAuthSuccess(toAuthSession(response));
     } catch (error) {
       messageApi.error(
         error instanceof Error ? error.message : "Registration failed",

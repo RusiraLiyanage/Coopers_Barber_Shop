@@ -6,6 +6,8 @@ export type ProxyRequestOptions = {
   target: ProxyTarget;
   method: ProxyMethod;
   path: string;
+  query?: Record<string, string | string[] | undefined>;
+  headers?: Record<string, string>;
   body?: unknown;
 };
 

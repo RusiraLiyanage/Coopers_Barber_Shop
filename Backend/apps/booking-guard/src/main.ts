@@ -27,7 +27,7 @@ async function bootstrap() {
     title: "Cooper's Barbershop Booking Guard",
     description:
       'Frontend-facing guard service for booking request routing and access control.',
-    tags: ['health', 'guard-public-proxy'],
+    tags: ['health', 'guard-public-proxy', 'guard-protected-proxy'],
   });
 
   await app.listen(guardConfig.guardPort);

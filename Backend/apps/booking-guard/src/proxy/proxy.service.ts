@@ -2,20 +2,43 @@ import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { GuardConfigService } from '@coopers/common';
 import { ProxyRequestOptions, ProxyResponse } from './proxy.types';
 
-function buildUrl(baseUrl: string, path: string): string {
+function buildUrl(
+  baseUrl: string,
+  path: string,
+  query?: ProxyRequestOptions['query'],
+): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const url = new URL(`${baseUrl}${normalizedPath}`);
 
-  return `${baseUrl}${normalizedPath}`;
+  if (query) {
+    Object.entries(query).forEach(([key, value]) => {
+      if (Array.isArray(value)) {
+        value.forEach((item) => url.searchParams.append(key, item));
+        return;
+      }
+
+      if (value !== undefined) {
+        url.searchParams.set(key, value);
+      }
+    });
+  }
+
+  return url.toString();
 }
 
 async function parseResponseBody(response: Response): Promise<unknown> {
   const contentType = response.headers.get('content-type') ?? '';
+  const text = await response.text();
 
-  if (contentType.includes('application/json')) {
-    return response.json();
+  if (text.length === 0) {
+    return null;
   }
 
-  return response.text();
+  if (contentType.includes('application/json')) {
+    return JSON.parse(text) as unknown;
+  }
+
+  return text;
 }
 
 @Injectable()
@@ -30,15 +53,21 @@ export class ProxyService {
         : upstreams.bookingApiUrl;
 
     try {
-      const response = await fetch(buildUrl(baseUrl, options.path), {
-        method: options.method,
-        headers: {
-          accept: 'application/json',
-          'content-type': 'application/json',
+      const response = await fetch(
+        buildUrl(baseUrl, options.path, options.query),
+        {
+          method: options.method,
+          headers: {
+            accept: 'application/json',
+            'content-type': 'application/json',
+            ...options.headers,
+          },
+          body:
+            options.body === undefined
+              ? undefined
+              : JSON.stringify(options.body),
         },
-        body:
-          options.body === undefined ? undefined : JSON.stringify(options.body),
-      });
+      );
 
       return {
         statusCode: response.status,
