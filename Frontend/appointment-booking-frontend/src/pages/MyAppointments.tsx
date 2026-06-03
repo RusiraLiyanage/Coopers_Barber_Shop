@@ -20,7 +20,6 @@ import {
 interface MyAppointmentsProps {
   open: boolean;
   authSession: AuthSession | null;
-  onAuthSessionRefresh: (session: AuthSession) => void;
   refreshKey: number;
   onClose: () => void;
   onMakeAppointment: () => void;
@@ -116,7 +115,6 @@ function AppointmentsList({
 export default function MyAppointments({
   open,
   authSession,
-  onAuthSessionRefresh,
   refreshKey,
   onClose,
   onMakeAppointment,
@@ -154,7 +152,7 @@ export default function MyAppointments({
     setLoading(true);
     setError(null);
 
-    getAppointments(authSession, onAuthSessionRefresh)
+    getAppointments()
       .then((response) => {
         setAppointments(response);
       })
@@ -168,7 +166,7 @@ export default function MyAppointments({
       .finally(() => {
         setLoading(false);
       });
-  }, [authSession, onAuthSessionRefresh, open, refreshKey]);
+  }, [authSession, open, refreshKey]);
 
   return (
     <Modal

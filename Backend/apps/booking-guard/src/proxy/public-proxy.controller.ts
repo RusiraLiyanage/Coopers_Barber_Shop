@@ -8,8 +8,23 @@ import {
   Res,
 } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { AuthTokensResponse } from '@coopers/common';
 import { ProxyService } from './proxy.service';
+import {
+  AuthCookieResponse,
+  clearAuthCookies,
+  getAuthorizationHeaderFromRequest,
+  setAuthCookies,
+} from './auth-cookie.util';
+import {
+  ProtectedProxyResponse,
+  ProtectedProxyService,
+} from './protected-proxy.service';
 import { createRefreshTokenBody } from './refresh-token.util';
+
+type AuthStatusResponse = {
+  authenticated: true;
+};
 
 type StatusResponse = {
   status: (statusCode: number) => void;
@@ -30,10 +45,58 @@ function writeStatus(response: StatusResponse, statusCode: number): void {
   response.status(statusCode);
 }
 
+function isAuthTokensResponse(value: unknown): value is AuthTokensResponse {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const tokens = value as Partial<AuthTokensResponse>;
+
+  return (
+    typeof tokens.access_token === 'string' &&
+    typeof tokens.refresh_token === 'string'
+  );
+}
+
+function isSuccessStatus(statusCode: number): boolean {
+  return statusCode >= 200 && statusCode < 300;
+}
+
+function writeAuthResponse(
+  response: AuthCookieResponse,
+  result: { statusCode: number; body: unknown },
+): unknown {
+  writeStatus(response, result.statusCode);
+
+  if (isSuccessStatus(result.statusCode) && isAuthTokensResponse(result.body)) {
+    setAuthCookies(response, result.body);
+
+    return { authenticated: true } satisfies AuthStatusResponse;
+  }
+
+  return result.body;
+}
+
+function writeSessionResponse(
+  response: AuthCookieResponse,
+  result: ProtectedProxyResponse,
+): AuthStatusResponse {
+  writeStatus(response, result.statusCode);
+
+  if (result.refreshedTokens) {
+    setAuthCookies(response, result.refreshedTokens);
+  }
+
+  return { authenticated: true };
+}
+
 @ApiTags('guard-public-proxy')
 @Controller()
 export class PublicProxyController {
-  constructor(private readonly proxyService: ProxyService) {}
+  constructor(
+    private readonly proxyService: ProxyService,
+    private readonly protectedProxyService: ProtectedProxyService,
+  ) {}
 
   @ApiOperation({ summary: 'Proxy customer login to auth-api' })
   @ApiBody({
@@ -49,7 +112,7 @@ export class PublicProxyController {
   @Post('auth/login')
   async login(
     @Body() body: LoginRequestBody,
-    @Res({ passthrough: true }) response: StatusResponse,
+    @Res({ passthrough: true }) response: AuthCookieResponse,
   ): Promise<unknown> {
     const result = await this.proxyService.forward({
       target: 'auth',
@@ -58,9 +121,7 @@ export class PublicProxyController {
       body,
     });
 
-    writeStatus(response, result.statusCode);
-
-    return result.body;
+    return writeAuthResponse(response, result);
   }
 
   @ApiOperation({ summary: 'Proxy customer registration to auth-api' })
@@ -77,7 +138,7 @@ export class PublicProxyController {
   @Post('auth/register')
   async register(
     @Body() body: RegisterRequestBody,
-    @Res({ passthrough: true }) response: StatusResponse,
+    @Res({ passthrough: true }) response: AuthCookieResponse,
   ): Promise<unknown> {
     const result = await this.proxyService.forward({
       target: 'auth',
@@ -86,9 +147,27 @@ export class PublicProxyController {
       body,
     });
 
-    writeStatus(response, result.statusCode);
+    return writeAuthResponse(response, result);
+  }
 
-    return result.body;
+  @ApiOperation({ summary: 'Validate current guard cookie session' })
+  @Get('auth/session')
+  async session(
+    @Headers('authorization') authorizationHeader: string | undefined,
+    @Headers('x-refresh-token') refreshTokenHeader: string | undefined,
+    @Headers('cookie') cookieHeader: string | undefined,
+    @Res({ passthrough: true }) response: AuthCookieResponse,
+  ): Promise<AuthStatusResponse> {
+    const result = await this.protectedProxyService.validateSession({
+      authorizationHeader: getAuthorizationHeaderFromRequest(
+        authorizationHeader,
+        cookieHeader,
+      ),
+      refreshToken: createRefreshTokenBody(refreshTokenHeader, cookieHeader, {})
+        .refresh_token,
+    });
+
+    return writeSessionResponse(response, result);
   }
 
   @ApiOperation({ summary: 'Proxy token refresh to auth-api' })
@@ -106,7 +185,7 @@ export class PublicProxyController {
     @Body() body: RefreshTokenRequestBody,
     @Headers('x-refresh-token') refreshTokenHeader: string | undefined,
     @Headers('cookie') cookieHeader: string | undefined,
-    @Res({ passthrough: true }) response: StatusResponse,
+    @Res({ passthrough: true }) response: AuthCookieResponse,
   ): Promise<unknown> {
     const result = await this.proxyService.forward({
       target: 'auth',
@@ -115,9 +194,7 @@ export class PublicProxyController {
       body: createRefreshTokenBody(refreshTokenHeader, cookieHeader, body),
     });
 
-    writeStatus(response, result.statusCode);
-
-    return result.body;
+    return writeAuthResponse(response, result);
   }
 
   @ApiOperation({ summary: 'Proxy logout to auth-api' })
@@ -135,7 +212,7 @@ export class PublicProxyController {
     @Body() body: RefreshTokenRequestBody,
     @Headers('x-refresh-token') refreshTokenHeader: string | undefined,
     @Headers('cookie') cookieHeader: string | undefined,
-    @Res({ passthrough: true }) response: StatusResponse,
+    @Res({ passthrough: true }) response: AuthCookieResponse,
   ): Promise<unknown> {
     const result = await this.proxyService.forward({
       target: 'auth',
@@ -144,6 +221,7 @@ export class PublicProxyController {
       body: createRefreshTokenBody(refreshTokenHeader, cookieHeader, body),
     });
 
+    clearAuthCookies(response);
     writeStatus(response, result.statusCode);
 
     return result.body;

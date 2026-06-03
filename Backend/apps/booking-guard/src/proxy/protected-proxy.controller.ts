@@ -12,12 +12,12 @@ import {
   ProtectedProxyResponse,
   ProtectedProxyService,
 } from './protected-proxy.service';
+import {
+  AuthCookieResponse,
+  getAuthorizationHeaderFromRequest,
+  setAuthCookies,
+} from './auth-cookie.util';
 import { getRefreshTokenFromRequest } from './refresh-token.util';
-
-type StatusResponse = {
-  status: (statusCode: number) => void;
-  setHeader: (name: string, value: string) => void;
-};
 
 type AppointmentRequestBody = {
   serviceId: string;
@@ -31,14 +31,13 @@ type AvailabilityQuery = {
 };
 
 function writeProxyResponse(
-  response: StatusResponse,
+  response: AuthCookieResponse,
   result: ProtectedProxyResponse,
 ): void {
   response.status(result.statusCode);
 
   if (result.refreshedTokens) {
-    response.setHeader('x-access-token', result.refreshedTokens.access_token);
-    response.setHeader('x-refresh-token', result.refreshedTokens.refresh_token);
+    setAuthCookies(response, result.refreshedTokens);
   }
 }
 
@@ -66,10 +65,13 @@ export class ProtectedProxyController {
     @Headers('x-refresh-token') refreshTokenHeader: string | undefined,
     @Headers('cookie') cookieHeader: string | undefined,
     @Body() body: AppointmentRequestBody,
-    @Res({ passthrough: true }) response: StatusResponse,
+    @Res({ passthrough: true }) response: AuthCookieResponse,
   ): Promise<unknown> {
     const result = await this.protectedProxyService.forward({
-      authorizationHeader,
+      authorizationHeader: getAuthorizationHeaderFromRequest(
+        authorizationHeader,
+        cookieHeader,
+      ),
       refreshToken: getRefreshTokenFromRequest(
         refreshTokenHeader,
         cookieHeader,
@@ -92,10 +94,13 @@ export class ProtectedProxyController {
     @Headers('authorization') authorizationHeader: string | undefined,
     @Headers('x-refresh-token') refreshTokenHeader: string | undefined,
     @Headers('cookie') cookieHeader: string | undefined,
-    @Res({ passthrough: true }) response: StatusResponse,
+    @Res({ passthrough: true }) response: AuthCookieResponse,
   ): Promise<unknown> {
     const result = await this.protectedProxyService.forward({
-      authorizationHeader,
+      authorizationHeader: getAuthorizationHeaderFromRequest(
+        authorizationHeader,
+        cookieHeader,
+      ),
       refreshToken: getRefreshTokenFromRequest(
         refreshTokenHeader,
         cookieHeader,
@@ -118,10 +123,13 @@ export class ProtectedProxyController {
     @Headers('x-refresh-token') refreshTokenHeader: string | undefined,
     @Headers('cookie') cookieHeader: string | undefined,
     @Query() query: AvailabilityQuery,
-    @Res({ passthrough: true }) response: StatusResponse,
+    @Res({ passthrough: true }) response: AuthCookieResponse,
   ): Promise<unknown> {
     const result = await this.protectedProxyService.forward({
-      authorizationHeader,
+      authorizationHeader: getAuthorizationHeaderFromRequest(
+        authorizationHeader,
+        cookieHeader,
+      ),
       refreshToken: getRefreshTokenFromRequest(
         refreshTokenHeader,
         cookieHeader,

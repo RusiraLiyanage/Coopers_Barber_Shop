@@ -107,7 +107,7 @@ export class SessionService {
 
   private createRefreshTokenExpiresAt(): Date {
     const configuredTtlDays =
-      this.configService.get<string>('REFRESH_TOKEN_TTL_DAYS') ?? '7';
+      this.configService.get<string>('REFRESH_TOKEN_TTL_DAYS') ?? '14';
     const ttlDays = Number(configuredTtlDays);
     const expiresAt = new Date();
 

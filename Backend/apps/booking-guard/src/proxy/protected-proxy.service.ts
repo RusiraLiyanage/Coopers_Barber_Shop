@@ -21,6 +21,11 @@ type ProtectedForwardOptions = Omit<
   refreshToken: string | undefined;
 };
 
+type SessionValidationOptions = {
+  authorizationHeader: string | undefined;
+  refreshToken: string | undefined;
+};
+
 export type ProtectedProxyResponse = ProxyResponse & {
   refreshedTokens?: AuthTokensResponse;
 };
@@ -101,10 +106,31 @@ export class ProtectedProxyService {
     };
   }
 
+  async validateSession(
+    options: SessionValidationOptions,
+  ): Promise<ProtectedProxyResponse> {
+    const context = await this.authenticateOrRefresh(
+      options.authorizationHeader,
+      options.refreshToken,
+    );
+
+    return {
+      statusCode: 200,
+      body: {
+        active: true,
+      },
+      refreshedTokens: context.refreshedTokens,
+    };
+  }
+
   private async authenticateOrRefresh(
     authorizationHeader: string | undefined,
     refreshToken: string | undefined,
   ): Promise<AuthenticatedProxyContext> {
+    if (!authorizationHeader && refreshToken) {
+      return this.refreshAndAuthenticate(refreshToken);
+    }
+
     try {
       const user =
         await this.authenticationService.authenticateBearerToken(
@@ -122,20 +148,26 @@ export class ProtectedProxyService {
         throw error;
       }
 
-      const refreshedTokens = await this.refreshTokens(refreshToken);
-      const refreshedAuthorizationHeader = `Bearer ${refreshedTokens.access_token}`;
-      const user = await this.authenticationService.authenticateBearerToken(
-        refreshedAuthorizationHeader,
-      );
-
-      await this.validateActiveSession(user.sessionId);
-
-      return {
-        authorizationHeader: refreshedAuthorizationHeader,
-        user,
-        refreshedTokens,
-      };
+      return this.refreshAndAuthenticate(refreshToken);
     }
+  }
+
+  private async refreshAndAuthenticate(
+    refreshToken: string | undefined,
+  ): Promise<AuthenticatedProxyContext> {
+    const refreshedTokens = await this.refreshTokens(refreshToken);
+    const refreshedAuthorizationHeader = `Bearer ${refreshedTokens.access_token}`;
+    const user = await this.authenticationService.authenticateBearerToken(
+      refreshedAuthorizationHeader,
+    );
+
+    await this.validateActiveSession(user.sessionId);
+
+    return {
+      authorizationHeader: refreshedAuthorizationHeader,
+      user,
+      refreshedTokens,
+    };
   }
 
   private async refreshTokens(

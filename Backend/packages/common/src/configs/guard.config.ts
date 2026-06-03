@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 export type GuardUpstreamConfig = {
   bookingApiUrl: string;
   authApiUrl: string;
+  frontendUrl: string;
 };
 
 function normalizeServiceUrl(value: string): string {
@@ -50,6 +51,9 @@ export class GuardConfigService {
       ),
       authApiUrl: normalizeServiceUrl(
         getRequiredString(this.config, 'AUTH_API_URL'),
+      ),
+      frontendUrl: normalizeServiceUrl(
+        this.config.get<string>('FRONTEND_DEV_URL') ?? this.frontendUrl,
       ),
     };
   }

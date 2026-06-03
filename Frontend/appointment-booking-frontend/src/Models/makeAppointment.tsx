@@ -19,7 +19,6 @@ import {
 interface MakeAppointmentModalProps {
   open: boolean;
   authSession: AuthSession | null;
-  onAuthSessionRefresh: (session: AuthSession) => void;
   onClose: () => void;
   onBooked: () => void;
 }
@@ -33,7 +32,6 @@ type AppointmentFormValues = {
 export default function MakeAppointmentModal({
   open,
   authSession,
-  onAuthSessionRefresh,
   onClose,
   onBooked,
 }: MakeAppointmentModalProps) {
@@ -96,10 +94,8 @@ export default function MakeAppointmentModal({
 
     try {
       const response = await getAvailability(
-        authSession,
         serviceId,
         appointmentDate.format("YYYY-MM-DD"),
-        onAuthSessionRefresh,
       );
       setSlots(response);
     } catch (error) {
@@ -124,13 +120,11 @@ export default function MakeAppointmentModal({
 
     try {
       await createAppointment(
-        authSession,
         {
           serviceId: values.serviceId,
           date: values.appointmentDate.format("YYYY-MM-DD"),
           slot: values.appointmentTime || "",
         },
-        onAuthSessionRefresh,
       );
       messageApi.success("Appointment created successfully");
       form.resetFields();

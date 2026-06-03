@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Layout } from "antd";
 import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import HeaderNav from "./components/HeaderNav";
@@ -6,85 +6,51 @@ import Home from "./pages/HomePage";
 import MyAppointments from "./pages/MyAppointments";
 import UserAuthModal from "./Models/userAuth";
 import MakeAppointmentModal from "./Models/makeAppointment";
-import { logout, type AuthSession } from "./lib/api";
+import { getCurrentSession, logout, toAuthSession, type AuthSession } from "./lib/api";
 
 const { Content, Footer } = Layout;
-const AUTH_SESSION_KEY = "booking_auth_session";
 const LEGACY_AUTH_TOKEN_KEY = "booking_auth_token";
-
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.trim().length > 0;
-}
-
-function isAuthSession(value: unknown): value is AuthSession {
-  if (typeof value !== "object" || value === null) {
-    return false;
-  }
-
-  const session = value as Partial<AuthSession>;
-
-  return (
-    isNonEmptyString(session.accessToken) &&
-    isNonEmptyString(session.refreshToken)
-  );
-}
-
-function readStoredAuthSession(): AuthSession | null {
-  const storedSession = localStorage.getItem(AUTH_SESSION_KEY);
-
-  if (storedSession) {
-    try {
-      const parsedSession = JSON.parse(storedSession) as unknown;
-
-      if (isAuthSession(parsedSession)) {
-        return parsedSession;
-      }
-
-      localStorage.removeItem(AUTH_SESSION_KEY);
-    } catch {
-      localStorage.removeItem(AUTH_SESSION_KEY);
-    }
-  }
-
-  localStorage.removeItem(LEGACY_AUTH_TOKEN_KEY);
-
-  return null;
-}
 
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [authSession, setAuthSessionState] = useState<AuthSession | null>(() =>
-    readStoredAuthSession(),
-  );
+  const [authSession, setAuthSessionState] = useState<AuthSession | null>(null);
   const [openAuthModal, setOpenAuthModal] = useState(false);
   const [openAppointmentModal, setOpenAppointmentModal] = useState(false);
   const [appointmentsRefreshKey, setAppointmentsRefreshKey] = useState(0);
 
-  const isAuthenticated = Boolean(
-    authSession?.accessToken && authSession.refreshToken,
-  );
+  const isAuthenticated = Boolean(authSession?.authenticated);
 
   const setAuthSession = useCallback((session: AuthSession | null) => {
-    if (session) {
-      localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
-    } else {
-      localStorage.removeItem(AUTH_SESSION_KEY);
-    }
-
     localStorage.removeItem(LEGACY_AUTH_TOKEN_KEY);
     setAuthSessionState(session);
   }, []);
 
-  const handleLogout = () => {
-    const currentSession = authSession;
+  useEffect(() => {
+    let isMounted = true;
 
+    getCurrentSession()
+      .then((session) => {
+        if (isMounted) {
+          setAuthSession(toAuthSession(session));
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setAuthSession(null);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [setAuthSession]);
+
+  const handleLogout = () => {
     setAuthSession(null);
     navigate("/");
 
-    if (currentSession?.refreshToken) {
-      void logout(currentSession).catch(() => undefined);
-    }
+    void logout().catch(() => undefined);
   };
 
   const openBookingFlow = () => {
@@ -120,7 +86,6 @@ function App() {
         <MyAppointments
           open={location.pathname === "/appointments"}
           authSession={authSession}
-          onAuthSessionRefresh={setAuthSession}
           refreshKey={appointmentsRefreshKey}
           onClose={() => navigate("/")}
           onMakeAppointment={openBookingFlow}
@@ -140,7 +105,6 @@ function App() {
       <MakeAppointmentModal
         open={openAppointmentModal}
         authSession={authSession}
-        onAuthSessionRefresh={setAuthSession}
         onClose={() => setOpenAppointmentModal(false)}
         onBooked={() => {
           setOpenAppointmentModal(false);

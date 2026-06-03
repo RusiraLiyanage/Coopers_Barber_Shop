@@ -22,6 +22,9 @@ async function bootstrap() {
 
   configureApiSecurity(app, {
     cors: createFrontendCorsOptions(guardConfig.frontendUrl),
+    helmet: {
+      contentSecurityPolicy: false,
+    },
   });
   configureSwagger(app, {
     title: "Cooper's Barbershop Booking Guard",

@@ -1,11 +1,12 @@
 import { INestApplication } from '@nestjs/common';
 import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
-import helmet from 'helmet';
+import helmet, { HelmetOptions } from 'helmet';
 import { AllExceptionsFilter } from '../filters';
 import { createGlobalValidationPipe } from '../pipes';
 
 export type ApiSecurityOptions = {
   cors?: CorsOptions;
+  helmet?: HelmetOptions;
 };
 
 function parseFrontendOrigins(frontendUrl: string): string | string[] {
@@ -35,7 +36,7 @@ export function configureApiSecurity(
     app.enableCors();
   }
 
-  app.use(helmet());
+  app.use(helmet(options.helmet));
   app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalPipes(createGlobalValidationPipe());
 }

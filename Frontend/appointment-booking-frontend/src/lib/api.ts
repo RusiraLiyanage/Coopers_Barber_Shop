@@ -1,13 +1,11 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? "";
 
 export interface AuthResponse {
-  access_token: string;
-  refresh_token: string;
+  authenticated: boolean;
 }
 
 export interface AuthSession {
-  accessToken: string;
-  refreshToken: string;
+  authenticated: true;
 }
 
 export interface ServiceOption {
@@ -34,52 +32,20 @@ type ApiErrorPayload = {
 
 type ParsedResponse<T> = T | ApiErrorPayload | string | null;
 
-type AuthSessionRefreshHandler = (session: AuthSession) => void;
-
-function buildHeaders(session?: AuthSession) {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  if (session?.accessToken) {
-    headers.Authorization = `Bearer ${session.accessToken}`;
-  }
-
-  if (session?.refreshToken) {
-    headers["x-refresh-token"] = session.refreshToken;
-  }
-
-  return headers;
-}
-
-function getRefreshedAuthSession(response: Response): AuthSession | null {
-  const accessToken = response.headers.get("x-access-token");
-  const refreshToken = response.headers.get("x-refresh-token");
-
-  if (!accessToken || !refreshToken) {
-    return null;
-  }
-
+function buildHeaders() {
   return {
-    accessToken,
-    refreshToken,
+    "Content-Type": "application/json",
   };
 }
 
 async function request<T>(
   path: string,
   options: RequestInit = {},
-  onAuthSessionRefresh?: AuthSessionRefreshHandler,
 ): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     credentials: "include",
     ...options,
   });
-  const refreshedSession = getRefreshedAuthSession(response);
-
-  if (refreshedSession) {
-    onAuthSessionRefresh?.(refreshedSession);
-  }
 
   const data = await parseResponse<T>(response);
 
@@ -130,10 +96,19 @@ function getApiErrorMessage<T>(
 }
 
 export function toAuthSession(response: AuthResponse): AuthSession {
+  if (!response.authenticated) {
+    throw new Error("Authentication failed");
+  }
+
   return {
-    accessToken: response.access_token,
-    refreshToken: response.refresh_token,
+    authenticated: true,
   };
+}
+
+export function getCurrentSession() {
+  return request<AuthResponse>("/auth/session", {
+    headers: buildHeaders(),
+  });
 }
 
 export function login(email: string, password: string) {
@@ -152,11 +127,11 @@ export function register(email: string, password: string) {
   });
 }
 
-export function logout(session: AuthSession) {
+export function logout() {
   return request<{ success: boolean }>("/auth/logout", {
     method: "POST",
     headers: buildHeaders(),
-    body: JSON.stringify({ refresh_token: session.refreshToken }),
+    body: JSON.stringify({}),
   });
 }
 
@@ -167,47 +142,28 @@ export function getServices() {
 }
 
 export function getAvailability(
-  session: AuthSession,
   serviceId: string,
   date: string,
-  onAuthSessionRefresh?: AuthSessionRefreshHandler,
 ) {
   const query = new URLSearchParams({ serviceId, date });
 
-  return request<string[]>(
-    `/appointments/availability?${query.toString()}`,
-    {
-      headers: buildHeaders(session),
-    },
-    onAuthSessionRefresh,
-  );
+  return request<string[]>(`/appointments/availability?${query.toString()}`, {
+    headers: buildHeaders(),
+  });
 }
 
 export function createAppointment(
-  session: AuthSession,
   payload: { serviceId: string; date: string; slot: string },
-  onAuthSessionRefresh?: AuthSessionRefreshHandler,
 ) {
-  return request<AppointmentRecord>(
-    "/appointments",
-    {
-      method: "POST",
-      headers: buildHeaders(session),
-      body: JSON.stringify(payload),
-    },
-    onAuthSessionRefresh,
-  );
+  return request<AppointmentRecord>("/appointments", {
+    method: "POST",
+    headers: buildHeaders(),
+    body: JSON.stringify(payload),
+  });
 }
 
-export function getAppointments(
-  session: AuthSession,
-  onAuthSessionRefresh?: AuthSessionRefreshHandler,
-) {
-  return request<AppointmentRecord[]>(
-    "/appointments/all",
-    {
-      headers: buildHeaders(session),
-    },
-    onAuthSessionRefresh,
-  );
+export function getAppointments() {
+  return request<AppointmentRecord[]>("/appointments/all", {
+    headers: buildHeaders(),
+  });
 }

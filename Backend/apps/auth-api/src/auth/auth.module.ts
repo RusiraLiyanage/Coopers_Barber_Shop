@@ -14,6 +14,16 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { LocalStrategy } from './strategies/local.strategy';
 
+function getAccessTokenTtlSeconds(config: ConfigService): number {
+  const configuredTtl = Number(
+    config.get<string>('ACCESS_TOKEN_TTL_SECONDS') ?? '900',
+  );
+
+  return Number.isFinite(configuredTtl) && configuredTtl > 0
+    ? configuredTtl
+    : 900;
+}
+
 @Module({
   imports: [
     UsersModule,
@@ -24,7 +34,9 @@ import { LocalStrategy } from './strategies/local.strategy';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         secret: config.getOrThrow<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '1h' },
+        signOptions: {
+          expiresIn: getAccessTokenTtlSeconds(config),
+        },
       }),
     }),
   ],
