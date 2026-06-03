@@ -1,9 +1,17 @@
-import { Body, Controller, Post, Request, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  Post,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type {
   AuthenticatedRequest,
   AuthTokensResponse,
   LogoutResponse,
+  SessionValidationResponse,
 } from '@coopers/common';
 import { AuthService } from './auth.service';
 import { LogoutDto } from './dto/logout.dto';
@@ -11,6 +19,7 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { LoginDto } from './dto/login.dto';
+import { SessionValidationDto } from './dto/session-validation.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -41,5 +50,14 @@ export class AuthController {
   @Post('logout')
   logout(@Body() dto: LogoutDto): Promise<LogoutResponse> {
     return this.authService.logout(dto.refresh_token);
+  }
+
+  @ApiOperation({ summary: 'Validate whether an auth session is still active' })
+  @HttpCode(200)
+  @Post('sessions/validate')
+  validateSession(
+    @Body() dto: SessionValidationDto,
+  ): Promise<SessionValidationResponse> {
+    return this.authService.validateSession(dto.sessionId);
   }
 }

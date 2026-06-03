@@ -12,6 +12,10 @@ const { Content, Footer } = Layout;
 const AUTH_SESSION_KEY = "booking_auth_session";
 const LEGACY_AUTH_TOKEN_KEY = "booking_auth_token";
 
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
 function isAuthSession(value: unknown): value is AuthSession {
   if (typeof value !== "object" || value === null) {
     return false;
@@ -20,8 +24,8 @@ function isAuthSession(value: unknown): value is AuthSession {
   const session = value as Partial<AuthSession>;
 
   return (
-    typeof session.accessToken === "string" &&
-    typeof session.refreshToken === "string"
+    isNonEmptyString(session.accessToken) &&
+    isNonEmptyString(session.refreshToken)
   );
 }
 
@@ -35,19 +39,14 @@ function readStoredAuthSession(): AuthSession | null {
       if (isAuthSession(parsedSession)) {
         return parsedSession;
       }
+
+      localStorage.removeItem(AUTH_SESSION_KEY);
     } catch {
       localStorage.removeItem(AUTH_SESSION_KEY);
     }
   }
 
-  const legacyAccessToken = localStorage.getItem(LEGACY_AUTH_TOKEN_KEY);
-
-  if (legacyAccessToken) {
-    return {
-      accessToken: legacyAccessToken,
-      refreshToken: "",
-    };
-  }
+  localStorage.removeItem(LEGACY_AUTH_TOKEN_KEY);
 
   return null;
 }
@@ -62,7 +61,9 @@ function App() {
   const [openAppointmentModal, setOpenAppointmentModal] = useState(false);
   const [appointmentsRefreshKey, setAppointmentsRefreshKey] = useState(0);
 
-  const isAuthenticated = Boolean(authSession?.accessToken);
+  const isAuthenticated = Boolean(
+    authSession?.accessToken && authSession.refreshToken,
+  );
 
   const setAuthSession = useCallback((session: AuthSession | null) => {
     if (session) {

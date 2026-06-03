@@ -8,6 +8,7 @@ import {
   GuardAuthenticationService,
   type AuthTokensResponse,
   type JwtRequestUser,
+  type SessionValidationResponse,
 } from '@coopers/common';
 import { ProxyRequestOptions, ProxyResponse } from './proxy.types';
 import { ProxyService } from './proxy.service';
@@ -43,6 +44,18 @@ function isAuthTokensResponse(value: unknown): value is AuthTokensResponse {
   );
 }
 
+function isSessionValidationResponse(
+  value: unknown,
+): value is SessionValidationResponse {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const response = value as Partial<SessionValidationResponse>;
+
+  return typeof response.active === 'boolean';
+}
+
 function createUserContextHeaders(
   authorizationHeader: string,
   user: JwtRequestUser,
@@ -52,6 +65,7 @@ function createUserContextHeaders(
     'x-user-id': user.userId,
     'x-user-email': user.email,
     'x-user-role': user.role,
+    'x-session-id': user.sessionId,
   };
 }
 
@@ -97,6 +111,8 @@ export class ProtectedProxyService {
           authorizationHeader,
         );
 
+      await this.validateActiveSession(user.sessionId);
+
       return {
         authorizationHeader: authorizationHeader ?? '',
         user,
@@ -111,6 +127,8 @@ export class ProtectedProxyService {
       const user = await this.authenticationService.authenticateBearerToken(
         refreshedAuthorizationHeader,
       );
+
+      await this.validateActiveSession(user.sessionId);
 
       return {
         authorizationHeader: refreshedAuthorizationHeader,
@@ -145,5 +163,26 @@ export class ProtectedProxyService {
     }
 
     return result.body;
+  }
+
+  private async validateActiveSession(sessionId: string): Promise<void> {
+    const result = await this.proxyService.forward({
+      target: 'auth',
+      method: 'POST',
+      path: '/auth/sessions/validate',
+      body: {
+        sessionId,
+      },
+    });
+
+    if (result.statusCode === 200 && isSessionValidationResponse(result.body)) {
+      if (!result.body.active) {
+        throw new UnauthorizedException('Session expired. Please login again.');
+      }
+
+      return;
+    }
+
+    throw new ServiceUnavailableException('Unable to validate session.');
   }
 }

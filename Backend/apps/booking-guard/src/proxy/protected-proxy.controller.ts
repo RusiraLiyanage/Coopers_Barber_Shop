@@ -12,6 +12,7 @@ import {
   ProtectedProxyResponse,
   ProtectedProxyService,
 } from './protected-proxy.service';
+import { getRefreshTokenFromRequest } from './refresh-token.util';
 
 type StatusResponse = {
   status: (statusCode: number) => void;
@@ -28,25 +29,6 @@ type AvailabilityQuery = {
   serviceId?: string;
   date?: string;
 };
-
-function getRefreshToken(
-  refreshTokenHeader: string | undefined,
-  cookieHeader: string | undefined,
-): string | undefined {
-  if (refreshTokenHeader) {
-    return refreshTokenHeader;
-  }
-
-  if (!cookieHeader) {
-    return undefined;
-  }
-
-  return cookieHeader
-    .split(';')
-    .map((cookie) => cookie.trim())
-    .find((cookie) => cookie.startsWith('refresh_token='))
-    ?.replace('refresh_token=', '');
-}
 
 function writeProxyResponse(
   response: StatusResponse,
@@ -88,7 +70,10 @@ export class ProtectedProxyController {
   ): Promise<unknown> {
     const result = await this.protectedProxyService.forward({
       authorizationHeader,
-      refreshToken: getRefreshToken(refreshTokenHeader, cookieHeader),
+      refreshToken: getRefreshTokenFromRequest(
+        refreshTokenHeader,
+        cookieHeader,
+      ),
       method: 'POST',
       path: '/appointments',
       body,
@@ -111,7 +96,10 @@ export class ProtectedProxyController {
   ): Promise<unknown> {
     const result = await this.protectedProxyService.forward({
       authorizationHeader,
-      refreshToken: getRefreshToken(refreshTokenHeader, cookieHeader),
+      refreshToken: getRefreshTokenFromRequest(
+        refreshTokenHeader,
+        cookieHeader,
+      ),
       method: 'GET',
       path: '/appointments/all',
     });
@@ -134,7 +122,10 @@ export class ProtectedProxyController {
   ): Promise<unknown> {
     const result = await this.protectedProxyService.forward({
       authorizationHeader,
-      refreshToken: getRefreshToken(refreshTokenHeader, cookieHeader),
+      refreshToken: getRefreshTokenFromRequest(
+        refreshTokenHeader,
+        cookieHeader,
+      ),
       method: 'GET',
       path: '/appointments/availability',
       query,

@@ -8,9 +8,18 @@ export type ApiSecurityOptions = {
   cors?: CorsOptions;
 };
 
+function parseFrontendOrigins(frontendUrl: string): string | string[] {
+  const origins = frontendUrl
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  return origins.length === 1 ? origins[0] : origins;
+}
+
 export function createFrontendCorsOptions(frontendUrl: string): CorsOptions {
   return {
-    origin: frontendUrl,
+    origin: parseFrontendOrigins(frontendUrl),
     credentials: true,
     exposedHeaders: ['x-access-token', 'x-refresh-token'],
   };

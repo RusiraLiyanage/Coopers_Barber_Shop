@@ -13,6 +13,7 @@ import {
   LogoutResponse,
   PasswordService,
   SessionService,
+  SessionValidationResponse,
 } from '@coopers/common';
 
 @Injectable()
@@ -87,14 +88,17 @@ export class AuthService {
       role: user.role,
     };
 
-    const tokens = this.jwtTokenService.createAuthTokens(authenticatedUser);
+    const newRefreshToken = this.jwtTokenService.generateRefreshToken();
 
-    await this.sessionService.rotateSession({
+    const newSession = await this.sessionService.rotateSession({
       currentRefreshToken: refreshToken,
-      newRefreshToken: tokens.refresh_token,
+      newRefreshToken: newRefreshToken.refresh_token,
     });
 
-    return tokens;
+    return {
+      ...this.jwtTokenService.signAccessToken(authenticatedUser, newSession.id),
+      ...newRefreshToken,
+    };
   }
 
   async logout(refreshToken: string): Promise<LogoutResponse> {
@@ -105,16 +109,25 @@ export class AuthService {
     };
   }
 
+  async validateSession(sessionId: string): Promise<SessionValidationResponse> {
+    return {
+      active: await this.sessionService.isSessionActive(sessionId),
+    };
+  }
+
   private async createSessionTokens(
     user: AuthenticatedUser,
   ): Promise<AuthTokensResponse> {
-    const tokens = this.jwtTokenService.createAuthTokens(user);
+    const refreshToken = this.jwtTokenService.generateRefreshToken();
 
-    await this.sessionService.createSession({
+    const session = await this.sessionService.createSession({
       userId: user.id,
-      refreshToken: tokens.refresh_token,
+      refreshToken: refreshToken.refresh_token,
     });
 
-    return tokens;
+    return {
+      ...this.jwtTokenService.signAccessToken(user, session.id),
+      ...refreshToken,
+    };
   }
 }

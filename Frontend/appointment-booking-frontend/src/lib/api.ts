@@ -32,6 +32,8 @@ type ApiErrorPayload = {
   message?: string | string[];
 };
 
+type ParsedResponse<T> = T | ApiErrorPayload | string | null;
+
 type AuthSessionRefreshHandler = (session: AuthSession) => void;
 
 function buildHeaders(session?: AuthSession) {
@@ -79,11 +81,10 @@ async function request<T>(
     onAuthSessionRefresh?.(refreshedSession);
   }
 
-  const rawBody = await response.text();
-  const data = rawBody ? (JSON.parse(rawBody) as T | ApiErrorPayload) : null;
+  const data = await parseResponse<T>(response);
 
   if (!response.ok) {
-    const errorMessage = (data as ApiErrorPayload | null)?.message;
+    const errorMessage = getApiErrorMessage(data);
     const message = Array.isArray(errorMessage)
       ? errorMessage.join(", ")
       : errorMessage || response.statusText;
@@ -92,6 +93,40 @@ async function request<T>(
   }
 
   return data as T;
+}
+
+async function parseResponse<T>(response: Response): Promise<ParsedResponse<T>> {
+  const rawBody = await response.text();
+
+  if (!rawBody) {
+    return null;
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (!contentType.includes("application/json")) {
+    return rawBody;
+  }
+
+  try {
+    return JSON.parse(rawBody) as T | ApiErrorPayload;
+  } catch {
+    return rawBody;
+  }
+}
+
+function getApiErrorMessage<T>(
+  data: ParsedResponse<T>,
+): string | string[] | undefined {
+  if (typeof data === "string") {
+    return data;
+  }
+
+  if (typeof data !== "object" || data === null || !("message" in data)) {
+    return undefined;
+  }
+
+  return data.message;
 }
 
 export function toAuthSession(response: AuthResponse): AuthSession {

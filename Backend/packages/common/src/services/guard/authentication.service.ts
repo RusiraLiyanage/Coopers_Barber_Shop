@@ -19,6 +19,7 @@ function isJwtPayload(value: unknown): value is JwtPayload {
   return (
     typeof payload.sub === 'string' &&
     typeof payload.email === 'string' &&
+    typeof payload.sid === 'string' &&
     payload.role !== undefined &&
     Object.values(UserRole).includes(payload.role)
   );
@@ -49,6 +50,7 @@ export class GuardAuthenticationService {
         userId: payload.sub,
         email: payload.email,
         role: payload.role,
+        sessionId: payload.sid,
       };
     } catch (error) {
       if (error instanceof UnauthorizedException) {

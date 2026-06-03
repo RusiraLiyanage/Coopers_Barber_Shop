@@ -13,11 +13,15 @@ import type {
 export class JwtTokenService {
   constructor(private readonly jwtService: JwtService) {}
 
-  signAccessToken(user: AuthenticatedUser): AccessTokenResponse {
+  signAccessToken(
+    user: AuthenticatedUser,
+    sessionId: string,
+  ): AccessTokenResponse {
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
       role: user.role,
+      sid: sessionId,
     };
 
     return {
@@ -31,9 +35,12 @@ export class JwtTokenService {
     };
   }
 
-  createAuthTokens(user: AuthenticatedUser): AuthTokensResponse {
+  createAuthTokens(
+    user: AuthenticatedUser,
+    sessionId: string,
+  ): AuthTokensResponse {
     return {
-      ...this.signAccessToken(user),
+      ...this.signAccessToken(user, sessionId),
       ...this.generateRefreshToken(),
     };
   }

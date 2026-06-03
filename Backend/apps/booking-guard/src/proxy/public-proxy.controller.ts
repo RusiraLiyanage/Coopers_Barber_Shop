@@ -1,6 +1,15 @@
-import { Body, Controller, Get, Param, Post, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Param,
+  Post,
+  Res,
+} from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ProxyService } from './proxy.service';
+import { createRefreshTokenBody } from './refresh-token.util';
 
 type StatusResponse = {
   status: (statusCode: number) => void;
@@ -14,7 +23,7 @@ type LoginRequestBody = {
 type RegisterRequestBody = LoginRequestBody;
 
 type RefreshTokenRequestBody = {
-  refresh_token: string;
+  refresh_token?: string;
 };
 
 function writeStatus(response: StatusResponse, statusCode: number): void {
@@ -95,13 +104,15 @@ export class PublicProxyController {
   @Post('auth/refresh')
   async refresh(
     @Body() body: RefreshTokenRequestBody,
+    @Headers('x-refresh-token') refreshTokenHeader: string | undefined,
+    @Headers('cookie') cookieHeader: string | undefined,
     @Res({ passthrough: true }) response: StatusResponse,
   ): Promise<unknown> {
     const result = await this.proxyService.forward({
       target: 'auth',
       method: 'POST',
       path: '/auth/refresh',
-      body,
+      body: createRefreshTokenBody(refreshTokenHeader, cookieHeader, body),
     });
 
     writeStatus(response, result.statusCode);
@@ -122,13 +133,15 @@ export class PublicProxyController {
   @Post('auth/logout')
   async logout(
     @Body() body: RefreshTokenRequestBody,
+    @Headers('x-refresh-token') refreshTokenHeader: string | undefined,
+    @Headers('cookie') cookieHeader: string | undefined,
     @Res({ passthrough: true }) response: StatusResponse,
   ): Promise<unknown> {
     const result = await this.proxyService.forward({
       target: 'auth',
       method: 'POST',
       path: '/auth/logout',
-      body,
+      body: createRefreshTokenBody(refreshTokenHeader, cookieHeader, body),
     });
 
     writeStatus(response, result.statusCode);

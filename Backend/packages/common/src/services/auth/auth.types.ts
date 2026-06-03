@@ -10,12 +10,14 @@ export interface JwtPayload {
   sub: string;
   email: string;
   role: UserRole;
+  sid: string;
 }
 
 export interface JwtRequestUser {
   userId: string;
   email: string;
   role: UserRole;
+  sessionId: string;
 }
 
 export interface AuthenticatedRequest {
@@ -40,4 +42,8 @@ export interface AuthTokensResponse
 
 export interface LogoutResponse {
   success: boolean;
+}
+
+export interface SessionValidationResponse {
+  active: boolean;
 }

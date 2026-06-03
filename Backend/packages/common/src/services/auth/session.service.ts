@@ -58,6 +58,18 @@ export class SessionService {
     });
   }
 
+  async isSessionActive(sessionId: string): Promise<boolean> {
+    const session = await this.sessionsRepo.findOne({
+      where: {
+        id: sessionId,
+      },
+    });
+
+    return Boolean(
+      session && !session.revokedAt && session.expiresAt > new Date(),
+    );
+  }
+
   async revokeSession(refreshToken: string): Promise<void> {
     const session = await this.sessionsRepo.findOne({
       where: {
