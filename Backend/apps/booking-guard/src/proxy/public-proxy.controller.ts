@@ -278,6 +278,8 @@ export class PublicProxyController {
     @Headers('cookie') cookieHeader: string | undefined,
     @Res({ passthrough: true }) response: AuthCookieResponse,
   ): Promise<unknown> {
+    clearAuthCookies(response);
+
     const result = await this.proxyService.forward({
       target: 'auth',
       method: 'POST',
@@ -285,7 +287,6 @@ export class PublicProxyController {
       body: createRefreshTokenBody(refreshTokenHeader, cookieHeader, body),
     });
 
-    clearAuthCookies(response);
     writeStatus(response, result.statusCode);
 
     return result.body;

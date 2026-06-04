@@ -5,6 +5,7 @@ import {
   Modal,
   Select,
   Spin,
+  Typography,
   message,
 } from "antd";
 import { useEffect, useState } from "react";
@@ -15,6 +16,7 @@ import {
   type AuthSession,
   type ServiceOption,
 } from "../lib/api";
+import { getGenericErrorMessage } from "../lib/errors";
 
 interface MakeAppointmentModalProps {
   open: boolean;
@@ -64,9 +66,9 @@ export default function MakeAppointmentModal({
       .then((response) => {
         setServices(response.filter((service) => service.isActive));
       })
-      .catch((error) => {
+      .catch((error: unknown) => {
         messageApi.error(
-          error instanceof Error ? error.message : "Failed to load services",
+          getGenericErrorMessage("Load appointment services", error),
         );
       })
       .finally(() => {
@@ -101,9 +103,7 @@ export default function MakeAppointmentModal({
     } catch (error) {
       setSlots([]);
       messageApi.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to load appointment slots",
+        getGenericErrorMessage("Load appointment availability", error),
       );
     } finally {
       setSlotsLoading(false);
@@ -133,7 +133,7 @@ export default function MakeAppointmentModal({
       onBooked();
     } catch (error) {
       messageApi.error(
-        error instanceof Error ? error.message : "Failed to create appointment",
+        getGenericErrorMessage("Create appointment", error),
       );
     } finally {
       setConfirmLoading(false);
@@ -144,12 +144,21 @@ export default function MakeAppointmentModal({
     <>
       {contextHolder}
       <Modal
-        title="New Appointment"
+        title={
+          <Typography.Title level={3} style={{ margin: 0 }}>
+            New Appointment
+          </Typography.Title>
+        }
         open={open}
         onCancel={onClose}
         footer={null}
         centered
-        width={560}
+        width={660}
+        styles={{
+          body: {
+            paddingTop: 16,
+          },
+        }}
       >
         <Spin spinning={servicesLoading}>
           <Form<AppointmentFormValues>
@@ -157,16 +166,22 @@ export default function MakeAppointmentModal({
             form={form}
             onFinish={handleSubmit}
             onValuesChange={(changedValues) => {
-              if ("serviceId" in changedValues || "appointmentDate" in changedValues) {
+              if (
+                "serviceId" in changedValues ||
+                "appointmentDate" in changedValues
+              ) {
                 form.setFieldValue("appointmentTime", undefined);
                 loadAvailability();
               }
             }}
             autoComplete="off"
+            style={{ fontSize: 16 }}
           >
             <Form.Item
               name="serviceId"
-              label="Service"
+              label={
+                <span style={{ fontSize: 16, fontWeight: 600 }}>Service</span>
+              }
               rules={[
                 {
                   required: true,
@@ -175,6 +190,7 @@ export default function MakeAppointmentModal({
               ]}
             >
               <Select
+                size="large"
                 placeholder="Select a service"
                 options={services.map((service) => ({
                   value: service.id,
@@ -185,7 +201,11 @@ export default function MakeAppointmentModal({
 
             <Form.Item
               name="appointmentDate"
-              label="Appointment Date"
+              label={
+                <span style={{ fontSize: 16, fontWeight: 600 }}>
+                  Appointment Date
+                </span>
+              }
               rules={[
                 {
                   required: true,
@@ -194,6 +214,7 @@ export default function MakeAppointmentModal({
               ]}
             >
               <DatePicker
+                size="large"
                 style={{ width: "100%" }}
                 disabled={!form.getFieldValue("serviceId")}
                 disabledDate={(current) => {
@@ -220,7 +241,11 @@ export default function MakeAppointmentModal({
 
             <Form.Item
               name="appointmentTime"
-              label="Available Time Slots"
+              label={
+                <span style={{ fontSize: 16, fontWeight: 600 }}>
+                  Available Time Slots
+                </span>
+              }
               rules={[
                 {
                   required: true,
@@ -231,15 +256,22 @@ export default function MakeAppointmentModal({
               {slotsLoading ? (
                 <Spin />
               ) : showNoAvailabilityMessage ? (
-                <div style={{ color: "#8c8c8c" }}>
+                <div style={{ color: "#8c8c8c", fontSize: 16 }}>
                   No appointments available for the selected service and date.
                 </div>
               ) : (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
                   {slots.map((slot) => (
                     <Button
                       key={slot}
                       type={selectedSlot === slot ? "primary" : "default"}
+                      size="large"
+                      style={{
+                        minWidth: 96,
+                        height: 44,
+                        fontSize: 16,
+                        fontWeight: 600,
+                      }}
                       onClick={() => {
                         setSelectedSlot(slot);
                         form.setFieldValue("appointmentTime", slot);
@@ -260,12 +292,15 @@ export default function MakeAppointmentModal({
                   justifyContent: "flex-end",
                 }}
               >
-                <Button onClick={onClose}>Cancel</Button>
+                <Button size="large" onClick={onClose}>
+                  Cancel
+                </Button>
                 <Button
                   type="primary"
                   htmlType="submit"
                   loading={confirmLoading}
                   disabled={!slots.length}
+                  size="large"
                 >
                   Book Appointment
                 </Button>

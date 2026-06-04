@@ -1,4 +1,7 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "";
+const AUTH_BROWSER_SESSION_KEY = "coopers_auth_browser_session";
+const AUTH_REMEMBERED_SESSION_KEY = "coopers_auth_remembered_session";
+const AUTH_HAD_SESSION_KEY = "coopers_auth_had_session";
 
 export interface AuthResponse {
   authenticated: boolean;
@@ -26,16 +29,143 @@ export interface AppointmentRecord {
   staffName: string;
 }
 
+export interface AccountProfile {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  mobile: string | null;
+  suburb: string | null;
+  role: string;
+}
+
+export type RegisterPayload = {
+  firstName: string;
+  lastName: string;
+  mobile: string;
+  suburb: string;
+  email: string;
+  password: string;
+  remember: boolean;
+};
+
+export type UpdateAccountPayload = {
+  email: string;
+  firstName: string;
+  lastName: string;
+  mobile: string;
+  suburb: string;
+};
+
 type ApiErrorPayload = {
   message?: string | string[];
 };
 
 type ParsedResponse<T> = T | ApiErrorPayload | string | null;
 
+export class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+  ) {
+    super(message);
+    this.name = 'ApiRequestError';
+  }
+}
+
 function buildHeaders() {
   return {
     "Content-Type": "application/json",
   };
+}
+
+function getSessionStorageValue(key: string): string | null {
+  try {
+    return window.sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function getLocalStorageValue(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function setSessionStorageValue(key: string, value: string): void {
+  try {
+    window.sessionStorage.setItem(key, value);
+  } catch {
+    return;
+  }
+}
+
+function setLocalStorageValue(key: string, value: string): void {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    return;
+  }
+}
+
+function removeSessionStorageValue(key: string): void {
+  try {
+    window.sessionStorage.removeItem(key);
+  } catch {
+    return;
+  }
+}
+
+function removeLocalStorageValue(key: string): void {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    return;
+  }
+}
+
+function rememberClientAuthSession(remember: boolean): void {
+  setSessionStorageValue(AUTH_BROWSER_SESSION_KEY, "true");
+  setLocalStorageValue(AUTH_HAD_SESSION_KEY, "true");
+
+  if (remember) {
+    setLocalStorageValue(AUTH_REMEMBERED_SESSION_KEY, "true");
+    return;
+  }
+
+  removeLocalStorageValue(AUTH_REMEMBERED_SESSION_KEY);
+}
+
+function markRestoredClientAuthSession(): void {
+  if (
+    getSessionStorageValue(AUTH_BROWSER_SESSION_KEY) === "true" ||
+    getLocalStorageValue(AUTH_REMEMBERED_SESSION_KEY) === "true"
+  ) {
+    setSessionStorageValue(AUTH_BROWSER_SESSION_KEY, "true");
+  }
+}
+
+export function canRestoreClientAuthSession(): boolean {
+  return (
+    getSessionStorageValue(AUTH_BROWSER_SESSION_KEY) === "true" ||
+    getLocalStorageValue(AUTH_REMEMBERED_SESSION_KEY) === "true"
+  );
+}
+
+export function shouldClearStaleClientAuthSession(): boolean {
+  return (
+    !canRestoreClientAuthSession() &&
+    getLocalStorageValue(AUTH_HAD_SESSION_KEY) === "true"
+  );
+}
+
+export function clearClientAuthSession(): void {
+  removeSessionStorageValue(AUTH_BROWSER_SESSION_KEY);
+  removeLocalStorageValue(AUTH_REMEMBERED_SESSION_KEY);
+  removeLocalStorageValue(AUTH_HAD_SESSION_KEY);
 }
 
 async function request<T>(
@@ -55,7 +185,7 @@ async function request<T>(
       ? errorMessage.join(", ")
       : errorMessage || response.statusText;
 
-    throw new Error(message || "Request failed");
+    throw new ApiRequestError(message || "Request failed", response.status);
   }
 
   return data as T;
@@ -105,33 +235,81 @@ export function toAuthSession(response: AuthResponse): AuthSession {
   };
 }
 
-export function getCurrentSession() {
-  return request<AuthResponse>("/auth/session", {
+export async function getCurrentSession() {
+  const response = await request<AuthResponse>("/auth/session", {
     headers: buildHeaders(),
   });
+
+  if (response.authenticated) {
+    markRestoredClientAuthSession();
+  }
+
+  return response;
 }
 
-export function login(email: string, password: string) {
-  return request<AuthResponse>("/auth/login", {
+export async function refreshSession() {
+  const response = await request<AuthResponse>("/auth/refresh", {
     method: "POST",
     headers: buildHeaders(),
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({}),
   });
+
+  if (response.authenticated) {
+    markRestoredClientAuthSession();
+  }
+
+  return response;
 }
 
-export function register(email: string, password: string) {
-  return request<AuthResponse>("/auth/register", {
+export async function login(email: string, password: string, remember: boolean) {
+  const response = await request<AuthResponse>("/auth/login", {
     method: "POST",
     headers: buildHeaders(),
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, remember }),
   });
+
+  if (response.authenticated) {
+    rememberClientAuthSession(remember);
+  }
+
+  return response;
+}
+
+export async function register(payload: RegisterPayload) {
+  const response = await request<AuthResponse>("/auth/register", {
+    method: "POST",
+    headers: buildHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  if (response.authenticated) {
+    rememberClientAuthSession(payload.remember);
+  }
+
+  return response;
 }
 
 export function logout() {
+  clearClientAuthSession();
+
   return request<{ success: boolean }>("/auth/logout", {
     method: "POST",
     headers: buildHeaders(),
     body: JSON.stringify({}),
+  });
+}
+
+export function getAccountProfile() {
+  return request<AccountProfile>("/auth/me", {
+    headers: buildHeaders(),
+  });
+}
+
+export function updateAccountProfile(payload: UpdateAccountPayload) {
+  return request<AccountProfile>("/auth/me", {
+    method: "PATCH",
+    headers: buildHeaders(),
+    body: JSON.stringify(payload),
   });
 }
 

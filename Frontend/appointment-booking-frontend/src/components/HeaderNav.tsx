@@ -7,6 +7,7 @@ interface HeaderNavProps {
   isAuthenticated: boolean;
   onLogout: () => void;
   onOpenAuthModal: () => void;
+  onOpenMyAccount: () => void;
   onOpenAppointmentModal: () => void;
 }
 
@@ -14,6 +15,7 @@ export default function HeaderNav({
   isAuthenticated,
   onLogout,
   onOpenAuthModal,
+  onOpenMyAccount,
   onOpenAppointmentModal,
 }: HeaderNavProps) {
   const navigate = useNavigate();
@@ -21,6 +23,7 @@ export default function HeaderNav({
 
   const handleMenuClick = (e: { key: string }) => {
     if (e.key === "login_register") onOpenAuthModal();
+    else if (e.key === "account") onOpenMyAccount();
     else if (e.key === "logout") onLogout();
   };
 
@@ -37,7 +40,10 @@ export default function HeaderNav({
 
   const profileMenu = {
     items: isAuthenticated
-      ? [{ key: "logout", label: "Logout" }]
+      ? [
+          { key: "account", label: "My Account" },
+          { key: "logout", label: "Logout" },
+        ]
       : [{ key: "login_register", label: "Login/Register" }],
     onClick: handleMenuClick,
   };

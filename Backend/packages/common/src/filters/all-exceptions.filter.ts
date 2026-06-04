@@ -59,6 +59,33 @@ function normalizeError(value: unknown, fallback: string): string {
   return typeof value === 'string' ? value : fallback;
 }
 
+function shouldLogDetailedError(exception: unknown): boolean {
+  if (!(exception instanceof HttpException)) {
+    return true;
+  }
+
+  return (
+    process.env.ENV === 'develop' || process.env.NODE_ENV === 'development'
+  );
+}
+
+function logException(
+  exception: unknown,
+  request: HttpRequestLike,
+  statusCode: number,
+): void {
+  if (!shouldLogDetailedError(exception)) {
+    return;
+  }
+
+  console.error('API exception caught:', {
+    statusCode,
+    method: request.method ?? '',
+    path: request.originalUrl ?? request.url ?? '',
+    exception,
+  });
+}
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
@@ -81,9 +108,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
         message = normalizeMessage(exceptionResponse.message);
         error = normalizeError(exceptionResponse.error, exception.name);
       }
-    } else {
-      console.error('Unhandled exception caught:', exception);
     }
+
+    logException(exception, request, statusCode);
 
     response.status(statusCode).json({
       success: false,

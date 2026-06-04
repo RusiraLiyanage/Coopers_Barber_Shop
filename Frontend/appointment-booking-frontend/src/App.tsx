@@ -1,15 +1,32 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Layout } from "antd";
 import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import HeaderNav from "./components/HeaderNav";
 import Home from "./pages/HomePage";
 import MyAppointments from "./pages/MyAppointments";
+import MyAccount from "./pages/MyAccount";
 import UserAuthModal from "./Models/userAuth";
 import MakeAppointmentModal from "./Models/makeAppointment";
-import { getCurrentSession, logout, toAuthSession, type AuthSession } from "./lib/api";
+import {
+  canRestoreClientAuthSession,
+  getCurrentSession,
+  logout,
+  refreshSession,
+  shouldClearStaleClientAuthSession,
+  toAuthSession,
+  type AuthSession,
+} from "./lib/api";
 
 const { Content, Footer } = Layout;
 const LEGACY_AUTH_TOKEN_KEY = "booking_auth_token";
+const SESSION_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+const SESSION_ACTIVITY_EVENTS = [
+  "click",
+  "keydown",
+  "mousemove",
+  "scroll",
+  "touchstart",
+] as const;
 
 function App() {
   const location = useLocation();
@@ -18,6 +35,8 @@ function App() {
   const [openAuthModal, setOpenAuthModal] = useState(false);
   const [openAppointmentModal, setOpenAppointmentModal] = useState(false);
   const [appointmentsRefreshKey, setAppointmentsRefreshKey] = useState(0);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const sessionLastActivityAtRef = useRef(Date.now());
 
   const isAuthenticated = Boolean(authSession?.authenticated);
 
@@ -28,6 +47,18 @@ function App() {
 
   useEffect(() => {
     let isMounted = true;
+
+    if (!canRestoreClientAuthSession()) {
+      if (shouldClearStaleClientAuthSession()) {
+        void logout().catch(() => undefined);
+      }
+
+      setAuthSession(null);
+
+      return () => {
+        isMounted = false;
+      };
+    }
 
     getCurrentSession()
       .then((session) => {
@@ -46,11 +77,98 @@ function App() {
     };
   }, [setAuthSession]);
 
+  useEffect(() => {
+    if (!isAuthenticated || sessionExpired) {
+      return;
+    }
+
+    let timeoutId: number | undefined;
+    let hasExpired = false;
+
+    const expireSession = () => {
+      if (hasExpired) {
+        return;
+      }
+
+      hasExpired = true;
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
+      setAuthSession(null);
+      setSessionExpired(true);
+      setOpenAppointmentModal(false);
+      navigate("/");
+      setOpenAuthModal(true);
+    };
+
+    const scheduleIdleCheck = () => {
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
+
+      const idleForMs = Date.now() - sessionLastActivityAtRef.current;
+      const remainingMs = SESSION_IDLE_TIMEOUT_MS - idleForMs;
+
+      if (remainingMs <= 0) {
+        expireSession();
+        return;
+      }
+
+      timeoutId = window.setTimeout(expireSession, remainingMs);
+    };
+
+    const recordActivity = () => {
+      sessionLastActivityAtRef.current = Date.now();
+      scheduleIdleCheck();
+    };
+
+    const checkIdleWhenTabReturns = () => {
+      scheduleIdleCheck();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkIdleWhenTabReturns();
+      }
+    };
+
+    SESSION_ACTIVITY_EVENTS.forEach((eventName) => {
+      window.addEventListener(eventName, recordActivity, { passive: true });
+    });
+    window.addEventListener("focus", checkIdleWhenTabReturns);
+    window.addEventListener("pageshow", checkIdleWhenTabReturns);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    sessionLastActivityAtRef.current = Date.now();
+    scheduleIdleCheck();
+
+    return () => {
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
+      SESSION_ACTIVITY_EVENTS.forEach((eventName) => {
+        window.removeEventListener(eventName, recordActivity);
+      });
+      window.removeEventListener("focus", checkIdleWhenTabReturns);
+      window.removeEventListener("pageshow", checkIdleWhenTabReturns);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [isAuthenticated, navigate, sessionExpired, setAuthSession]);
+
   const handleLogout = () => {
+    setSessionExpired(false);
     setAuthSession(null);
     navigate("/");
 
     void logout().catch(() => undefined);
+  };
+
+  const handleExtendSession = async () => {
+    const session = await refreshSession();
+
+    sessionLastActivityAtRef.current = Date.now();
+    setAuthSession(toAuthSession(session));
+    setSessionExpired(false);
+    setOpenAuthModal(false);
   };
 
   const openBookingFlow = () => {
@@ -68,6 +186,7 @@ function App() {
         isAuthenticated={isAuthenticated}
         onLogout={handleLogout}
         onOpenAuthModal={() => setOpenAuthModal(true)}
+        onOpenMyAccount={() => navigate("/account")}
         onOpenAppointmentModal={() => setOpenAppointmentModal(true)}
       />
 
@@ -81,6 +200,10 @@ function App() {
             path="/appointments"
             element={<Home onMakeAppointment={openBookingFlow} />}
           />
+          <Route
+            path="/account"
+            element={<Home onMakeAppointment={openBookingFlow} />}
+          />
         </Routes>
 
         <MyAppointments
@@ -90,13 +213,23 @@ function App() {
           onClose={() => navigate("/")}
           onMakeAppointment={openBookingFlow}
         />
+
+        <MyAccount
+          open={location.pathname === "/account"}
+          authSession={authSession}
+          onClose={() => navigate("/")}
+        />
       </Content>
 
       <UserAuthModal
         open={openAuthModal}
+        sessionExpired={sessionExpired}
         onClose={() => setOpenAuthModal(false)}
+        onExtendSession={handleExtendSession}
         onAuthSuccess={(session) => {
+          sessionLastActivityAtRef.current = Date.now();
           setAuthSession(session);
+          setSessionExpired(false);
           setOpenAuthModal(false);
           setOpenAppointmentModal(true);
         }}
