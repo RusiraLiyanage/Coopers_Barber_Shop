@@ -57,6 +57,19 @@ export type UpdateAccountPayload = {
   suburb: string;
 };
 
+export type PasswordResetRequestPayload = {
+  email: string;
+};
+
+export type PasswordResetVerifyPayload = {
+  email: string;
+  code: string;
+};
+
+export type PasswordResetConfirmPayload = PasswordResetVerifyPayload & {
+  password: string;
+};
+
 type ApiErrorPayload = {
   message?: string | string[];
 };
@@ -308,6 +321,32 @@ export function getAccountProfile() {
 export function updateAccountProfile(payload: UpdateAccountPayload) {
   return request<AccountProfile>("/auth/me", {
     method: "PATCH",
+    headers: buildHeaders(),
+    body: JSON.stringify(payload),
+  });
+}
+
+export function requestPasswordReset(payload: PasswordResetRequestPayload) {
+  return request<{ success: true }>("/auth/password-reset/request", {
+    method: "POST",
+    headers: buildHeaders(),
+    body: JSON.stringify(payload),
+  });
+}
+
+export function verifyPasswordResetCode(payload: PasswordResetVerifyPayload) {
+  return request<{ valid: true }>("/auth/password-reset/verify", {
+    method: "POST",
+    headers: buildHeaders(),
+    body: JSON.stringify(payload),
+  });
+}
+
+export function confirmPasswordReset(payload: PasswordResetConfirmPayload) {
+  clearClientAuthSession();
+
+  return request<{ success: true }>("/auth/password-reset/confirm", {
+    method: "POST",
     headers: buildHeaders(),
     body: JSON.stringify(payload),
   });
