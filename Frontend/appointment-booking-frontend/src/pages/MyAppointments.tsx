@@ -58,8 +58,7 @@ const CALENDAR_TOOLBAR_HEIGHT = 72;
 const MONTH_VIEW_ROWS = 6;
 const MONTH_ROW_BASE_HEIGHT = 100;
 const MONTH_DATE_HEADER_HEIGHT = 28;
-const MONTH_EVENT_CARD_HEIGHT = 30;
-const MONTH_SELECTED_EVENT_EXTRA_HEIGHT = 64;
+const MONTH_EVENT_CARD_HEIGHT = 82;
 const MONTH_ROW_VERTICAL_PADDING = 18;
 const CALENDAR_VIEW_OPTIONS: CalendarViewOption[] = [
   { label: "Month", value: "month" },
@@ -115,19 +114,16 @@ function getLargestDailyAppointmentCount(events: AppointmentCalendarEvent[]) {
   return Math.max(0, ...Object.values(appointmentCountByDate));
 }
 
-function getCalendarHeight(
-  events: AppointmentCalendarEvent[],
-  selectedEvent: AppointmentCalendarEvent | null,
-) {
+function getCalendarHeight(events: AppointmentCalendarEvent[], view: View) {
+  if (view !== "month") {
+    return MIN_CALENDAR_HEIGHT;
+  }
+
   const largestDailyAppointmentCount = getLargestDailyAppointmentCount(events);
-  const expandedEventHeight = selectedEvent
-    ? MONTH_SELECTED_EVENT_EXTRA_HEIGHT
-    : 0;
   const rowHeight = Math.max(
     MONTH_ROW_BASE_HEIGHT,
     MONTH_DATE_HEADER_HEIGHT +
       largestDailyAppointmentCount * MONTH_EVENT_CARD_HEIGHT +
-      expandedEventHeight +
       MONTH_ROW_VERTICAL_PADDING,
   );
 
@@ -421,19 +417,17 @@ function AppointmentsCalendar({
     () => getCalendarSelectedDate(appointments),
     [appointments],
   );
-  const [selectedEvent, setSelectedEvent] =
-    useState<AppointmentCalendarEvent | null>(null);
   const [calendarDate, setCalendarDate] = useState(selectedDate);
   const [calendarView, setCalendarView] = useState<View>("month");
   const calendarHeight = useMemo(
-    () => getCalendarHeight(calendarEvents, selectedEvent),
-    [calendarEvents, selectedEvent],
+    () => getCalendarHeight(calendarEvents, calendarView),
+    [calendarEvents, calendarView],
   );
   const calendarComponents = useMemo(
     () => ({
       toolbar: AppointmentCalendarToolbar,
       event: ({ event }: EventProps<AppointmentCalendarEvent>) => {
-        const isSelected = selectedEvent?.id === event.id;
+        const isMonthView = calendarView === "month";
         const isAgendaView = calendarView === "agenda";
         const isWeekView = calendarView === "week";
         const isDayView = calendarView === "day";
@@ -445,10 +439,6 @@ function AppointmentsCalendar({
           `appointment-calendar-event-${calendarView}`,
         ];
 
-        if (isSelected) {
-          eventClassNames.push("appointment-calendar-event-selected");
-        }
-
         if (isShortTimeEvent) {
           eventClassNames.push("appointment-calendar-event-short");
         }
@@ -457,18 +447,16 @@ function AppointmentsCalendar({
           <div className={eventClassNames.join(" ")}>
             <div className="appointment-calendar-event-main">
               <span className="appointment-calendar-event-time">
-                {isShortTimeEvent
-                  ? format(event.start, "h:mm a")
-                  : isAgendaView || isTimeGridView
-                    ? formatCalendarEventTime(event)
-                    : format(event.start, "h:mm a")}
+                {isAgendaView || isTimeGridView
+                  ? formatCalendarEventTime(event)
+                  : format(event.start, "h:mm a")}
               </span>
               <span className="appointment-calendar-event-title">
                 {event.title}
               </span>
             </div>
 
-            {(isAgendaView || isDayView) && !isShortTimeEvent ? (
+            {isAgendaView || isDayView ? (
               <div className="appointment-calendar-event-summary">
                 <span>Staff: {event.staffName}</span>
                 <span className="appointment-calendar-event-status">
@@ -477,7 +465,7 @@ function AppointmentsCalendar({
               </div>
             ) : null}
 
-            {isSelected && !isAgendaView && !isTimeGridView ? (
+            {isMonthView ? (
               <div className="appointment-calendar-event-details">
                 <span>{formatCalendarEventTime(event)}</span>
                 <span>Staff: {event.staffName}</span>
@@ -488,11 +476,10 @@ function AppointmentsCalendar({
         );
       },
     }),
-    [calendarView, selectedEvent?.id],
+    [calendarView],
   );
 
   useEffect(() => {
-    setSelectedEvent(null);
     setCalendarDate(selectedDate);
   }, [appointments, selectedDate]);
 
@@ -531,18 +518,10 @@ function AppointmentsCalendar({
         eventPropGetter={getCalendarEventStyle}
         onNavigate={(newDate) => {
           setCalendarDate(newDate);
-          setSelectedEvent(null);
         }}
         onView={(nextView) => {
           setCalendarView(nextView);
-          setSelectedEvent(null);
         }}
-        onSelectEvent={(event) => {
-          setSelectedEvent((currentEvent) =>
-            currentEvent?.id === event.id ? null : event,
-          );
-        }}
-        selected={selectedEvent}
         components={calendarComponents}
         min={new Date(1970, 0, 1, 8, 0)}
         max={new Date(1970, 0, 1, 19, 0)}

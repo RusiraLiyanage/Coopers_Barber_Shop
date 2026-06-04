@@ -41,6 +41,7 @@ body {
 
 .appointments-calendar .rbc-event {
   border-radius: 6px;
+  cursor: default;
 }
 
 .appointments-calendar-toolbar {
@@ -72,7 +73,7 @@ body {
 
 .appointments-calendar .rbc-month-view .rbc-event {
   margin-top: 2px;
-  padding: 2px 5px;
+  padding: 4px 6px;
   line-height: 1.25;
 }
 
@@ -81,6 +82,7 @@ body {
 }
 
 .appointments-calendar .rbc-time-view .rbc-event {
+  min-height: 50px;
   padding: 0;
   border-left: 4px solid #1d4ed8;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.24);
@@ -111,6 +113,11 @@ body {
 
 .appointment-calendar-event {
   min-width: 0;
+}
+
+.appointment-calendar-event-month {
+  display: grid;
+  gap: 4px;
 }
 
 .appointment-calendar-event-week,
@@ -196,38 +203,31 @@ body {
 }
 
 .appointment-calendar-event-short {
-  justify-content: center;
-  gap: 0;
-  padding: 3px 6px;
+  min-height: 50px;
+  justify-content: flex-start;
+  gap: 3px;
+  padding: 6px 8px;
 }
 
 .appointment-calendar-event-short .appointment-calendar-event-main {
-  align-items: center;
-  flex-direction: row;
-  gap: 5px;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .appointment-calendar-event-short .appointment-calendar-event-time {
-  font-size: 10px;
+  font-size: 10.5px;
 }
 
 .appointment-calendar-event-short .appointment-calendar-event-title {
   overflow: hidden;
   font-size: 12px;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .appointment-calendar-event-day .appointment-calendar-event-summary {
   color: rgba(255, 255, 255, 0.92);
-}
-
-.appointment-calendar-event-selected {
-  padding: 2px 0;
-}
-
-.appointment-calendar-event-selected .appointment-calendar-event-title {
-  white-space: normal;
 }
 
 .appointment-calendar-event-details {
@@ -238,6 +238,16 @@ body {
   border-top: 1px solid rgba(255, 255, 255, 0.36);
   font-size: 11px;
   line-height: 1.25;
+}
+
+.appointment-calendar-event-month .appointment-calendar-event-details {
+  overflow: hidden;
+}
+
+.appointment-calendar-event-month .appointment-calendar-event-details span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .appointments-calendar .rbc-toolbar {
