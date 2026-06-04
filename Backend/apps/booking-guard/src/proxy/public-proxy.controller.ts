@@ -56,6 +56,19 @@ type RefreshTokenRequestBody = {
   refresh_token?: string;
 };
 
+type PasswordResetRequestBody = {
+  email: string;
+};
+
+type PasswordResetVerifyBody = {
+  email: string;
+  code: string;
+};
+
+type PasswordResetConfirmBody = PasswordResetVerifyBody & {
+  password: string;
+};
+
 function writeStatus(response: StatusResponse, statusCode: number): void {
   response.status(statusCode);
 }
@@ -285,6 +298,94 @@ export class PublicProxyController {
       method: 'POST',
       path: '/auth/logout',
       body: createRefreshTokenBody(refreshTokenHeader, cookieHeader, body),
+    });
+
+    writeStatus(response, result.statusCode);
+
+    return result.body;
+  }
+
+  @ApiOperation({ summary: 'Proxy password reset code request to auth-api' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['email'],
+      properties: {
+        email: { type: 'string', example: 'customer@example.com' },
+      },
+    },
+  })
+  @Post('auth/password-reset/request')
+  async requestPasswordReset(
+    @Body() body: PasswordResetRequestBody,
+    @Res({ passthrough: true }) response: StatusResponse,
+  ): Promise<unknown> {
+    const result = await this.proxyService.forward({
+      target: 'auth',
+      method: 'POST',
+      path: '/auth/password-reset/request',
+      body,
+    });
+
+    writeStatus(response, result.statusCode);
+
+    return result.body;
+  }
+
+  @ApiOperation({
+    summary: 'Proxy password reset code verification to auth-api',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['email', 'code'],
+      properties: {
+        email: { type: 'string', example: 'customer@example.com' },
+        code: { type: 'string', example: '123456' },
+      },
+    },
+  })
+  @Post('auth/password-reset/verify')
+  async verifyPasswordResetCode(
+    @Body() body: PasswordResetVerifyBody,
+    @Res({ passthrough: true }) response: StatusResponse,
+  ): Promise<unknown> {
+    const result = await this.proxyService.forward({
+      target: 'auth',
+      method: 'POST',
+      path: '/auth/password-reset/verify',
+      body,
+    });
+
+    writeStatus(response, result.statusCode);
+
+    return result.body;
+  }
+
+  @ApiOperation({ summary: 'Proxy password reset confirmation to auth-api' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['email', 'code', 'password'],
+      properties: {
+        email: { type: 'string', example: 'customer@example.com' },
+        code: { type: 'string', example: '123456' },
+        password: { type: 'string', example: 'newSecurePassword123' },
+      },
+    },
+  })
+  @Post('auth/password-reset/confirm')
+  async confirmPasswordReset(
+    @Body() body: PasswordResetConfirmBody,
+    @Res({ passthrough: true }) response: AuthCookieResponse,
+  ): Promise<unknown> {
+    clearAuthCookies(response);
+
+    const result = await this.proxyService.forward({
+      target: 'auth',
+      method: 'POST',
+      path: '/auth/password-reset/confirm',
+      body,
     });
 
     writeStatus(response, result.statusCode);

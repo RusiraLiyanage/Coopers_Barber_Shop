@@ -91,4 +91,10 @@ export class UsersService {
 
     return this.usersRepo.save(user);
   }
+
+  async updatePassword(userId: string, passwordHash: string): Promise<void> {
+    await this.usersRepo.update(userId, {
+      passwordHash,
+    });
+  }
 }

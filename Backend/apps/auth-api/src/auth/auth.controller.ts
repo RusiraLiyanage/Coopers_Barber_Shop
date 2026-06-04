@@ -26,6 +26,14 @@ import { LoginDto } from './dto/login.dto';
 import { SessionValidationDto } from './dto/session-validation.dto';
 import { UpdateAccountDto } from './dto/update-account.dto';
 import { AccountProfileResponse } from './auth.service';
+import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
+import { VerifyPasswordResetCodeDto } from './dto/verify-password-reset-code.dto';
+import { ConfirmPasswordResetDto } from './dto/confirm-password-reset.dto';
+import type {
+  PasswordResetConfirmResponse,
+  PasswordResetRequestResponse,
+  PasswordResetVerificationResponse,
+} from './auth.service';
 
 function getRequiredUserId(userId: string | undefined): string {
   if (!userId) {
@@ -64,6 +72,36 @@ export class AuthController {
   @Post('logout')
   logout(@Body() dto: LogoutDto): Promise<LogoutResponse> {
     return this.authService.logout(dto.refresh_token);
+  }
+
+  @ApiOperation({ summary: 'Request a password reset verification code' })
+  @ApiBody({ type: RequestPasswordResetDto })
+  @HttpCode(200)
+  @Post('password-reset/request')
+  requestPasswordReset(
+    @Body() dto: RequestPasswordResetDto,
+  ): Promise<PasswordResetRequestResponse> {
+    return this.authService.requestPasswordReset(dto);
+  }
+
+  @ApiOperation({ summary: 'Verify a password reset code' })
+  @ApiBody({ type: VerifyPasswordResetCodeDto })
+  @HttpCode(200)
+  @Post('password-reset/verify')
+  verifyPasswordResetCode(
+    @Body() dto: VerifyPasswordResetCodeDto,
+  ): Promise<PasswordResetVerificationResponse> {
+    return this.authService.verifyPasswordResetCode(dto);
+  }
+
+  @ApiOperation({ summary: 'Reset password using a verified reset code' })
+  @ApiBody({ type: ConfirmPasswordResetDto })
+  @HttpCode(200)
+  @Post('password-reset/confirm')
+  confirmPasswordReset(
+    @Body() dto: ConfirmPasswordResetDto,
+  ): Promise<PasswordResetConfirmResponse> {
+    return this.authService.confirmPasswordReset(dto);
   }
 
   @ApiOperation({ summary: 'Validate whether an auth session is still active' })

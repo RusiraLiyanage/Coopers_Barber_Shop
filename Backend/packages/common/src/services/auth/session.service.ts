@@ -85,6 +85,18 @@ export class SessionService {
     await this.sessionsRepo.save(session);
   }
 
+  async revokeUserSessions(userId: string): Promise<void> {
+    await this.sessionsRepo
+      .createQueryBuilder()
+      .update(AuthSession)
+      .set({
+        revokedAt: new Date(),
+      })
+      .where('user_id = :userId', { userId })
+      .andWhere('revoked_at IS NULL')
+      .execute();
+  }
+
   async rotateSession(input: RotateAuthSessionInput): Promise<AuthSession> {
     const currentSession = await this.findActiveSession(
       input.currentRefreshToken,

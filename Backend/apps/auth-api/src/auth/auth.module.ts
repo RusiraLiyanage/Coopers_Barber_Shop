@@ -4,11 +4,12 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
+  EmailModule,
   JwtTokenService,
   PasswordService,
   SessionService,
 } from '@coopers/common';
-import { AuthSession } from '@coopers/entities';
+import { AuthSession, PasswordResetToken } from '@coopers/entities';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -27,7 +28,8 @@ function getAccessTokenTtlSeconds(config: ConfigService): number {
 @Module({
   imports: [
     UsersModule,
-    TypeOrmModule.forFeature([AuthSession]),
+    EmailModule,
+    TypeOrmModule.forFeature([AuthSession, PasswordResetToken]),
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
