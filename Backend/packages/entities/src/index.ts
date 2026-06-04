@@ -3,3 +3,4 @@ export * from './service.entity';
 export * from './staff.entity';
 export * from './user.entity';
 export * from './auth-session.entity';
+export * from './password-reset-token.entity';

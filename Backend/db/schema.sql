@@ -34,6 +34,18 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    email text NOT NULL,
+    code_hash text NOT NULL,
+    expires_at timestamptz NOT NULL,
+    used_at timestamptz,
+    attempt_count integer NOT NULL DEFAULT 0,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS services (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     name text NOT NULL UNIQUE,
@@ -206,3 +218,6 @@ ON CONFLICT (email) DO NOTHING;
 
 -- 6) Helpful index for queries ----------------------------------------------
 CREATE INDEX IF NOT EXISTS idx_appt_staff_start ON appointments (staff_id, start_at);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens (user_id);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_email ON password_reset_tokens (email);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expires_at ON password_reset_tokens (expires_at);
