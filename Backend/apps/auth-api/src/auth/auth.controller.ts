@@ -1,9 +1,13 @@
 import {
   Body,
   Controller,
+  Get,
+  Headers,
   HttpCode,
+  Patch,
   Post,
   Request,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -20,6 +24,16 @@ import { RegisterDto } from './dto/register.dto';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { LoginDto } from './dto/login.dto';
 import { SessionValidationDto } from './dto/session-validation.dto';
+import { UpdateAccountDto } from './dto/update-account.dto';
+import { AccountProfileResponse } from './auth.service';
+
+function getRequiredUserId(userId: string | undefined): string {
+  if (!userId) {
+    throw new UnauthorizedException('Missing authenticated user context');
+  }
+
+  return userId;
+}
 
 @ApiTags('auth')
 @Controller('auth')
@@ -59,5 +73,26 @@ export class AuthController {
     @Body() dto: SessionValidationDto,
   ): Promise<SessionValidationResponse> {
     return this.authService.validateSession(dto.sessionId);
+  }
+
+  @ApiOperation({ summary: 'Get the current authenticated account profile' })
+  @Get('me')
+  getAccountProfile(
+    @Headers('x-user-id') userId: string | undefined,
+  ): Promise<AccountProfileResponse> {
+    return this.authService.getAccountProfile(getRequiredUserId(userId));
+  }
+
+  @ApiOperation({ summary: 'Update the current authenticated account profile' })
+  @ApiBody({ type: UpdateAccountDto })
+  @Patch('me')
+  updateAccountProfile(
+    @Headers('x-user-id') userId: string | undefined,
+    @Body() dto: UpdateAccountDto,
+  ): Promise<AccountProfileResponse> {
+    return this.authService.updateAccountProfile(
+      getRequiredUserId(userId),
+      dto,
+    );
   }
 }

@@ -1,17 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsEmail,
-  IsNotEmpty,
-  IsString,
-  Matches,
-  MinLength,
-} from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, Matches } from 'class-validator';
 
 const AU_MOBILE_PATTERN = /^(?:\+?61|0)4\d{8}$/;
 
-// data to be expected from the body of the register request.
+export class UpdateAccountDto {
+  @ApiProperty({ example: 'customer@example.com' })
+  @IsEmail()
+  @IsNotEmpty()
+  @IsString()
+  email: string;
 
-export class RegisterDto {
   @ApiProperty({ example: 'Cooper' })
   @IsString()
   @IsNotEmpty()
@@ -34,17 +32,4 @@ export class RegisterDto {
   @IsString()
   @IsNotEmpty()
   suburb: string;
-
-  // The email of the user trying to register.
-  @ApiProperty({ example: 'customer@example.com' })
-  @IsEmail()
-  @IsNotEmpty()
-  @IsString()
-  email: string;
-
-  // The password of the user trying to register. (type string, min length 6)
-  @ApiProperty({ example: 'securePassword123', minLength: 6 })
-  @IsString()
-  @MinLength(6)
-  password: string;
 }

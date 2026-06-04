@@ -25,6 +25,10 @@ CREATE TABLE IF NOT EXISTS users (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (), --uuid to generate a random unique id.
     email text NOT NULL UNIQUE,
     password_hash text NOT NULL,
+    first_name text,
+    last_name text,
+    mobile text,
+    suburb text,
     role user_role NOT NULL DEFAULT 'customer',
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()

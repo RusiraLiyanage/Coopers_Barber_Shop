@@ -17,6 +17,7 @@ type ProtectedForwardOptions = Omit<
   ProxyRequestOptions,
   'target' | 'headers'
 > & {
+  target?: ProxyRequestOptions['target'];
   authorizationHeader: string | undefined;
   refreshToken: string | undefined;
 };
@@ -89,7 +90,7 @@ export class ProtectedProxyService {
       options.refreshToken,
     );
     const result = await this.proxyService.forward({
-      target: 'booking',
+      target: options.target ?? 'booking',
       method: options.method,
       path: options.path,
       query: options.query,

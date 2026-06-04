@@ -25,7 +25,7 @@ async function bootstrap() {
 
   const rawAuthApiPort = config.get<number>('AUTH_API_PORT');
   const authApiPort: number =
-    typeof rawAuthApiPort === 'number' ? rawAuthApiPort : 3002;
+    typeof rawAuthApiPort === 'number' ? rawAuthApiPort : 7312;
 
   const corsOptions = createFrontendCorsOptions(frontendUrl);
 

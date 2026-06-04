@@ -14,6 +14,7 @@ import {
   AuthCookieResponse,
   clearAuthCookies,
   getAuthorizationHeaderFromRequest,
+  getRememberMeFromCookie,
   setAuthCookies,
 } from './auth-cookie.util';
 import {
@@ -33,9 +34,23 @@ type StatusResponse = {
 type LoginRequestBody = {
   email: string;
   password: string;
+  remember?: boolean;
 };
 
-type RegisterRequestBody = LoginRequestBody;
+type AuthApiLoginRequestBody = {
+  email: string;
+  password: string;
+};
+
+type RegisterRequestBody = {
+  email: string;
+  password: string;
+  remember?: boolean;
+  firstName: string;
+  lastName: string;
+  mobile: string;
+  suburb: string;
+};
 
 type RefreshTokenRequestBody = {
   refresh_token?: string;
@@ -65,11 +80,12 @@ function isSuccessStatus(statusCode: number): boolean {
 function writeAuthResponse(
   response: AuthCookieResponse,
   result: { statusCode: number; body: unknown },
+  rememberMe: boolean,
 ): unknown {
   writeStatus(response, result.statusCode);
 
   if (isSuccessStatus(result.statusCode) && isAuthTokensResponse(result.body)) {
-    setAuthCookies(response, result.body);
+    setAuthCookies(response, result.body, { rememberMe });
 
     return { authenticated: true } satisfies AuthStatusResponse;
   }
@@ -80,14 +96,41 @@ function writeAuthResponse(
 function writeSessionResponse(
   response: AuthCookieResponse,
   result: ProtectedProxyResponse,
+  rememberMe: boolean,
 ): AuthStatusResponse {
   writeStatus(response, result.statusCode);
 
   if (result.refreshedTokens) {
-    setAuthCookies(response, result.refreshedTokens);
+    setAuthCookies(response, result.refreshedTokens, { rememberMe });
   }
 
   return { authenticated: true };
+}
+
+function getRememberMe(body: { remember?: boolean }): boolean {
+  return body.remember !== false;
+}
+
+function createLoginAuthApiBody(
+  body: LoginRequestBody,
+): AuthApiLoginRequestBody {
+  return {
+    email: body.email,
+    password: body.password,
+  };
+}
+
+function createRegisterAuthApiBody(
+  body: RegisterRequestBody,
+): Omit<RegisterRequestBody, 'remember'> {
+  return {
+    firstName: body.firstName,
+    lastName: body.lastName,
+    mobile: body.mobile,
+    suburb: body.suburb,
+    email: body.email,
+    password: body.password,
+  };
 }
 
 @ApiTags('guard-public-proxy')
@@ -106,6 +149,7 @@ export class PublicProxyController {
       properties: {
         email: { type: 'string', example: 'customer@example.com' },
         password: { type: 'string', example: 'password123' },
+        remember: { type: 'boolean', example: true },
       },
     },
   })
@@ -118,20 +162,32 @@ export class PublicProxyController {
       target: 'auth',
       method: 'POST',
       path: '/auth/login',
-      body,
+      body: createLoginAuthApiBody(body),
     });
 
-    return writeAuthResponse(response, result);
+    return writeAuthResponse(response, result, getRememberMe(body));
   }
 
   @ApiOperation({ summary: 'Proxy customer registration to auth-api' })
   @ApiBody({
     schema: {
       type: 'object',
-      required: ['email', 'password'],
+      required: [
+        'firstName',
+        'lastName',
+        'mobile',
+        'suburb',
+        'email',
+        'password',
+      ],
       properties: {
+        firstName: { type: 'string', example: 'Cooper' },
+        lastName: { type: 'string', example: 'Smith' },
+        mobile: { type: 'string', example: '+61412345678' },
+        suburb: { type: 'string', example: 'Surry Hills' },
         email: { type: 'string', example: 'customer@example.com' },
         password: { type: 'string', example: 'password123' },
+        remember: { type: 'boolean', example: true },
       },
     },
   })
@@ -144,10 +200,10 @@ export class PublicProxyController {
       target: 'auth',
       method: 'POST',
       path: '/auth/register',
-      body,
+      body: createRegisterAuthApiBody(body),
     });
 
-    return writeAuthResponse(response, result);
+    return writeAuthResponse(response, result, getRememberMe(body));
   }
 
   @ApiOperation({ summary: 'Validate current guard cookie session' })
@@ -167,7 +223,11 @@ export class PublicProxyController {
         .refresh_token,
     });
 
-    return writeSessionResponse(response, result);
+    return writeSessionResponse(
+      response,
+      result,
+      getRememberMeFromCookie(cookieHeader) ?? true,
+    );
   }
 
   @ApiOperation({ summary: 'Proxy token refresh to auth-api' })
@@ -194,7 +254,11 @@ export class PublicProxyController {
       body: createRefreshTokenBody(refreshTokenHeader, cookieHeader, body),
     });
 
-    return writeAuthResponse(response, result);
+    return writeAuthResponse(
+      response,
+      result,
+      getRememberMeFromCookie(cookieHeader) ?? true,
+    );
   }
 
   @ApiOperation({ summary: 'Proxy logout to auth-api' })

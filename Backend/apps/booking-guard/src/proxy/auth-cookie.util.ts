@@ -2,10 +2,11 @@ import type { AuthTokensResponse } from '@coopers/common';
 
 export const ACCESS_TOKEN_COOKIE = 'tsa';
 export const REFRESH_TOKEN_COOKIE = 'tsr';
+export const REMEMBER_ME_COOKIE = 'tsm';
 
 const LEGACY_ACCESS_TOKEN_COOKIE = 'access_token';
 const LEGACY_REFRESH_TOKEN_COOKIE = 'refresh_token';
-const ACCESS_TOKEN_MAX_AGE_MS = 1000 * 60 * 15;
+const ACCESS_TOKEN_MAX_AGE_MS = 1000 * 60 * 5;
 const DEFAULT_REFRESH_TOKEN_TTL_DAYS = 14;
 
 type AuthCookieOptions = {
@@ -22,6 +23,10 @@ export type AuthCookieResponse = {
   cookie: (name: string, value: string, options: AuthCookieOptions) => void;
   clearCookie: (name: string, options: AuthCookieOptions) => void;
   setHeader?: (name: string, value: string) => void;
+};
+
+type SetAuthCookieOptions = {
+  rememberMe?: boolean;
 };
 
 function getRefreshTokenMaxAgeMs(): number {
@@ -98,6 +103,18 @@ export function getRefreshTokenFromCookie(
   );
 }
 
+export function getRememberMeFromCookie(
+  cookieHeader: string | undefined,
+): boolean | undefined {
+  const rememberMe = getCookieValue(cookieHeader, REMEMBER_ME_COOKIE);
+
+  if (rememberMe === undefined) {
+    return undefined;
+  }
+
+  return rememberMe === 'true';
+}
+
 export function getAuthorizationHeaderFromRequest(
   authorizationHeader: string | undefined,
   cookieHeader: string | undefined,
@@ -114,16 +131,26 @@ export function getAuthorizationHeaderFromRequest(
 export function setAuthCookies(
   response: AuthCookieResponse,
   tokens: AuthTokensResponse,
+  options: SetAuthCookieOptions = {},
 ): void {
+  const rememberMe = options.rememberMe ?? true;
+  const accessTokenMaxAge = rememberMe ? ACCESS_TOKEN_MAX_AGE_MS : undefined;
+  const refreshTokenMaxAge = rememberMe ? getRefreshTokenMaxAgeMs() : undefined;
+
   response.cookie(
     ACCESS_TOKEN_COOKIE,
     tokens.access_token,
-    createCookieOptions(ACCESS_TOKEN_MAX_AGE_MS),
+    createCookieOptions(accessTokenMaxAge),
   );
   response.cookie(
     REFRESH_TOKEN_COOKIE,
     tokens.refresh_token,
-    createCookieOptions(getRefreshTokenMaxAgeMs()),
+    createCookieOptions(refreshTokenMaxAge),
+  );
+  response.cookie(
+    REMEMBER_ME_COOKIE,
+    rememberMe ? 'true' : 'false',
+    createCookieOptions(refreshTokenMaxAge),
   );
 }
 
@@ -131,6 +158,7 @@ export function clearAuthCookies(response: AuthCookieResponse): void {
   [
     ACCESS_TOKEN_COOKIE,
     REFRESH_TOKEN_COOKIE,
+    REMEMBER_ME_COOKIE,
     LEGACY_ACCESS_TOKEN_COOKIE,
     LEGACY_REFRESH_TOKEN_COOKIE,
   ].forEach((cookieName) => {

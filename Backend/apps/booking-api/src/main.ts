@@ -27,6 +27,6 @@ async function bootstrap() {
     tags: ['health', 'auth', 'users', 'services', 'staff', 'appointments'],
   });
 
-  await app.listen(config.get<number>('API_PORT', 3000));
+  await app.listen(config.get<number>('API_PORT', 7310));
 }
 void bootstrap();

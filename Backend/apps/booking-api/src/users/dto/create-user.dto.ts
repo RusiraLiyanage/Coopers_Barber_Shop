@@ -1,9 +1,40 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  Matches,
+  MinLength,
+} from 'class-validator';
+
+const AU_MOBILE_PATTERN = /^(?:\+?61|0)4\d{8}$/;
 
 // Data to be expected from the body of the create user request.
 
 export class CreateUserDto {
+  @ApiProperty({ example: 'Cooper' })
+  @IsString()
+  @IsNotEmpty()
+  firstName!: string;
+
+  @ApiProperty({ example: 'Smith' })
+  @IsString()
+  @IsNotEmpty()
+  lastName!: string;
+
+  @ApiProperty({ example: '+61412345678' })
+  @IsString()
+  @IsNotEmpty()
+  @Matches(AU_MOBILE_PATTERN, {
+    message: 'Mobile must be a valid Australian mobile number',
+  })
+  mobile!: string;
+
+  @ApiProperty({ example: 'Surry Hills' })
+  @IsString()
+  @IsNotEmpty()
+  suburb!: string;
+
   @ApiProperty({ example: 'customer@example.com' })
   @IsEmail()
   email!: string;

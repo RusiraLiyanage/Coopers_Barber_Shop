@@ -41,7 +41,7 @@ export class GuardConfigService {
   }
 
   get guardPort(): number {
-    return getOptionalPort(this.config, 'GUARD_PORT', 3001);
+    return getOptionalPort(this.config, 'GUARD_PORT', 7311);
   }
 
   getUpstreams(): GuardUpstreamConfig {

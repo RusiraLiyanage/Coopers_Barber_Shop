@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { GuardAuthenticationModule, GuardConfigModule } from '@coopers/common';
+import { AccountProxyController } from './account-proxy.controller';
 import { FrontendProxyController } from './frontend-proxy.controller';
 import { FrontendProxyService } from './frontend-proxy.service';
 import { ProtectedProxyController } from './protected-proxy.controller';
@@ -10,6 +11,7 @@ import { ProxyService } from './proxy.service';
 @Module({
   imports: [GuardConfigModule, GuardAuthenticationModule],
   controllers: [
+    AccountProxyController,
     PublicProxyController,
     ProtectedProxyController,
     FrontendProxyController,

@@ -16,12 +16,12 @@ import { LocalStrategy } from './strategies/local.strategy';
 
 function getAccessTokenTtlSeconds(config: ConfigService): number {
   const configuredTtl = Number(
-    config.get<string>('ACCESS_TOKEN_TTL_SECONDS') ?? '900',
+    config.get<string>('ACCESS_TOKEN_TTL_SECONDS') ?? '300',
   );
 
   return Number.isFinite(configuredTtl) && configuredTtl > 0
     ? configuredTtl
-    : 900;
+    : 300;
 }
 
 @Module({

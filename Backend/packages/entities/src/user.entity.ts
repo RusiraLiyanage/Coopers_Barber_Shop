@@ -29,6 +29,18 @@ export class User {
   @Column({ name: 'password_hash' })
   passwordHash: string;
 
+  @Column({ name: 'first_name', nullable: true })
+  firstName: string | null;
+
+  @Column({ name: 'last_name', nullable: true })
+  lastName: string | null;
+
+  @Column({ nullable: true })
+  mobile: string | null;
+
+  @Column({ nullable: true })
+  suburb: string | null;
+
   // the role is an enum type with a default value of 'customer'. - the current usage
   @Column({
     type: 'enum',

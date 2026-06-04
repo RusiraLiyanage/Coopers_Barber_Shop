@@ -24,12 +24,12 @@ This is the same intuition behind company-wide backend service architecture: bus
 
 ## Runtime Endpoints
 
-- Auth API Swagger UI: `http://localhost:3002/docs`
-- Auth API OpenAPI JSON: `http://localhost:3002/docs-json`
-- Auth API health: `http://localhost:3002/health`
-- Booking API Swagger UI: `http://localhost:3000/docs`
-- Booking API OpenAPI JSON: `http://localhost:3000/docs-json`
-- Booking API health: `http://localhost:3000/health`
+- Auth API Swagger UI: `http://localhost:7312/docs`
+- Auth API OpenAPI JSON: `http://localhost:7312/docs-json`
+- Auth API health: `http://localhost:7312/health`
+- Booking API Swagger UI: `http://localhost:7310/docs`
+- Booking API OpenAPI JSON: `http://localhost:7310/docs-json`
+- Booking API health: `http://localhost:7310/health`
 
 ## Validation Completed
 

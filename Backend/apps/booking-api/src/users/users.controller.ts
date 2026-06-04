@@ -50,6 +50,10 @@ export class UsersController {
     return this.usersService.create({
       email: dto.email,
       passwordHash,
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+      mobile: dto.mobile,
+      suburb: dto.suburb,
       role: UserRole.CUSTOMER, // default role
     });
   }
