@@ -25,7 +25,15 @@ import {
 } from "react-big-calendar";
 import { format, getDay, parse, startOfWeek } from "date-fns";
 import { enAU } from "date-fns/locale/en-AU";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   cancelAppointment,
   getAppointments,
@@ -48,6 +56,7 @@ interface MyAppointmentsProps {
 }
 
 type AppointmentViewMode = "cards" | "calendar";
+type AppointmentTabKey = "today" | "other";
 
 type AppointmentCalendarEvent = {
   id: string;
@@ -332,11 +341,13 @@ function getCalendarSelectedDate(appointments: AppointmentRecord[]) {
 function AppointmentActionsDropdown({
   appointment,
   children,
+  triggerMode = "inline",
   onUpdateAppointment,
   onCancelAppointment,
 }: {
   appointment: AppointmentRecord;
   children: ReactNode;
+  triggerMode?: "inline" | "full";
   onUpdateAppointment: (appointment: AppointmentRecord) => void;
   onCancelAppointment: (appointment: AppointmentRecord) => void;
 }) {
@@ -359,7 +370,15 @@ function AppointmentActionsDropdown({
 
   return (
     <Dropdown menu={menu} trigger={["click"]} placement="bottomRight">
-      <div className="appointment-action-trigger">{children}</div>
+      <span
+        className={
+          triggerMode === "full"
+            ? "appointment-action-trigger appointment-action-trigger-full"
+            : "appointment-action-trigger"
+        }
+      >
+        {children}
+      </span>
     </Dropdown>
   );
 }
@@ -474,6 +493,12 @@ function AppointmentsCalendar({
   appointments,
   emptyDescription,
   emptyActionLabel,
+  calendarView,
+  calendarDate,
+  timeGridScrollTop,
+  onCalendarViewChange,
+  onCalendarDateChange,
+  onTimeGridScrollTopChange,
   onMakeAppointment,
   onUpdateAppointment,
   onCancelAppointment,
@@ -481,20 +506,21 @@ function AppointmentsCalendar({
   appointments: AppointmentRecord[];
   emptyDescription: string;
   emptyActionLabel: string;
+  calendarView: View;
+  calendarDate: Date;
+  timeGridScrollTop: number;
+  onCalendarViewChange: (view: View) => void;
+  onCalendarDateChange: (date: Date) => void;
+  onTimeGridScrollTopChange: (scrollTop: number) => void;
   onMakeAppointment: () => void;
   onUpdateAppointment: (appointment: AppointmentRecord) => void;
   onCancelAppointment: (appointment: AppointmentRecord) => void;
 }) {
+  const calendarContainerRef = useRef<HTMLDivElement | null>(null);
   const calendarEvents = useMemo(
     () => toCalendarEvents(appointments),
     [appointments],
   );
-  const selectedDate = useMemo(
-    () => getCalendarSelectedDate(appointments),
-    [appointments],
-  );
-  const [calendarDate, setCalendarDate] = useState(selectedDate);
-  const [calendarView, setCalendarView] = useState<View>("month");
   const calendarHeight = useMemo(
     () => getCalendarHeight(calendarEvents, calendarView),
     [calendarEvents, calendarView],
@@ -522,6 +548,7 @@ function AppointmentsCalendar({
         return (
           <AppointmentActionsDropdown
             appointment={event.appointment}
+            triggerMode="full"
             onUpdateAppointment={onUpdateAppointment}
             onCancelAppointment={onCancelAppointment}
           >
@@ -560,10 +587,49 @@ function AppointmentsCalendar({
     }),
     [calendarView, onCancelAppointment, onUpdateAppointment],
   );
+  const isTimeGridView = calendarView === "week" || calendarView === "day";
 
-  useEffect(() => {
-    setCalendarDate(selectedDate);
-  }, [appointments, selectedDate]);
+  useLayoutEffect(() => {
+    if (!isTimeGridView) {
+      return undefined;
+    }
+
+    const timeGridScrollContainer =
+      calendarContainerRef.current?.querySelector(".rbc-time-content");
+
+    if (!(timeGridScrollContainer instanceof HTMLElement)) {
+      return undefined;
+    }
+
+    timeGridScrollContainer.scrollTop = timeGridScrollTop;
+
+    const handleTimeGridScroll = () => {
+      onTimeGridScrollTopChange(timeGridScrollContainer.scrollTop);
+    };
+
+    timeGridScrollContainer.addEventListener(
+      "scroll",
+      handleTimeGridScroll,
+      {
+        passive: true,
+      },
+    );
+
+    return () => {
+      onTimeGridScrollTopChange(timeGridScrollContainer.scrollTop);
+      timeGridScrollContainer.removeEventListener(
+        "scroll",
+        handleTimeGridScroll,
+      );
+    };
+  }, [
+    calendarDate,
+    calendarEvents.length,
+    calendarView,
+    isTimeGridView,
+    onTimeGridScrollTopChange,
+    timeGridScrollTop,
+  ]);
 
   if (appointments.length === 0) {
     return (
@@ -580,6 +646,7 @@ function AppointmentsCalendar({
 
   return (
     <div
+      ref={calendarContainerRef}
       className={`appointments-calendar appointments-calendar-${calendarView}`}
       style={{ minHeight: calendarHeight }}
     >
@@ -599,14 +666,16 @@ function AppointmentsCalendar({
         tooltipAccessor={() => ""}
         eventPropGetter={getCalendarEventStyle}
         onNavigate={(newDate) => {
-          setCalendarDate(newDate);
+          onCalendarDateChange(newDate);
         }}
         onView={(nextView) => {
-          setCalendarView(nextView);
+          onCalendarViewChange(nextView);
         }}
         components={calendarComponents}
         min={new Date(1970, 0, 1, 8, 0)}
         max={new Date(1970, 0, 1, 19, 0)}
+        scrollToTime={new Date(1970, 0, 1, 8, 0)}
+        enableAutoScroll={false}
         step={15}
         timeslots={2}
         style={{ height: calendarHeight }}
@@ -627,7 +696,19 @@ export default function MyAppointments({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<AppointmentViewMode>("cards");
+  const [calendarView, setCalendarView] = useState<View>("month");
+  const [calendarDate, setCalendarDate] = useState(() => new Date());
+  const timeGridScrollTopRef = useRef(0);
+  const [activeAppointmentTab, setActiveAppointmentTab] =
+    useState<AppointmentTabKey>("today");
   const [messageApi, contextHolder] = message.useMessage();
+  const hasInitializedCalendarDateRef = useRef(false);
+  const tabsClassName = [
+    "appointments-tabs",
+    viewMode === "calendar" ? `appointments-tabs-calendar-${calendarView}` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
   const todayDateKey = useMemo(() => getTodayDateKey(), []);
   const sortedAppointments = useMemo(
     () => sortAppointmentsByStartTime(appointments),
@@ -647,9 +728,12 @@ export default function MyAppointments({
       ),
     [sortedAppointments, todayDateKey],
   );
+  const activeTabAppointments =
+    activeAppointmentTab === "today" ? todaysAppointments : otherAppointments;
 
   useEffect(() => {
     if (!open) {
+      hasInitializedCalendarDateRef.current = false;
       return;
     }
 
@@ -674,6 +758,24 @@ export default function MyAppointments({
         setLoading(false);
       });
   }, [authSession, open, refreshKey]);
+
+  useEffect(() => {
+    if (
+      !open ||
+      viewMode !== "calendar" ||
+      hasInitializedCalendarDateRef.current ||
+      activeTabAppointments.length === 0
+    ) {
+      return;
+    }
+
+    setCalendarDate(getCalendarSelectedDate(activeTabAppointments));
+    hasInitializedCalendarDateRef.current = true;
+  }, [activeTabAppointments, open, viewMode]);
+
+  const handleTimeGridScrollTopChange = useCallback((scrollTop: number) => {
+    timeGridScrollTopRef.current = scrollTop;
+  }, []);
 
   const handleCancelAppointment = (appointment: AppointmentRecord) => {
     Modal.confirm({
@@ -714,6 +816,12 @@ export default function MyAppointments({
           appointments={appointmentGroup}
           emptyDescription={emptyDescription}
           emptyActionLabel={emptyActionLabel}
+          calendarView={calendarView}
+          calendarDate={calendarDate}
+          timeGridScrollTop={timeGridScrollTopRef.current}
+          onCalendarViewChange={setCalendarView}
+          onCalendarDateChange={setCalendarDate}
+          onTimeGridScrollTopChange={handleTimeGridScrollTopChange}
           onMakeAppointment={onMakeAppointment}
           onUpdateAppointment={onUpdateAppointment}
           onCancelAppointment={handleCancelAppointment}
@@ -752,8 +860,8 @@ export default function MyAppointments({
       width={viewMode === "calendar" ? 1080 : 920}
       styles={{
         body: {
-          maxHeight: "70vh",
-          overflowY: "auto",
+          height: "70vh",
+          overflowY: "hidden",
           paddingTop: 12,
         },
       }}
@@ -773,15 +881,15 @@ export default function MyAppointments({
       ) : error ? (
         <Alert type="error" message={error} showIcon />
       ) : (
-        <>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              marginBottom: 12,
-            }}
-          >
+        <Tabs
+          className={tabsClassName}
+          activeKey={activeAppointmentTab}
+          onChange={(nextActiveKey) => {
+            setActiveAppointmentTab(nextActiveKey as AppointmentTabKey);
+          }}
+          tabBarExtraContent={
             <Segmented<AppointmentViewMode>
+              className="appointments-view-switch"
               value={viewMode}
               onChange={setViewMode}
               options={[
@@ -789,40 +897,36 @@ export default function MyAppointments({
                 { label: "Calendar", value: "calendar" },
               ]}
             />
-          </div>
-
-          <Tabs
-            defaultActiveKey="today"
-            items={[
-              {
-                key: "today",
-                label: (
-                  <span style={{ fontSize: 16, fontWeight: 600 }}>
-                    Today ({todaysAppointments.length})
-                  </span>
-                ),
-                children: renderAppointmentsContent(
-                  todaysAppointments,
-                  "No appointments scheduled for today.",
-                  "Book an Appointment",
-                ),
-              },
-              {
-                key: "other",
-                label: (
-                  <span style={{ fontSize: 16, fontWeight: 600 }}>
-                    Other Appointments ({otherAppointments.length})
-                  </span>
-                ),
-                children: renderAppointmentsContent(
-                  otherAppointments,
-                  "No other appointments found for this account yet.",
-                  "Book Your First Appointment",
-                ),
-              },
-            ]}
-          />
-        </>
+          }
+          items={[
+            {
+              key: "today",
+              label: (
+                <span style={{ fontSize: 16, fontWeight: 600 }}>
+                  Today ({todaysAppointments.length})
+                </span>
+              ),
+              children: renderAppointmentsContent(
+                todaysAppointments,
+                "No appointments scheduled for today.",
+                "Book an Appointment",
+              ),
+            },
+            {
+              key: "other",
+              label: (
+                <span style={{ fontSize: 16, fontWeight: 600 }}>
+                  Other Appointments ({otherAppointments.length})
+                </span>
+              ),
+              children: renderAppointmentsContent(
+                otherAppointments,
+                "No other appointments found for this account yet.",
+                "Book Your First Appointment",
+              ),
+            },
+          ]}
+        />
       )}
     </Modal>
   );
