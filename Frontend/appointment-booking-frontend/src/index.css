@@ -41,7 +41,7 @@ body {
 
 .appointments-calendar .rbc-event {
   border-radius: 6px;
-  cursor: default;
+  cursor: pointer;
 }
 
 .appointments-calendar-toolbar {
@@ -113,6 +113,11 @@ body {
 
 .appointment-calendar-event {
   min-width: 0;
+}
+
+.appointment-action-trigger {
+  display: block;
+  height: 100%;
 }
 
 .appointment-calendar-event-month {

@@ -14,6 +14,7 @@ import {
   refreshSession,
   shouldClearStaleClientAuthSession,
   toAuthSession,
+  type AppointmentRecord,
   type AuthSession,
 } from "./lib/api";
 
@@ -34,6 +35,8 @@ function App() {
   const [authSession, setAuthSessionState] = useState<AuthSession | null>(null);
   const [openAuthModal, setOpenAuthModal] = useState(false);
   const [openAppointmentModal, setOpenAppointmentModal] = useState(false);
+  const [editingAppointment, setEditingAppointment] =
+    useState<AppointmentRecord | null>(null);
   const [appointmentsRefreshKey, setAppointmentsRefreshKey] = useState(0);
   const [sessionExpired, setSessionExpired] = useState(false);
   const sessionLastActivityAtRef = useRef(Date.now());
@@ -97,6 +100,7 @@ function App() {
       setAuthSession(null);
       setSessionExpired(true);
       setOpenAppointmentModal(false);
+      setEditingAppointment(null);
       navigate("/");
       setOpenAuthModal(true);
     };
@@ -157,6 +161,7 @@ function App() {
   const handleLogout = () => {
     setSessionExpired(false);
     setAuthSession(null);
+    setEditingAppointment(null);
     navigate("/");
 
     void logout().catch(() => undefined);
@@ -173,6 +178,7 @@ function App() {
 
   const openBookingFlow = () => {
     if (isAuthenticated) {
+      setEditingAppointment(null);
       setOpenAppointmentModal(true);
       return;
     }
@@ -187,7 +193,10 @@ function App() {
         onLogout={handleLogout}
         onOpenAuthModal={() => setOpenAuthModal(true)}
         onOpenMyAccount={() => navigate("/account")}
-        onOpenAppointmentModal={() => setOpenAppointmentModal(true)}
+        onOpenAppointmentModal={() => {
+          setEditingAppointment(null);
+          setOpenAppointmentModal(true);
+        }}
       />
 
       <Content style={{ paddingTop: 64 }}>
@@ -212,6 +221,10 @@ function App() {
           refreshKey={appointmentsRefreshKey}
           onClose={() => navigate("/")}
           onMakeAppointment={openBookingFlow}
+          onUpdateAppointment={(appointment) => {
+            setEditingAppointment(appointment);
+            setOpenAppointmentModal(true);
+          }}
         />
 
         <MyAccount
@@ -231,6 +244,7 @@ function App() {
           setAuthSession(session);
           setSessionExpired(false);
           setOpenAuthModal(false);
+          setEditingAppointment(null);
           setOpenAppointmentModal(true);
         }}
       />
@@ -238,9 +252,14 @@ function App() {
       <MakeAppointmentModal
         open={openAppointmentModal}
         authSession={authSession}
-        onClose={() => setOpenAppointmentModal(false)}
+        editingAppointment={editingAppointment}
+        onClose={() => {
+          setOpenAppointmentModal(false);
+          setEditingAppointment(null);
+        }}
         onBooked={() => {
           setOpenAppointmentModal(false);
+          setEditingAppointment(null);
           setAppointmentsRefreshKey((current) => current + 1);
           navigate("/appointments");
         }}

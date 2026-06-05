@@ -3,6 +3,8 @@ import {
   Controller,
   Get,
   Headers,
+  Param,
+  Patch,
   Post,
   Query,
   Res,
@@ -22,13 +24,18 @@ import { getRefreshTokenFromRequest } from './refresh-token.util';
 
 type AppointmentRequestBody = {
   serviceId: string;
-  staffId: string;
-  startAt: string;
+  date: string;
+  slot: string;
+};
+
+type UpdateAppointmentRequestBody = {
+  slot: string;
 };
 
 type AvailabilityQuery = {
   serviceId?: string;
   date?: string;
+  excludeAppointmentId?: string;
 };
 
 function writeProxyResponse(
@@ -53,11 +60,11 @@ export class ProtectedProxyController {
   @ApiBody({
     schema: {
       type: 'object',
-      required: ['serviceId', 'staffId', 'startAt'],
+      required: ['serviceId', 'date', 'slot'],
       properties: {
         serviceId: { type: 'string' },
-        staffId: { type: 'string' },
-        startAt: { type: 'string', format: 'date-time' },
+        date: { type: 'string', format: 'date' },
+        slot: { type: 'string' },
       },
     },
   })
@@ -81,6 +88,70 @@ export class ProtectedProxyController {
       method: 'POST',
       path: '/appointments',
       body,
+    });
+
+    writeProxyResponse(
+      response,
+      result,
+      getRememberMeFromCookie(cookieHeader) ?? true,
+    );
+
+    return result.body;
+  }
+
+  @ApiOperation({ summary: 'Proxy appointment time update to booking-api' })
+  @Patch(':id')
+  async updateAppointmentTime(
+    @Headers('authorization') authorizationHeader: string | undefined,
+    @Headers('x-refresh-token') refreshTokenHeader: string | undefined,
+    @Headers('cookie') cookieHeader: string | undefined,
+    @Param('id') appointmentId: string,
+    @Body() body: UpdateAppointmentRequestBody,
+    @Res({ passthrough: true }) response: AuthCookieResponse,
+  ): Promise<unknown> {
+    const result = await this.protectedProxyService.forward({
+      authorizationHeader: getAuthorizationHeaderFromRequest(
+        authorizationHeader,
+        cookieHeader,
+      ),
+      refreshToken: getRefreshTokenFromRequest(
+        refreshTokenHeader,
+        cookieHeader,
+      ),
+      method: 'PATCH',
+      path: `/appointments/${appointmentId}`,
+      body,
+    });
+
+    writeProxyResponse(
+      response,
+      result,
+      getRememberMeFromCookie(cookieHeader) ?? true,
+    );
+
+    return result.body;
+  }
+
+  @ApiOperation({ summary: 'Proxy appointment cancellation to booking-api' })
+  @Patch(':id/cancel')
+  async cancelAppointment(
+    @Headers('authorization') authorizationHeader: string | undefined,
+    @Headers('x-refresh-token') refreshTokenHeader: string | undefined,
+    @Headers('cookie') cookieHeader: string | undefined,
+    @Param('id') appointmentId: string,
+    @Res({ passthrough: true }) response: AuthCookieResponse,
+  ): Promise<unknown> {
+    const result = await this.protectedProxyService.forward({
+      authorizationHeader: getAuthorizationHeaderFromRequest(
+        authorizationHeader,
+        cookieHeader,
+      ),
+      refreshToken: getRefreshTokenFromRequest(
+        refreshTokenHeader,
+        cookieHeader,
+      ),
+      method: 'PATCH',
+      path: `/appointments/${appointmentId}/cancel`,
     });
 
     writeProxyResponse(

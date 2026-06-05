@@ -361,8 +361,13 @@ export function getServices() {
 export function getAvailability(
   serviceId: string,
   date: string,
+  excludeAppointmentId?: string,
 ) {
   const query = new URLSearchParams({ serviceId, date });
+
+  if (excludeAppointmentId) {
+    query.set("excludeAppointmentId", excludeAppointmentId);
+  }
 
   return request<string[]>(`/appointments/availability?${query.toString()}`, {
     headers: buildHeaders(),
@@ -376,6 +381,24 @@ export function createAppointment(
     method: "POST",
     headers: buildHeaders(),
     body: JSON.stringify(payload),
+  });
+}
+
+export function updateAppointment(
+  appointmentId: string,
+  payload: { slot: string },
+) {
+  return request<AppointmentRecord>(`/appointments/${appointmentId}`, {
+    method: "PATCH",
+    headers: buildHeaders(),
+    body: JSON.stringify(payload),
+  });
+}
+
+export function cancelAppointment(appointmentId: string) {
+  return request<AppointmentRecord>(`/appointments/${appointmentId}/cancel`, {
+    method: "PATCH",
+    headers: buildHeaders(),
   });
 }
 

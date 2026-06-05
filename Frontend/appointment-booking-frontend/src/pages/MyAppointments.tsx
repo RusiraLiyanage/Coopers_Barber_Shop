@@ -2,6 +2,7 @@ import {
   Alert,
   Button,
   Card,
+  Dropdown,
   Empty,
   List,
   Modal,
@@ -10,7 +11,10 @@ import {
   Tag,
   Tabs,
   Typography,
+  message,
+  type MenuProps,
 } from "antd";
+import { MoreOutlined } from "@ant-design/icons";
 import {
   Calendar,
   dateFnsLocalizer,
@@ -21,13 +25,18 @@ import {
 } from "react-big-calendar";
 import { format, getDay, parse, startOfWeek } from "date-fns";
 import { enAU } from "date-fns/locale/en-AU";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
+  cancelAppointment,
   getAppointments,
   type AppointmentRecord,
   type AuthSession,
 } from "../lib/api";
-import { GENERIC_ERROR_MESSAGE, logDevelopmentError } from "../lib/errors";
+import {
+  GENERIC_ERROR_MESSAGE,
+  getGenericErrorMessage,
+  logDevelopmentError,
+} from "../lib/errors";
 
 interface MyAppointmentsProps {
   open: boolean;
@@ -35,6 +44,7 @@ interface MyAppointmentsProps {
   refreshKey: number;
   onClose: () => void;
   onMakeAppointment: () => void;
+  onUpdateAppointment: (appointment: AppointmentRecord) => void;
 }
 
 type AppointmentViewMode = "cards" | "calendar";
@@ -46,6 +56,7 @@ type AppointmentCalendarEvent = {
   end: Date;
   staffName: string;
   status: string;
+  appointment: AppointmentRecord;
 };
 
 type CalendarViewOption = {
@@ -302,6 +313,7 @@ function toCalendarEvents(
         end: endTime,
         staffName: appointment.staffName,
         status: appointment.status,
+        appointment,
       },
     ];
   });
@@ -317,16 +329,55 @@ function getCalendarSelectedDate(appointments: AppointmentRecord[]) {
   return parseAppointmentDateTime(firstAppointment.startAt) ?? new Date();
 }
 
+function AppointmentActionsDropdown({
+  appointment,
+  children,
+  onUpdateAppointment,
+  onCancelAppointment,
+}: {
+  appointment: AppointmentRecord;
+  children: ReactNode;
+  onUpdateAppointment: (appointment: AppointmentRecord) => void;
+  onCancelAppointment: (appointment: AppointmentRecord) => void;
+}) {
+  const menu: MenuProps = {
+    items: [
+      { key: "update", label: "Update appointment" },
+      { key: "cancel", label: "Cancel appointment", danger: true },
+    ],
+    onClick: ({ key, domEvent }) => {
+      domEvent.stopPropagation();
+
+      if (key === "update") {
+        onUpdateAppointment(appointment);
+        return;
+      }
+
+      onCancelAppointment(appointment);
+    },
+  };
+
+  return (
+    <Dropdown menu={menu} trigger={["click"]} placement="bottomRight">
+      <div className="appointment-action-trigger">{children}</div>
+    </Dropdown>
+  );
+}
+
 function AppointmentsList({
   appointments,
   emptyDescription,
   emptyActionLabel,
   onMakeAppointment,
+  onUpdateAppointment,
+  onCancelAppointment,
 }: {
   appointments: AppointmentRecord[];
   emptyDescription: string;
   emptyActionLabel: string;
   onMakeAppointment: () => void;
+  onUpdateAppointment: (appointment: AppointmentRecord) => void;
+  onCancelAppointment: (appointment: AppointmentRecord) => void;
 }) {
   if (appointments.length === 0) {
     return (
@@ -379,17 +430,38 @@ function AppointmentsList({
                 </Typography.Text>
               </div>
 
-              <Tag
-                color={appointment.status === "booked" ? "green" : "default"}
+              <div
                 style={{
-                  alignSelf: "flex-start",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  padding: "4px 10px",
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 8,
                 }}
               >
-                {appointment.status.toUpperCase()}
-              </Tag>
+                <Tag
+                  color={appointment.status === "booked" ? "green" : "default"}
+                  style={{
+                    alignSelf: "flex-start",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    padding: "4px 10px",
+                  }}
+                >
+                  {appointment.status.toUpperCase()}
+                </Tag>
+
+                <AppointmentActionsDropdown
+                  appointment={appointment}
+                  onUpdateAppointment={onUpdateAppointment}
+                  onCancelAppointment={onCancelAppointment}
+                >
+                  <Button
+                    aria-label={`Actions for ${appointment.serviceName}`}
+                    icon={<MoreOutlined />}
+                    shape="circle"
+                    type="text"
+                  />
+                </AppointmentActionsDropdown>
+              </div>
             </div>
           </Card>
         </List.Item>
@@ -403,11 +475,15 @@ function AppointmentsCalendar({
   emptyDescription,
   emptyActionLabel,
   onMakeAppointment,
+  onUpdateAppointment,
+  onCancelAppointment,
 }: {
   appointments: AppointmentRecord[];
   emptyDescription: string;
   emptyActionLabel: string;
   onMakeAppointment: () => void;
+  onUpdateAppointment: (appointment: AppointmentRecord) => void;
+  onCancelAppointment: (appointment: AppointmentRecord) => void;
 }) {
   const calendarEvents = useMemo(
     () => toCalendarEvents(appointments),
@@ -444,39 +520,45 @@ function AppointmentsCalendar({
         }
 
         return (
-          <div className={eventClassNames.join(" ")}>
-            <div className="appointment-calendar-event-main">
-              <span className="appointment-calendar-event-time">
-                {isAgendaView || isTimeGridView
-                  ? formatCalendarEventTime(event)
-                  : format(event.start, "h:mm a")}
-              </span>
-              <span className="appointment-calendar-event-title">
-                {event.title}
-              </span>
-            </div>
-
-            {isAgendaView || isDayView ? (
-              <div className="appointment-calendar-event-summary">
-                <span>Staff: {event.staffName}</span>
-                <span className="appointment-calendar-event-status">
-                  {event.status.toUpperCase()}
+          <AppointmentActionsDropdown
+            appointment={event.appointment}
+            onUpdateAppointment={onUpdateAppointment}
+            onCancelAppointment={onCancelAppointment}
+          >
+            <div className={eventClassNames.join(" ")}>
+              <div className="appointment-calendar-event-main">
+                <span className="appointment-calendar-event-time">
+                  {isAgendaView || isTimeGridView
+                    ? formatCalendarEventTime(event)
+                    : format(event.start, "h:mm a")}
+                </span>
+                <span className="appointment-calendar-event-title">
+                  {event.title}
                 </span>
               </div>
-            ) : null}
 
-            {isMonthView ? (
-              <div className="appointment-calendar-event-details">
-                <span>{formatCalendarEventTime(event)}</span>
-                <span>Staff: {event.staffName}</span>
-                <span>{event.status.toUpperCase()}</span>
-              </div>
-            ) : null}
-          </div>
+              {isAgendaView || isDayView ? (
+                <div className="appointment-calendar-event-summary">
+                  <span>Staff: {event.staffName}</span>
+                  <span className="appointment-calendar-event-status">
+                    {event.status.toUpperCase()}
+                  </span>
+                </div>
+              ) : null}
+
+              {isMonthView ? (
+                <div className="appointment-calendar-event-details">
+                  <span>{formatCalendarEventTime(event)}</span>
+                  <span>Staff: {event.staffName}</span>
+                  <span>{event.status.toUpperCase()}</span>
+                </div>
+              ) : null}
+            </div>
+          </AppointmentActionsDropdown>
         );
       },
     }),
-    [calendarView],
+    [calendarView, onCancelAppointment, onUpdateAppointment],
   );
 
   useEffect(() => {
@@ -539,11 +621,13 @@ export default function MyAppointments({
   refreshKey,
   onClose,
   onMakeAppointment,
+  onUpdateAppointment,
 }: MyAppointmentsProps) {
   const [appointments, setAppointments] = useState<AppointmentRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<AppointmentViewMode>("cards");
+  const [messageApi, contextHolder] = message.useMessage();
   const todayDateKey = useMemo(() => getTodayDateKey(), []);
   const sortedAppointments = useMemo(
     () => sortAppointmentsByStartTime(appointments),
@@ -591,6 +675,34 @@ export default function MyAppointments({
       });
   }, [authSession, open, refreshKey]);
 
+  const handleCancelAppointment = (appointment: AppointmentRecord) => {
+    Modal.confirm({
+      title: "Cancel appointment?",
+      content: `${appointment.serviceName} at ${formatAppointmentWindow(
+        appointment,
+      )} will be cancelled.`,
+      okText: "Cancel appointment",
+      okButtonProps: { danger: true },
+      cancelText: "Keep appointment",
+      async onOk() {
+        try {
+          await cancelAppointment(appointment.id);
+          setAppointments((currentAppointments) =>
+            currentAppointments.filter(
+              (currentAppointment) => currentAppointment.id !== appointment.id,
+            ),
+          );
+          messageApi.success("Appointment cancelled successfully");
+        } catch (cancelError) {
+          messageApi.error(
+            getGenericErrorMessage("Cancel appointment", cancelError),
+          );
+          throw cancelError;
+        }
+      },
+    });
+  };
+
   const renderAppointmentsContent = (
     appointmentGroup: AppointmentRecord[],
     emptyDescription: string,
@@ -603,6 +715,8 @@ export default function MyAppointments({
           emptyDescription={emptyDescription}
           emptyActionLabel={emptyActionLabel}
           onMakeAppointment={onMakeAppointment}
+          onUpdateAppointment={onUpdateAppointment}
+          onCancelAppointment={handleCancelAppointment}
         />
       );
     }
@@ -613,6 +727,8 @@ export default function MyAppointments({
         emptyDescription={emptyDescription}
         emptyActionLabel={emptyActionLabel}
         onMakeAppointment={onMakeAppointment}
+        onUpdateAppointment={onUpdateAppointment}
+        onCancelAppointment={handleCancelAppointment}
       />
     );
   };
@@ -642,6 +758,7 @@ export default function MyAppointments({
         },
       }}
     >
+      {contextHolder}
       {!authSession ? (
         <Alert
           type="info"

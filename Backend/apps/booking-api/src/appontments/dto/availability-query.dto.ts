@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsUUID, IsDateString } from 'class-validator';
+import { IsUUID, IsDateString, IsOptional } from 'class-validator';
 
 export class AvailabilityQueryDto {
   // The ID of the service to check availability for.
@@ -11,4 +11,12 @@ export class AvailabilityQueryDto {
   @ApiProperty({ example: '2026-06-15', format: 'date' })
   @IsDateString()
   date!: string; // "YYYY-MM-DD"
+
+  @ApiProperty({
+    example: '9cc07820-5f57-4f0d-a3bc-0d8217f1fb42',
+    required: false,
+  })
+  @IsOptional()
+  @IsUUID()
+  excludeAppointmentId?: string;
 }

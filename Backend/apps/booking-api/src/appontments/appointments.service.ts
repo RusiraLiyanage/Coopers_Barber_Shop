@@ -9,6 +9,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { DeepPartial, Repository } from 'typeorm';
 import { Appointment, Service, Staff } from '@coopers/entities';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
+import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { StaffService } from '../staff/staff.service';
 import { EntityClassOrSchema } from '@nestjs/typeorm/dist/interfaces/entity-class-or-schema.type';
 
@@ -222,6 +223,41 @@ export class AppointmentsService {
     });
   }
 
+  private formatDate(date: Date, timeZone: string): string {
+    const parts = new Intl.DateTimeFormat('en-AU', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      timeZone,
+    }).formatToParts(date);
+
+    const year = parts.find((part) => part.type === 'year')?.value;
+    const month = parts.find((part) => part.type === 'month')?.value;
+    const day = parts.find((part) => part.type === 'day')?.value;
+
+    if (!year || !month || !day) {
+      throw new BadRequestException('Unable to resolve appointment date');
+    }
+
+    return `${year}-${month}-${day}`;
+  }
+
+  private getAppointmentTimesForSlot(
+    date: string,
+    slot: string,
+    timeZone: string,
+  ): { startAt: Date; endAt: Date } {
+    const [start, end] = slot.split('-');
+    if (!start || !end) {
+      throw new BadRequestException('Invalid slot format');
+    }
+
+    return {
+      startAt: this.toStaffDateTime(date, start, timeZone),
+      endAt: this.toStaffDateTime(date, end, timeZone),
+    };
+  }
+
   private toAppointmentResponse(
     appointment: AppointmentResponseInput,
     timeZone: string,
@@ -273,16 +309,26 @@ export class AppointmentsService {
     staff: BlockedIntervalStaffInput,
     workStart: Date,
     workEnd: Date,
+    excludeAppointmentId?: string,
   ): Promise<TimeInterval[]> {
     const { id: staffId, bufferAfterMinutes } = staff;
-    const appointmentIntervals = await this.appointmentsRepo
+    const appointmentsQueryBuilder = this.appointmentsRepo
       .createQueryBuilder('appointment')
       .select('appointment.startAt', 'startAt')
       .addSelect('appointment.endAt', 'endAt')
       .innerJoin('appointment.staff', 'staff')
       .where('staff.id = :staffId', { staffId })
-      .andWhere('appointment.status = :status', { status: 'booked' })
-      .getRawMany<AppointmentIntervalRow>();
+      .andWhere('appointment.status = :status', { status: 'booked' });
+
+    if (excludeAppointmentId) {
+      appointmentsQueryBuilder.andWhere(
+        'appointment.id != :excludeAppointmentId',
+        { excludeAppointmentId },
+      );
+    }
+
+    const appointmentIntervals =
+      await appointmentsQueryBuilder.getRawMany<AppointmentIntervalRow>();
 
     const blockedIntervals: TimeInterval[] = appointmentIntervals.map(
       (interval: AppointmentIntervalRow): TimeInterval => ({
@@ -300,6 +346,7 @@ export class AppointmentsService {
     service: AvailabilityServiceInput,
     staff: AvailabilityStaffInput,
     date: string,
+    excludeAppointmentId?: string,
   ): Promise<string[]> {
     const schedule = this.getStaffScheduleForDate(staff, date);
     if (!schedule) {
@@ -311,6 +358,7 @@ export class AppointmentsService {
         staff,
         schedule.workStart,
         schedule.workEnd,
+        excludeAppointmentId,
       )),
       ...schedule.breaks,
     ].sort(
@@ -380,13 +428,11 @@ export class AppointmentsService {
       );
     }
 
-    const [start, end] = dto.slot.split('-');
-    if (!start || !end) {
-      throw new BadRequestException('Invalid slot format');
-    }
-
-    const startAt: Date = this.toStaffDateTime(dto.date, start, staff.timezone);
-    const endAt: Date = this.toStaffDateTime(dto.date, end, staff.timezone);
+    const { startAt, endAt } = this.getAppointmentTimesForSlot(
+      dto.date,
+      dto.slot,
+      staff.timezone,
+    );
 
     const appointmentInput: DeepPartial<Appointment> = {
       customer: { id: user.userId },
@@ -407,7 +453,7 @@ export class AppointmentsService {
   // To show upcoming booked appointments for the login user.
   async findAllForUser(userId: string): Promise<AppointmentResponse[]> {
     const appointments = await this.appointmentsRepo.find({
-      where: { customer: { id: userId } },
+      where: { customer: { id: userId }, status: 'booked' },
       relations: ['service', 'staff'],
       order: { startAt: 'DESC' },
     });
@@ -421,7 +467,11 @@ export class AppointmentsService {
   }
 
   // To get a list of available time slots for a specific service on a given date.
-  async getAvailability(serviceId: string, date: string): Promise<string[]> {
+  async getAvailability(
+    serviceId: string,
+    date: string,
+    excludeAppointmentId?: string,
+  ): Promise<string[]> {
     // retrieve service details based on the service id.
     const service = await this.servicesRepo.findOneBy({ id: serviceId });
     if (!service) throw new BadRequestException('Service not found');
@@ -430,6 +480,91 @@ export class AppointmentsService {
     const staff = await this.staffRepo.findOne({ where: {} });
     if (!staff) throw new BadRequestException('No staff available');
 
-    return this.calculateAvailability(service, staff, date);
+    return this.calculateAvailability(
+      service,
+      staff,
+      date,
+      excludeAppointmentId,
+    );
+  }
+
+  async updateAppointmentTime(
+    user: BookingUser,
+    appointmentId: string,
+    dto: UpdateAppointmentDto,
+  ): Promise<AppointmentResponse> {
+    const appointment = await this.appointmentsRepo.findOne({
+      where: {
+        id: appointmentId,
+        customer: { id: user.userId },
+      },
+      relations: ['service', 'staff'],
+    });
+
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    if (appointment.status !== 'booked') {
+      throw new BadRequestException('Only booked appointments can be updated');
+    }
+
+    const appointmentDate = this.formatDate(
+      appointment.startAt,
+      appointment.staff.timezone,
+    );
+
+    const availableSlots = await this.calculateAvailability(
+      appointment.service,
+      appointment.staff,
+      appointmentDate,
+      appointment.id,
+    );
+
+    if (!availableSlots.includes(dto.slot)) {
+      throw new ConflictException(`The slot ${dto.slot} is not available`);
+    }
+
+    const { startAt, endAt } = this.getAppointmentTimesForSlot(
+      appointmentDate,
+      dto.slot,
+      appointment.staff.timezone,
+    );
+
+    appointment.startAt = startAt;
+    appointment.endAt = endAt;
+
+    const saved = await this.appointmentsRepo.save(appointment);
+
+    return this.toAppointmentResponse(saved, appointment.staff.timezone);
+  }
+
+  async cancelAppointment(
+    user: BookingUser,
+    appointmentId: string,
+  ): Promise<AppointmentResponse> {
+    const appointment = await this.appointmentsRepo.findOne({
+      where: {
+        id: appointmentId,
+        customer: { id: user.userId },
+      },
+      relations: ['service', 'staff'],
+    });
+
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    if (appointment.status !== 'booked') {
+      throw new BadRequestException(
+        'Only booked appointments can be cancelled',
+      );
+    }
+
+    appointment.status = 'cancelled';
+
+    const saved = await this.appointmentsRepo.save(appointment);
+
+    return this.toAppointmentResponse(saved, appointment.staff.timezone);
   }
 }
