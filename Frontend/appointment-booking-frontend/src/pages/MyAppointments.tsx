@@ -13,8 +13,8 @@ import {
   Typography,
   message,
   type MenuProps,
-} from "antd";
-import { MoreOutlined } from "@ant-design/icons";
+} from 'antd';
+import { MoreOutlined } from '@ant-design/icons';
 import {
   Calendar,
   dateFnsLocalizer,
@@ -22,9 +22,9 @@ import {
   type EventProps,
   type ToolbarProps,
   type View,
-} from "react-big-calendar";
-import { format, getDay, parse, startOfWeek } from "date-fns";
-import { enAU } from "date-fns/locale/en-AU";
+} from 'react-big-calendar';
+import { format, getDay, parse, startOfWeek } from 'date-fns';
+import { enAU } from 'date-fns/locale/en-AU';
 import {
   useCallback,
   useEffect,
@@ -33,18 +33,18 @@ import {
   useRef,
   useState,
   type ReactNode,
-} from "react";
+} from 'react';
 import {
   cancelAppointment,
   getAppointments,
   type AppointmentRecord,
   type AuthSession,
-} from "../lib/api";
+} from '../lib/api';
 import {
   GENERIC_ERROR_MESSAGE,
   getGenericErrorMessage,
   logDevelopmentError,
-} from "../lib/errors";
+} from '../lib/errors';
 
 interface MyAppointmentsProps {
   open: boolean;
@@ -55,8 +55,8 @@ interface MyAppointmentsProps {
   onUpdateAppointment: (appointment: AppointmentRecord) => void;
 }
 
-type AppointmentViewMode = "cards" | "calendar";
-type AppointmentTabKey = "today" | "other";
+type AppointmentViewMode = 'cards' | 'calendar';
+type AppointmentTabKey = 'today' | 'other';
 
 type AppointmentCalendarEvent = {
   id: string;
@@ -81,10 +81,10 @@ const MONTH_DATE_HEADER_HEIGHT = 28;
 const MONTH_EVENT_CARD_HEIGHT = 82;
 const MONTH_ROW_VERTICAL_PADDING = 18;
 const CALENDAR_VIEW_OPTIONS: CalendarViewOption[] = [
-  { label: "Month", value: "month" },
-  { label: "Week", value: "week" },
-  { label: "Day", value: "day" },
-  { label: "Agenda", value: "agenda" },
+  { label: 'Month', value: 'month' },
+  { label: 'Week', value: 'week' },
+  { label: 'Day', value: 'day' },
+  { label: 'Agenda', value: 'agenda' },
 ];
 
 const calendarLocalizer = dateFnsLocalizer({
@@ -93,14 +93,14 @@ const calendarLocalizer = dateFnsLocalizer({
   startOfWeek,
   getDay,
   locales: {
-    "en-AU": enAU,
+    'en-AU': enAU,
   },
 });
 
 const getCalendarEventStyle: EventPropGetter<AppointmentCalendarEvent> = (
   event,
 ) => ({
-  className: event.status === "booked" ? "appointment-event-booked" : "",
+  className: event.status === 'booked' ? 'appointment-event-booked' : '',
   style: {
     borderRadius: 6,
     border: 0,
@@ -109,7 +109,7 @@ const getCalendarEventStyle: EventPropGetter<AppointmentCalendarEvent> = (
 });
 
 function formatCalendarEventTime(event: AppointmentCalendarEvent) {
-  return `${format(event.start, "h:mm a")} - ${format(event.end, "h:mm a")}`;
+  return `${format(event.start, 'h:mm a')} - ${format(event.end, 'h:mm a')}`;
 }
 
 function getCalendarEventDurationMinutes(event: AppointmentCalendarEvent) {
@@ -117,7 +117,7 @@ function getCalendarEventDurationMinutes(event: AppointmentCalendarEvent) {
 }
 
 function getCalendarDateKey(date: Date) {
-  return format(date, "yyyy-MM-dd");
+  return format(date, 'yyyy-MM-dd');
 }
 
 function getLargestDailyAppointmentCount(events: AppointmentCalendarEvent[]) {
@@ -135,7 +135,7 @@ function getLargestDailyAppointmentCount(events: AppointmentCalendarEvent[]) {
 }
 
 function getCalendarHeight(events: AppointmentCalendarEvent[], view: View) {
-  if (view !== "month") {
+  if (view !== 'month') {
     return MIN_CALENDAR_HEIGHT;
   }
 
@@ -164,13 +164,13 @@ function AppointmentCalendarToolbar({
       <div className="appointments-calendar-toolbar-actions">
         <Button
           aria-label="Previous calendar period"
-          onClick={() => onNavigate("PREV")}
+          onClick={() => onNavigate('PREV')}
         >
           Back
         </Button>
         <Button
           aria-label="Next calendar period"
-          onClick={() => onNavigate("NEXT")}
+          onClick={() => onNavigate('NEXT')}
         >
           Next
         </Button>
@@ -190,39 +190,39 @@ function AppointmentCalendarToolbar({
 }
 
 const SHORT_MONTHS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ];
 
 function getOrdinalSuffix(day: number) {
   if (day >= 11 && day <= 13) {
-    return "th";
+    return 'th';
   }
 
   switch (day % 10) {
     case 1:
-      return "st";
+      return 'st';
     case 2:
-      return "nd";
+      return 'nd';
     case 3:
-      return "rd";
+      return 'rd';
     default:
-      return "th";
+      return 'th';
   }
 }
 
 function formatReadableDate(dateText: string) {
-  const [dayText, monthText, yearText] = dateText.split("/");
+  const [dayText, monthText, yearText] = dateText.split('/');
   const day = Number(dayText);
   const month = Number(monthText);
   const year = Number(yearText);
@@ -241,8 +241,8 @@ function formatReadableDate(dateText: string) {
 }
 
 function formatAppointmentWindow(appointment: AppointmentRecord) {
-  const [startDate, startTime] = appointment.startAt.split(", ");
-  const [endDate, endTime] = appointment.endAt.split(", ");
+  const [startDate, startTime] = appointment.startAt.split(', ');
+  const [endDate, endTime] = appointment.endAt.split(', ');
 
   if (startDate && startTime && endDate && endTime && startDate === endDate) {
     return `${formatReadableDate(startDate)} | ${startTime} - ${endTime}`;
@@ -258,14 +258,14 @@ function formatAppointmentWindow(appointment: AppointmentRecord) {
 }
 
 function getAppointmentDateKey(appointment: AppointmentRecord) {
-  return appointment.startAt.split(", ")[0] ?? "";
+  return appointment.startAt.split(', ')[0] ?? '';
 }
 
 function getTodayDateKey() {
-  return new Intl.DateTimeFormat("en-AU", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
+  return new Intl.DateTimeFormat('en-AU', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
   }).format(new Date());
 }
 
@@ -277,9 +277,9 @@ function getAppointmentStartTime(appointment: AppointmentRecord) {
 }
 
 function parseAppointmentDateTime(value: string) {
-  const [datePart = "", timePart = ""] = value.split(", ");
-  const [day, month, year] = datePart.split("/").map(Number);
-  const [hourText = "", minuteText = ""] = timePart.split(":");
+  const [datePart = '', timePart = ''] = value.split(', ');
+  const [day, month, year] = datePart.split('/').map(Number);
+  const [hourText = '', minuteText = ''] = timePart.split(':');
   const hour = Number(hourText);
   const minute = Number(minuteText);
 
@@ -341,25 +341,25 @@ function getCalendarSelectedDate(appointments: AppointmentRecord[]) {
 function AppointmentActionsDropdown({
   appointment,
   children,
-  triggerMode = "inline",
+  triggerMode = 'inline',
   onUpdateAppointment,
   onCancelAppointment,
 }: {
   appointment: AppointmentRecord;
   children: ReactNode;
-  triggerMode?: "inline" | "full";
+  triggerMode?: 'inline' | 'full';
   onUpdateAppointment: (appointment: AppointmentRecord) => void;
   onCancelAppointment: (appointment: AppointmentRecord) => void;
 }) {
   const menu: MenuProps = {
     items: [
-      { key: "update", label: "Update appointment" },
-      { key: "cancel", label: "Cancel appointment", danger: true },
+      { key: 'update', label: 'Update appointment' },
+      { key: 'cancel', label: 'Cancel appointment', danger: true },
     ],
     onClick: ({ key, domEvent }) => {
       domEvent.stopPropagation();
 
-      if (key === "update") {
+      if (key === 'update') {
         onUpdateAppointment(appointment);
         return;
       }
@@ -369,12 +369,12 @@ function AppointmentActionsDropdown({
   };
 
   return (
-    <Dropdown menu={menu} trigger={["click"]} placement="bottomRight">
+    <Dropdown menu={menu} trigger={['click']} placement="bottomRight">
       <span
         className={
-          triggerMode === "full"
-            ? "appointment-action-trigger appointment-action-trigger-full"
-            : "appointment-action-trigger"
+          triggerMode === 'full'
+            ? 'appointment-action-trigger appointment-action-trigger-full'
+            : 'appointment-action-trigger'
         }
       >
         {children}
@@ -415,9 +415,9 @@ function AppointmentsList({
     <List
       dataSource={appointments}
       renderItem={(appointment) => (
-        <List.Item style={{ padding: "10px 0" }}>
+        <List.Item style={{ padding: '10px 0' }}>
           <Card
-            style={{ width: "100%", borderRadius: 8 }}
+            style={{ width: '100%', borderRadius: 8 }}
             styles={{
               body: {
                 padding: 24,
@@ -426,10 +426,10 @@ function AppointmentsList({
           >
             <div
               style={{
-                display: "flex",
-                justifyContent: "space-between",
+                display: 'flex',
+                justifyContent: 'space-between',
                 gap: 20,
-                flexWrap: "wrap",
+                flexWrap: 'wrap',
               }}
             >
               <div>
@@ -451,18 +451,18 @@ function AppointmentsList({
 
               <div
                 style={{
-                  display: "flex",
-                  alignItems: "flex-start",
+                  display: 'flex',
+                  alignItems: 'flex-start',
                   gap: 8,
                 }}
               >
                 <Tag
-                  color={appointment.status === "booked" ? "green" : "default"}
+                  color={appointment.status === 'booked' ? 'green' : 'default'}
                   style={{
-                    alignSelf: "flex-start",
+                    alignSelf: 'flex-start',
                     fontSize: 14,
                     fontWeight: 600,
-                    padding: "4px 10px",
+                    padding: '4px 10px',
                   }}
                 >
                   {appointment.status.toUpperCase()}
@@ -529,20 +529,20 @@ function AppointmentsCalendar({
     () => ({
       toolbar: AppointmentCalendarToolbar,
       event: ({ event }: EventProps<AppointmentCalendarEvent>) => {
-        const isMonthView = calendarView === "month";
-        const isAgendaView = calendarView === "agenda";
-        const isWeekView = calendarView === "week";
-        const isDayView = calendarView === "day";
+        const isMonthView = calendarView === 'month';
+        const isAgendaView = calendarView === 'agenda';
+        const isWeekView = calendarView === 'week';
+        const isDayView = calendarView === 'day';
         const isTimeGridView = isWeekView || isDayView;
         const isShortTimeEvent =
           isTimeGridView && getCalendarEventDurationMinutes(event) <= 30;
         const eventClassNames = [
-          "appointment-calendar-event",
+          'appointment-calendar-event',
           `appointment-calendar-event-${calendarView}`,
         ];
 
         if (isShortTimeEvent) {
-          eventClassNames.push("appointment-calendar-event-short");
+          eventClassNames.push('appointment-calendar-event-short');
         }
 
         return (
@@ -552,12 +552,12 @@ function AppointmentsCalendar({
             onUpdateAppointment={onUpdateAppointment}
             onCancelAppointment={onCancelAppointment}
           >
-            <div className={eventClassNames.join(" ")}>
+            <div className={eventClassNames.join(' ')}>
               <div className="appointment-calendar-event-main">
                 <span className="appointment-calendar-event-time">
                   {isAgendaView || isTimeGridView
                     ? formatCalendarEventTime(event)
-                    : format(event.start, "h:mm a")}
+                    : format(event.start, 'h:mm a')}
                 </span>
                 <span className="appointment-calendar-event-title">
                   {event.title}
@@ -587,7 +587,7 @@ function AppointmentsCalendar({
     }),
     [calendarView, onCancelAppointment, onUpdateAppointment],
   );
-  const isTimeGridView = calendarView === "week" || calendarView === "day";
+  const isTimeGridView = calendarView === 'week' || calendarView === 'day';
 
   useLayoutEffect(() => {
     if (!isTimeGridView) {
@@ -595,7 +595,7 @@ function AppointmentsCalendar({
     }
 
     const timeGridScrollContainer =
-      calendarContainerRef.current?.querySelector(".rbc-time-content");
+      calendarContainerRef.current?.querySelector('.rbc-time-content');
 
     if (!(timeGridScrollContainer instanceof HTMLElement)) {
       return undefined;
@@ -607,18 +607,14 @@ function AppointmentsCalendar({
       onTimeGridScrollTopChange(timeGridScrollContainer.scrollTop);
     };
 
-    timeGridScrollContainer.addEventListener(
-      "scroll",
-      handleTimeGridScroll,
-      {
-        passive: true,
-      },
-    );
+    timeGridScrollContainer.addEventListener('scroll', handleTimeGridScroll, {
+      passive: true,
+    });
 
     return () => {
       onTimeGridScrollTopChange(timeGridScrollContainer.scrollTop);
       timeGridScrollContainer.removeEventListener(
-        "scroll",
+        'scroll',
         handleTimeGridScroll,
       );
     };
@@ -656,14 +652,14 @@ function AppointmentsCalendar({
         events={calendarEvents}
         date={calendarDate}
         view={calendarView}
-        views={["month", "week", "day", "agenda"]}
+        views={['month', 'week', 'day', 'agenda']}
         popup
         showAllEvents
         selectable={false}
         startAccessor="start"
         endAccessor="end"
         titleAccessor={(event) => `${event.title}; ${event.staffName}`}
-        tooltipAccessor={() => ""}
+        tooltipAccessor={() => ''}
         eventPropGetter={getCalendarEventStyle}
         onNavigate={(newDate) => {
           onCalendarDateChange(newDate);
@@ -695,20 +691,20 @@ export default function MyAppointments({
   const [appointments, setAppointments] = useState<AppointmentRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<AppointmentViewMode>("cards");
-  const [calendarView, setCalendarView] = useState<View>("month");
+  const [viewMode, setViewMode] = useState<AppointmentViewMode>('cards');
+  const [calendarView, setCalendarView] = useState<View>('month');
   const [calendarDate, setCalendarDate] = useState(() => new Date());
   const timeGridScrollTopRef = useRef(0);
   const [activeAppointmentTab, setActiveAppointmentTab] =
-    useState<AppointmentTabKey>("today");
+    useState<AppointmentTabKey>('today');
   const [messageApi, contextHolder] = message.useMessage();
   const hasInitializedCalendarDateRef = useRef(false);
   const tabsClassName = [
-    "appointments-tabs",
-    viewMode === "calendar" ? `appointments-tabs-calendar-${calendarView}` : "",
+    'appointments-tabs',
+    viewMode === 'calendar' ? `appointments-tabs-calendar-${calendarView}` : '',
   ]
     .filter(Boolean)
-    .join(" ");
+    .join(' ');
   const todayDateKey = useMemo(() => getTodayDateKey(), []);
   const sortedAppointments = useMemo(
     () => sortAppointmentsByStartTime(appointments),
@@ -729,7 +725,7 @@ export default function MyAppointments({
     [sortedAppointments, todayDateKey],
   );
   const activeTabAppointments =
-    activeAppointmentTab === "today" ? todaysAppointments : otherAppointments;
+    activeAppointmentTab === 'today' ? todaysAppointments : otherAppointments;
 
   useEffect(() => {
     if (!open) {
@@ -743,6 +739,11 @@ export default function MyAppointments({
       return;
     }
 
+    // always the default view will be card view.
+    setViewMode('cards');
+    // always the default view within the calendar would be month view
+    setCalendarView('month');
+
     setLoading(true);
     setError(null);
 
@@ -751,7 +752,7 @@ export default function MyAppointments({
         setAppointments(response);
       })
       .catch((fetchError: unknown) => {
-        logDevelopmentError("Load appointments", fetchError);
+        logDevelopmentError('Load appointments', fetchError);
         setError(GENERIC_ERROR_MESSAGE);
       })
       .finally(() => {
@@ -762,7 +763,7 @@ export default function MyAppointments({
   useEffect(() => {
     if (
       !open ||
-      viewMode !== "calendar" ||
+      viewMode !== 'calendar' ||
       hasInitializedCalendarDateRef.current ||
       activeTabAppointments.length === 0
     ) {
@@ -779,13 +780,13 @@ export default function MyAppointments({
 
   const handleCancelAppointment = (appointment: AppointmentRecord) => {
     Modal.confirm({
-      title: "Cancel appointment?",
+      title: 'Cancel appointment?',
       content: `${appointment.serviceName} at ${formatAppointmentWindow(
         appointment,
       )} will be cancelled.`,
-      okText: "Cancel appointment",
+      okText: 'Cancel appointment',
       okButtonProps: { danger: true },
-      cancelText: "Keep appointment",
+      cancelText: 'Keep appointment',
       async onOk() {
         try {
           await cancelAppointment(appointment.id);
@@ -794,10 +795,10 @@ export default function MyAppointments({
               (currentAppointment) => currentAppointment.id !== appointment.id,
             ),
           );
-          messageApi.success("Appointment cancelled successfully");
+          messageApi.success('Appointment cancelled successfully');
         } catch (cancelError) {
           messageApi.error(
-            getGenericErrorMessage("Cancel appointment", cancelError),
+            getGenericErrorMessage('Cancel appointment', cancelError),
           );
           throw cancelError;
         }
@@ -810,7 +811,7 @@ export default function MyAppointments({
     emptyDescription: string,
     emptyActionLabel: string,
   ) => {
-    if (viewMode === "calendar") {
+    if (viewMode === 'calendar') {
       return (
         <AppointmentsCalendar
           appointments={appointmentGroup}
@@ -857,11 +858,11 @@ export default function MyAppointments({
       onCancel={onClose}
       footer={null}
       centered
-      width={viewMode === "calendar" ? 1080 : 920}
+      width={viewMode === 'calendar' ? 1080 : 920}
       styles={{
         body: {
-          height: "70vh",
-          overflowY: "hidden",
+          height: '70vh',
+          overflowY: 'hidden',
           paddingTop: 12,
         },
       }}
@@ -875,7 +876,7 @@ export default function MyAppointments({
           showIcon
         />
       ) : loading ? (
-        <div style={{ display: "flex", justifyContent: "center", padding: 48 }}>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
           <Spin size="large" />
         </div>
       ) : error ? (
@@ -893,14 +894,14 @@ export default function MyAppointments({
               value={viewMode}
               onChange={setViewMode}
               options={[
-                { label: "Cards", value: "cards" },
-                { label: "Calendar", value: "calendar" },
+                { label: 'Cards', value: 'cards' },
+                { label: 'Calendar', value: 'calendar' },
               ]}
             />
           }
           items={[
             {
-              key: "today",
+              key: 'today',
               label: (
                 <span style={{ fontSize: 16, fontWeight: 600 }}>
                   Today ({todaysAppointments.length})
@@ -908,12 +909,12 @@ export default function MyAppointments({
               ),
               children: renderAppointmentsContent(
                 todaysAppointments,
-                "No appointments scheduled for today.",
-                "Book an Appointment",
+                'No appointments scheduled for today.',
+                'Book an Appointment',
               ),
             },
             {
-              key: "other",
+              key: 'other',
               label: (
                 <span style={{ fontSize: 16, fontWeight: 600 }}>
                   Other Appointments ({otherAppointments.length})
@@ -921,8 +922,8 @@ export default function MyAppointments({
               ),
               children: renderAppointmentsContent(
                 otherAppointments,
-                "No other appointments found for this account yet.",
-                "Book Your First Appointment",
+                'No other appointments found for this account yet.',
+                'Book Your First Appointment',
               ),
             },
           ]}
