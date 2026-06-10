@@ -35,7 +35,7 @@ export class AppointmentsController {
     return this.appointmentsService.book(req.user, dto);
   }
 
-  @ApiOperation({ summary: 'Update appointment time' })
+  @ApiOperation({ summary: 'Update appointment date and time' })
   @UseGuards(JwtAuthGuard)
   @Patch(':id')
   async updateAppointmentTime(

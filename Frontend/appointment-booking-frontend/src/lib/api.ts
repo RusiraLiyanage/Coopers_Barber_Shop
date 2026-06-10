@@ -386,7 +386,7 @@ export function createAppointment(
 
 export function updateAppointment(
   appointmentId: string,
-  payload: { slot: string },
+  payload: { date: string; slot: string },
 ) {
   return request<AppointmentRecord>(`/appointments/${appointmentId}`, {
     method: "PATCH",

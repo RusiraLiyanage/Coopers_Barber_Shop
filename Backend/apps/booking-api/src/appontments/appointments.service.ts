@@ -371,13 +371,22 @@ export class AppointmentsService {
 
     while (slotStart < schedule.workEnd) {
       const slotEnd = this.addMinutes(slotStart, service.durationMinutes);
+      const slotEndWithBuffer = this.addMinutes(
+        slotEnd,
+        staff.bufferAfterMinutes,
+      );
       if (slotEnd > schedule.workEnd) {
         break;
       }
 
       const overlappingIntervals: TimeInterval[] = blocked.filter(
         (interval: TimeInterval): boolean =>
-          this.rangesOverlap(slotStart, slotEnd, interval.start, interval.end),
+          this.rangesOverlap(
+            slotStart,
+            slotEndWithBuffer,
+            interval.start,
+            interval.end,
+          ),
       );
 
       if (overlappingIntervals.length === 0) {
@@ -450,10 +459,10 @@ export class AppointmentsService {
     return this.toAppointmentResponse(saved, staff.timezone);
   }
 
-  // To show upcoming booked appointments for the login user.
+  // To show appointment history for the login user.
   async findAllForUser(userId: string): Promise<AppointmentResponse[]> {
     const appointments = await this.appointmentsRepo.find({
-      where: { customer: { id: userId }, status: 'booked' },
+      where: { customer: { id: userId } },
       relations: ['service', 'staff'],
       order: { startAt: 'DESC' },
     });
@@ -509,15 +518,10 @@ export class AppointmentsService {
       throw new BadRequestException('Only booked appointments can be updated');
     }
 
-    const appointmentDate = this.formatDate(
-      appointment.startAt,
-      appointment.staff.timezone,
-    );
-
     const availableSlots = await this.calculateAvailability(
       appointment.service,
       appointment.staff,
-      appointmentDate,
+      dto.date,
       appointment.id,
     );
 
@@ -526,7 +530,7 @@ export class AppointmentsService {
     }
 
     const { startAt, endAt } = this.getAppointmentTimesForSlot(
-      appointmentDate,
+      dto.date,
       dto.slot,
       appointment.staff.timezone,
     );
@@ -561,7 +565,7 @@ export class AppointmentsService {
       );
     }
 
-    appointment.status = 'cancelled';
+    appointment.status = 'cancelled_by_client';
 
     const saved = await this.appointmentsRepo.save(appointment);
 

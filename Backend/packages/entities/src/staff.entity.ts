@@ -19,11 +19,11 @@ export class Staff {
   @Column({ name: 'display_name', type: 'text' })
   displayName: string;
 
-  // the timezone of the staff member, default is 'Australia/Sydney'.
+  // the timezone of the staff member, default is 'Australia/Sydney'. --> appointments are schedulded based on the staff member's working days
   @Column({ type: 'text', default: 'Australia/Sydney' })
   timezone: string;
 
-  // the color associated with the staff member, default is '#FF5733'.
+  // the buffer period a barber get before moving ahead with the next appointment
   @Column({ name: 'buffer_after_minutes', type: 'smallint', default: 15 })
   bufferAfterMinutes: number;
 

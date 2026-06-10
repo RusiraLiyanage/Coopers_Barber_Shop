@@ -10,6 +10,7 @@ import { ConflictException } from '@nestjs/common';
 // Mock repositories
 const mockAppointmentsRepo = {
   find: jest.fn(),
+  findOne: jest.fn(),
   createQueryBuilder: jest.fn(),
   create: jest.fn(),
   save: jest.fn(),
@@ -37,6 +38,7 @@ const mockStaffService = {
   getDefaultStaff: jest.fn().mockResolvedValue({
     id: '11111111-1111-1111-1111-111111111111',
     displayName: 'Main Staff',
+    timezone: 'Australia/Sydney',
     bufferAfterMinutes: 15,
   }),
   getBufferMinutes: jest.fn().mockResolvedValue(15),
@@ -200,6 +202,34 @@ describe('AppointmentsService', () => {
     expect(slots).toContain('10:30-11:00');
   });
 
+  it('should reject a slot when its own buffer would overlap the next appointment', async () => {
+    mockServicesRepo.findOneBy.mockResolvedValue({
+      id: 'svc3',
+      name: 'Consultation',
+      durationMinutes: 15,
+    });
+
+    mockAppointmentsQueryBuilder.getRawMany.mockResolvedValue([
+      {
+        startAt: new Date('2025-09-24T09:45:00+10:00'),
+        endAt: new Date('2025-09-24T10:00:00+10:00'),
+        status: 'booked',
+      },
+      {
+        startAt: new Date('2025-09-24T10:30:00+10:00'),
+        endAt: new Date('2025-09-24T11:15:00+10:00'),
+        status: 'booked',
+      },
+    ]);
+
+    mockStaffRepo.findOne.mockResolvedValue({ bufferAfterMinutes: 15 });
+
+    const slots = await service.getAvailability('svc3', '2025-09-24');
+
+    expect(slots).not.toContain('10:15-10:30');
+    expect(slots).toContain('11:30-11:45');
+  });
+
   // Test case 6: Ensure that long services are correctly blocked from overlapping breaks or work end
   it('should correctly block long services (90 mins) from overlapping breaks or work end', async () => {
     mockServicesRepo.findOneBy.mockResolvedValue({
@@ -254,5 +284,118 @@ describe('AppointmentsService', () => {
         },
       ),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('should update an appointment onto the selected date when the slot is available', async () => {
+    const appointment = {
+      id: 'appointment-1',
+      customer: { id: 'user-1' },
+      service: {
+        id: 'svc1',
+        name: 'Haircut',
+        durationMinutes: 30,
+      },
+      staff: {
+        id: '11111111-1111-1111-1111-111111111111',
+        displayName: 'Main Staff',
+        timezone: 'Australia/Sydney',
+        bufferAfterMinutes: 15,
+      },
+      startAt: new Date('2025-09-24T00:00:00.000Z'),
+      endAt: new Date('2025-09-24T00:30:00.000Z'),
+      status: 'booked',
+    };
+
+    mockAppointmentsRepo.findOne.mockResolvedValue(appointment);
+    mockAppointmentsQueryBuilder.getRawMany.mockResolvedValue([]);
+    mockAppointmentsRepo.save.mockImplementation(
+      (updatedAppointment: typeof appointment) => updatedAppointment,
+    );
+
+    const result = await service.updateAppointmentTime(
+      { userId: 'user-1' },
+      'appointment-1',
+      {
+        date: '2025-09-25',
+        slot: '10:30-11:00',
+      },
+    );
+
+    expect(appointment.startAt.toISOString()).toBe('2025-09-25T00:30:00.000Z');
+    expect(appointment.endAt.toISOString()).toBe('2025-09-25T01:00:00.000Z');
+    expect(result.startAt).toContain('25/09/2025');
+    expect(result.startAt).toContain('10:30');
+  });
+
+  it('should include cancelled appointments in the user appointment history', async () => {
+    mockAppointmentsRepo.find.mockResolvedValue([
+      {
+        id: 'appointment-1',
+        service: { id: 'svc1', name: 'Haircut' },
+        staff: {
+          id: '11111111-1111-1111-1111-111111111111',
+          displayName: 'Main Staff',
+        },
+        startAt: new Date('2025-09-24T00:00:00.000Z'),
+        endAt: new Date('2025-09-24T00:30:00.000Z'),
+        status: 'booked',
+      },
+      {
+        id: 'appointment-2',
+        service: { id: 'svc2', name: 'Hair Styling' },
+        staff: {
+          id: '11111111-1111-1111-1111-111111111111',
+          displayName: 'Main Staff',
+        },
+        startAt: new Date('2025-09-25T00:00:00.000Z'),
+        endAt: new Date('2025-09-25T00:45:00.000Z'),
+        status: 'cancelled_by_client',
+      },
+    ]);
+
+    const result = await service.findAllForUser('user-1');
+
+    expect(mockAppointmentsRepo.find).toHaveBeenCalledWith({
+      where: { customer: { id: 'user-1' } },
+      relations: ['service', 'staff'],
+      order: { startAt: 'DESC' },
+    });
+    expect(result).toHaveLength(2);
+    expect(result.map((appointment) => appointment.status)).toEqual([
+      'booked',
+      'cancelled_by_client',
+    ]);
+  });
+
+  it('should soft cancel appointments as cancelled by client', async () => {
+    const appointment = {
+      id: 'appointment-1',
+      customer: { id: 'user-1' },
+      service: {
+        id: 'svc1',
+        name: 'Haircut',
+      },
+      staff: {
+        id: '11111111-1111-1111-1111-111111111111',
+        displayName: 'Main Staff',
+        timezone: 'Australia/Sydney',
+      },
+      startAt: new Date('2025-09-24T00:00:00.000Z'),
+      endAt: new Date('2025-09-24T00:30:00.000Z'),
+      status: 'booked',
+    };
+
+    mockAppointmentsRepo.findOne.mockResolvedValue(appointment);
+    mockAppointmentsRepo.save.mockImplementation(
+      (updatedAppointment: typeof appointment) => updatedAppointment,
+    );
+
+    const result = await service.cancelAppointment(
+      { userId: 'user-1' },
+      'appointment-1',
+    );
+
+    expect(appointment.status).toBe('cancelled_by_client');
+    expect(result.status).toBe('cancelled_by_client');
   });
 });

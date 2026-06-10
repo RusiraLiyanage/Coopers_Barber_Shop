@@ -35,9 +35,27 @@ body {
   flex-direction: column;
 }
 
+.appointments-calendar-panel {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
 .appointments-tabs > .ant-tabs-nav {
   flex: 0 0 auto;
   margin: 0;
+  padding: 10px 0 16px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+.appointments-calendar-view-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   padding: 10px 0 16px;
   border-bottom: 1px solid #e5e7eb;
   background: #fff;
@@ -54,6 +72,13 @@ body {
   padding-top: 14px;
 }
 
+.appointments-calendar-panel-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-top: 14px;
+}
+
 .appointments-tabs > .ant-tabs-content-holder > .ant-tabs-content {
   min-height: 100%;
 }
@@ -63,8 +88,8 @@ body {
   height: 100%;
 }
 
-.appointments-tabs-calendar-week > .ant-tabs-content-holder,
-.appointments-tabs-calendar-day > .ant-tabs-content-holder {
+.appointments-calendar-panel-week .appointments-calendar-panel-content,
+.appointments-calendar-panel-day .appointments-calendar-panel-content {
   overflow-y: hidden;
 }
 
@@ -105,8 +130,8 @@ body {
   min-height: 680px;
 }
 
-.appointments-tabs-calendar-week .appointments-calendar,
-.appointments-tabs-calendar-day .appointments-calendar {
+.appointments-calendar-panel-week .appointments-calendar,
+.appointments-calendar-panel-day .appointments-calendar {
   height: 100%;
   min-height: 0 !important;
 }
@@ -118,8 +143,8 @@ body {
   overflow: hidden;
 }
 
-.appointments-tabs-calendar-week .appointments-calendar .rbc-calendar,
-.appointments-tabs-calendar-day .appointments-calendar .rbc-calendar {
+.appointments-calendar-panel-week .appointments-calendar .rbc-calendar,
+.appointments-calendar-panel-day .appointments-calendar .rbc-calendar {
   height: 100% !important;
 }
 
@@ -173,11 +198,6 @@ body {
   overflow: hidden;
 }
 
-.appointments-calendar-day .rbc-day-slot .rbc-event {
-  right: auto !important;
-  width: min(680px, calc(100% - 8px)) !important;
-}
-
 .appointments-calendar .rbc-time-view .rbc-event-label {
   display: none;
 }
@@ -186,13 +206,216 @@ body {
   height: 100%;
 }
 
-.appointments-calendar .appointment-event-booked {
+.appointment-slot-section {
+  display: grid;
+  gap: 12px;
+}
+
+.appointment-current-slot-card {
+  position: relative;
+  display: grid;
+  width: min(100%, 252px);
+  min-height: 72px;
+  padding: 10px 12px;
+  border: 1px solid #93c5fd;
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(239, 246, 255, 0.96), rgba(255, 255, 255, 0.98)),
+    #fff;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.12);
+  color: #111827;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.appointment-current-slot-card:hover,
+.appointment-current-slot-card-selected {
+  border-color: #2563eb;
+  box-shadow: 0 14px 30px rgba(37, 99, 235, 0.18);
+  transform: translateY(-1px);
+}
+
+.appointment-current-slot-card-selected {
+  background:
+    linear-gradient(135deg, rgba(219, 234, 254, 0.98), rgba(255, 255, 255, 0.98)),
+    #fff;
+  box-shadow:
+    0 0 0 3px rgba(37, 99, 235, 0.2),
+    0 12px 26px rgba(37, 99, 235, 0.18);
+}
+
+.appointment-current-slot-kicker {
+  color: #2563eb;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.appointment-current-slot-time {
+  margin-top: 2px;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.appointment-current-slot-service {
+  max-width: 160px;
+  margin-top: 2px;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.appointment-current-slot-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 7px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.appointment-current-slot-card-selected .appointment-current-slot-badge {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #fff;
+}
+
+.appointment-current-slot-pulse {
+  position: absolute;
+  inset: -5px;
+  border: 2px solid rgba(37, 99, 235, 0.52);
+  border-radius: 10px;
+  pointer-events: none;
+  animation: appointment-current-slot-pulse 520ms ease-out;
+}
+
+@keyframes appointment-current-slot-pulse {
+  from {
+    opacity: 0.8;
+    transform: scale(0.98);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(1.06);
+  }
+}
+
+.appointment-slot-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.appointment-slot-empty {
+  color: #8c8c8c;
+  font-size: 16px;
+}
+
+.appointment-original-date-cell {
+  display: inline-flex;
+  min-width: 44px;
+  min-height: 34px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+}
+
+.appointment-original-date-cell .ant-picker-cell-inner {
+  border: 1px solid #2563eb;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-weight: 800;
+}
+
+.appointment-original-date-marker {
+  color: #2563eb;
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.appointments-calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  color: #4b5563;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.appointments-calendar-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.appointments-calendar-legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.appointments-calendar-legend-dot-scheduled {
+  background: #2563eb;
+}
+
+.appointments-calendar-legend-dot-client {
+  border: 1px solid #fecaca;
+  background: #fee2e2;
+}
+
+.appointments-calendar-legend-dot-barber {
+  border: 1px solid #fde68a;
+  background: #fef3c7;
+}
+
+.appointments-calendar .appointment-event-booked,
+.appointments-calendar .appointment-event-scheduled {
   background-color: #2563eb;
 }
 
-.appointments-calendar .rbc-time-view .appointment-event-booked {
+.appointments-calendar .rbc-time-view .appointment-event-booked,
+.appointments-calendar .rbc-time-view .appointment-event-scheduled {
   background-color: #2563eb;
   color: #fff;
+}
+
+.appointments-calendar .appointment-event-cancelledClient {
+  background: #fee2e2;
+  color: #7f1d1d;
+}
+
+.appointments-calendar .rbc-time-view .appointment-event-cancelledClient {
+  border-left-color: #ef4444;
+  background: #fee2e2;
+  color: #7f1d1d;
+}
+
+.appointments-calendar .appointment-event-cancelledBarber {
+  background: #fef3c7;
+  color: #713f12;
+}
+
+.appointments-calendar .rbc-time-view .appointment-event-cancelledBarber {
+  border-left-color: #f59e0b;
+  background: #fef3c7;
+  color: #713f12;
 }
 
 .appointment-calendar-event {
@@ -208,6 +431,17 @@ body {
 .appointment-action-trigger-full {
   display: block;
   height: 100%;
+}
+
+.cancel-appointment-confirmation-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cancel-appointment-confirmation-title .anticon {
+  color: #faad14;
+  font-size: 20px;
 }
 
 .appointment-calendar-event-month {
@@ -325,6 +559,32 @@ body {
   color: rgba(255, 255, 255, 0.92);
 }
 
+.appointment-event-cancelledClient .appointment-calendar-event-week,
+.appointment-event-cancelledClient .appointment-calendar-event-day,
+.appointment-event-cancelledClient .appointment-calendar-event-time,
+.appointment-event-cancelledClient .appointment-calendar-event-title,
+.appointment-event-cancelledClient .appointment-calendar-event-summary,
+.appointment-event-cancelledClient .appointment-calendar-event-status {
+  color: #7f1d1d;
+}
+
+.appointment-event-cancelledBarber .appointment-calendar-event-week,
+.appointment-event-cancelledBarber .appointment-calendar-event-day,
+.appointment-event-cancelledBarber .appointment-calendar-event-time,
+.appointment-event-cancelledBarber .appointment-calendar-event-title,
+.appointment-event-cancelledBarber .appointment-calendar-event-summary,
+.appointment-event-cancelledBarber .appointment-calendar-event-status {
+  color: #713f12;
+}
+
+.appointment-event-cancelledClient .appointment-calendar-event-status {
+  background: rgba(248, 113, 113, 0.24);
+}
+
+.appointment-event-cancelledBarber .appointment-calendar-event-status {
+  background: rgba(245, 158, 11, 0.26);
+}
+
 .appointment-calendar-event-details {
   display: grid;
   gap: 2px;
@@ -333,6 +593,14 @@ body {
   border-top: 1px solid rgba(255, 255, 255, 0.36);
   font-size: 11px;
   line-height: 1.25;
+}
+
+.appointment-event-cancelledClient .appointment-calendar-event-details {
+  border-top-color: rgba(239, 68, 68, 0.26);
+}
+
+.appointment-event-cancelledBarber .appointment-calendar-event-details {
+  border-top-color: rgba(245, 158, 11, 0.32);
 }
 
 .appointment-calendar-event-month .appointment-calendar-event-details {
@@ -384,7 +652,12 @@ body {
   .rbc-agenda-view
   table.rbc-agenda-table
   tbody
-  > tr.appointment-event-booked {
+  > tr.appointment-event-booked,
+.appointments-calendar
+  .rbc-agenda-view
+  table.rbc-agenda-table
+  tbody
+  > tr.appointment-event-scheduled {
   background: #fff;
   color: #111827;
 }
@@ -393,8 +666,47 @@ body {
   .rbc-agenda-view
   table.rbc-agenda-table
   tbody
-  > tr.appointment-event-booked:hover {
+  > tr.appointment-event-booked:hover,
+.appointments-calendar
+  .rbc-agenda-view
+  table.rbc-agenda-table
+  tbody
+  > tr.appointment-event-scheduled:hover {
   background: #eff6ff;
+}
+
+.appointments-calendar
+  .rbc-agenda-view
+  table.rbc-agenda-table
+  tbody
+  > tr.appointment-event-cancelledClient {
+  background: #fff7f7;
+  color: #7f1d1d;
+}
+
+.appointments-calendar
+  .rbc-agenda-view
+  table.rbc-agenda-table
+  tbody
+  > tr.appointment-event-cancelledClient:hover {
+  background: #fee2e2;
+}
+
+.appointments-calendar
+  .rbc-agenda-view
+  table.rbc-agenda-table
+  tbody
+  > tr.appointment-event-cancelledBarber {
+  background: #fffbeb;
+  color: #713f12;
+}
+
+.appointments-calendar
+  .rbc-agenda-view
+  table.rbc-agenda-table
+  tbody
+  > tr.appointment-event-cancelledBarber:hover {
+  background: #fef3c7;
 }
 
 .appointments-calendar

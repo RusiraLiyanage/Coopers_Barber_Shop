@@ -14,7 +14,7 @@ import {
   message,
   type MenuProps,
 } from 'antd';
-import { MoreOutlined } from '@ant-design/icons';
+import { ExclamationCircleFilled, MoreOutlined } from '@ant-design/icons';
 import {
   Calendar,
   dateFnsLocalizer,
@@ -56,7 +56,11 @@ interface MyAppointmentsProps {
 }
 
 type AppointmentViewMode = 'cards' | 'calendar';
-type AppointmentTabKey = 'today' | 'other';
+type AppointmentTabKey = 'today' | 'scheduled' | 'cancelled';
+type AppointmentStatusCategory =
+  | 'scheduled'
+  | 'cancelledClient'
+  | 'cancelledBarber';
 
 type AppointmentCalendarEvent = {
   id: string;
@@ -87,6 +91,25 @@ const CALENDAR_VIEW_OPTIONS: CalendarViewOption[] = [
   { label: 'Agenda', value: 'agenda' },
 ];
 
+function getAppointmentsModalWidth(
+  viewMode: AppointmentViewMode,
+  calendarView: View,
+) {
+  if (viewMode !== 'calendar') {
+    return 920;
+  }
+
+  if (calendarView === 'week') {
+    return 'min(94vw, 1280px)';
+  }
+
+  if (calendarView === 'day') {
+    return 'min(88vw, 1120px)';
+  }
+
+  return 1080;
+}
+
 const calendarLocalizer = dateFnsLocalizer({
   format,
   parse,
@@ -97,10 +120,50 @@ const calendarLocalizer = dateFnsLocalizer({
   },
 });
 
+function getAppointmentStatusCategory(
+  status: string,
+): AppointmentStatusCategory {
+  switch (status) {
+    case 'cancelled':
+    case 'cancelled_by_client':
+      return 'cancelledClient';
+    case 'cancelled_by_barber':
+      return 'cancelledBarber';
+    default:
+      return 'scheduled';
+  }
+}
+
+function isScheduledAppointment(appointment: AppointmentRecord) {
+  return getAppointmentStatusCategory(appointment.status) === 'scheduled';
+}
+
+function getAppointmentStatusLabel(status: string) {
+  switch (getAppointmentStatusCategory(status)) {
+    case 'cancelledClient':
+      return 'Cancelled by client';
+    case 'cancelledBarber':
+      return 'Cancelled by barber';
+    default:
+      return 'Scheduled';
+  }
+}
+
+function getAppointmentTagColor(status: string) {
+  switch (getAppointmentStatusCategory(status)) {
+    case 'cancelledClient':
+      return 'red';
+    case 'cancelledBarber':
+      return 'gold';
+    default:
+      return 'green';
+  }
+}
+
 const getCalendarEventStyle: EventPropGetter<AppointmentCalendarEvent> = (
   event,
 ) => ({
-  className: event.status === 'booked' ? 'appointment-event-booked' : '',
+  className: `appointment-event-${getAppointmentStatusCategory(event.status)}`,
   style: {
     borderRadius: 6,
     border: 0,
@@ -240,21 +303,47 @@ function formatReadableDate(dateText: string) {
   return `${day}${getOrdinalSuffix(day)} ${SHORT_MONTHS[month - 1]} ${year}`;
 }
 
+function formatDisplayTime(timeText: string) {
+  const [hourText = '', minuteText = ''] = timeText.split(':');
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+
+  if (
+    !Number.isInteger(hour) ||
+    !Number.isInteger(minute) ||
+    hour < 0 ||
+    hour > 23 ||
+    minute < 0 ||
+    minute > 59
+  ) {
+    return timeText;
+  }
+
+  const displayHour = hour % 12 || 12;
+  const period = hour >= 12 ? 'PM' : 'AM';
+
+  return `${displayHour}:${minuteText.padStart(2, '0')} ${period}`;
+}
+
 function formatAppointmentWindow(appointment: AppointmentRecord) {
   const [startDate, startTime] = appointment.startAt.split(', ');
   const [endDate, endTime] = appointment.endAt.split(', ');
 
   if (startDate && startTime && endDate && endTime && startDate === endDate) {
-    return `${formatReadableDate(startDate)} | ${startTime} - ${endTime}`;
+    return `${formatReadableDate(startDate)} | ${formatDisplayTime(
+      startTime,
+    )} - ${formatDisplayTime(endTime)}`;
   }
 
   if (!startDate || !startTime || !endDate || !endTime) {
     return `${appointment.startAt} - ${appointment.endAt}`;
   }
 
-  return `${formatReadableDate(startDate)} ${startTime} - ${formatReadableDate(
+  return `${formatReadableDate(startDate)} ${formatDisplayTime(
+    startTime,
+  )} - ${formatReadableDate(
     endDate,
-  )} ${endTime}`;
+  )} ${formatDisplayTime(endTime)}`;
 }
 
 function getAppointmentDateKey(appointment: AppointmentRecord) {
@@ -414,77 +503,83 @@ function AppointmentsList({
   return (
     <List
       dataSource={appointments}
-      renderItem={(appointment) => (
-        <List.Item style={{ padding: '10px 0' }}>
-          <Card
-            style={{ width: '100%', borderRadius: 8 }}
-            styles={{
-              body: {
-                padding: 24,
-              },
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: 20,
-                flexWrap: 'wrap',
+      renderItem={(appointment) => {
+        const isScheduled = isScheduledAppointment(appointment);
+
+        return (
+          <List.Item style={{ padding: '10px 0' }}>
+            <Card
+              style={{ width: '100%', borderRadius: 8 }}
+              styles={{
+                body: {
+                  padding: 24,
+                },
               }}
             >
-              <div>
-                <Typography.Title
-                  level={3}
-                  style={{ marginTop: 0, marginBottom: 8 }}
-                >
-                  {appointment.serviceName}
-                </Typography.Title>
-                <Typography.Paragraph
-                  style={{ marginBottom: 10, fontSize: 16, fontWeight: 500 }}
-                >
-                  {formatAppointmentWindow(appointment)}
-                </Typography.Paragraph>
-                <Typography.Text type="secondary" style={{ fontSize: 16 }}>
-                  Staff: {appointment.staffName}
-                </Typography.Text>
-              </div>
-
               <div
                 style={{
                   display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 8,
+                  justifyContent: 'space-between',
+                  gap: 20,
+                  flexWrap: 'wrap',
                 }}
               >
-                <Tag
-                  color={appointment.status === 'booked' ? 'green' : 'default'}
+                <div>
+                  <Typography.Title
+                    level={3}
+                    style={{ marginTop: 0, marginBottom: 8 }}
+                  >
+                    {appointment.serviceName}
+                  </Typography.Title>
+                  <Typography.Paragraph
+                    style={{ marginBottom: 10, fontSize: 16, fontWeight: 500 }}
+                  >
+                    {formatAppointmentWindow(appointment)}
+                  </Typography.Paragraph>
+                  <Typography.Text type="secondary" style={{ fontSize: 16 }}>
+                    Staff: {appointment.staffName}
+                  </Typography.Text>
+                </div>
+
+                <div
                   style={{
-                    alignSelf: 'flex-start',
-                    fontSize: 14,
-                    fontWeight: 600,
-                    padding: '4px 10px',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 8,
                   }}
                 >
-                  {appointment.status.toUpperCase()}
-                </Tag>
+                  <Tag
+                    color={getAppointmentTagColor(appointment.status)}
+                    style={{
+                      alignSelf: 'flex-start',
+                      fontSize: 14,
+                      fontWeight: 600,
+                      padding: '4px 10px',
+                    }}
+                  >
+                    {getAppointmentStatusLabel(appointment.status)}
+                  </Tag>
 
-                <AppointmentActionsDropdown
-                  appointment={appointment}
-                  onUpdateAppointment={onUpdateAppointment}
-                  onCancelAppointment={onCancelAppointment}
-                >
-                  <Button
-                    aria-label={`Actions for ${appointment.serviceName}`}
-                    icon={<MoreOutlined />}
-                    shape="circle"
-                    type="text"
-                  />
-                </AppointmentActionsDropdown>
+                  {isScheduled ? (
+                    <AppointmentActionsDropdown
+                      appointment={appointment}
+                      onUpdateAppointment={onUpdateAppointment}
+                      onCancelAppointment={onCancelAppointment}
+                    >
+                      <Button
+                        aria-label={`Actions for ${appointment.serviceName}`}
+                        icon={<MoreOutlined />}
+                        shape="circle"
+                        type="text"
+                      />
+                    </AppointmentActionsDropdown>
+                  ) : null}
+                </div>
               </div>
-            </div>
-          </Card>
-        </List.Item>
-      )}
+            </Card>
+          </List.Item>
+        );
+      }}
     />
   );
 }
@@ -545,6 +640,43 @@ function AppointmentsCalendar({
           eventClassNames.push('appointment-calendar-event-short');
         }
 
+        const eventContent = (
+          <div className={eventClassNames.join(' ')}>
+            <div className="appointment-calendar-event-main">
+              <span className="appointment-calendar-event-time">
+                {isAgendaView || isTimeGridView
+                  ? formatCalendarEventTime(event)
+                  : format(event.start, 'h:mm a')}
+              </span>
+              <span className="appointment-calendar-event-title">
+                {event.title}
+              </span>
+            </div>
+
+            {isAgendaView || isTimeGridView ? (
+              <div className="appointment-calendar-event-summary">
+                <span>Staff: {event.staffName}</span>
+                {isAgendaView ? (
+                  <span className="appointment-calendar-event-status">
+                    {getAppointmentStatusLabel(event.status)}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+
+            {isMonthView ? (
+              <div className="appointment-calendar-event-details">
+                <span>{formatCalendarEventTime(event)}</span>
+                <span>Staff: {event.staffName}</span>
+              </div>
+            ) : null}
+          </div>
+        );
+
+        if (!isScheduledAppointment(event.appointment)) {
+          return eventContent;
+        }
+
         return (
           <AppointmentActionsDropdown
             appointment={event.appointment}
@@ -552,35 +684,7 @@ function AppointmentsCalendar({
             onUpdateAppointment={onUpdateAppointment}
             onCancelAppointment={onCancelAppointment}
           >
-            <div className={eventClassNames.join(' ')}>
-              <div className="appointment-calendar-event-main">
-                <span className="appointment-calendar-event-time">
-                  {isAgendaView || isTimeGridView
-                    ? formatCalendarEventTime(event)
-                    : format(event.start, 'h:mm a')}
-                </span>
-                <span className="appointment-calendar-event-title">
-                  {event.title}
-                </span>
-              </div>
-
-              {isAgendaView || isDayView ? (
-                <div className="appointment-calendar-event-summary">
-                  <span>Staff: {event.staffName}</span>
-                  <span className="appointment-calendar-event-status">
-                    {event.status.toUpperCase()}
-                  </span>
-                </div>
-              ) : null}
-
-              {isMonthView ? (
-                <div className="appointment-calendar-event-details">
-                  <span>{formatCalendarEventTime(event)}</span>
-                  <span>Staff: {event.staffName}</span>
-                  <span>{event.status.toUpperCase()}</span>
-                </div>
-              ) : null}
-            </div>
+            {eventContent}
           </AppointmentActionsDropdown>
         );
       },
@@ -656,6 +760,7 @@ function AppointmentsCalendar({
         popup
         showAllEvents
         selectable={false}
+        dayLayoutAlgorithm="no-overlap"
         startAccessor="start"
         endAccessor="end"
         titleAccessor={(event) => `${event.title}; ${event.staffName}`}
@@ -697,39 +802,53 @@ export default function MyAppointments({
   const timeGridScrollTopRef = useRef(0);
   const [activeAppointmentTab, setActiveAppointmentTab] =
     useState<AppointmentTabKey>('today');
+  const [appointmentPendingCancellation, setAppointmentPendingCancellation] =
+    useState<AppointmentRecord | null>(null);
+  const [isCancellingAppointment, setIsCancellingAppointment] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();
   const hasInitializedCalendarDateRef = useRef(false);
-  const tabsClassName = [
-    'appointments-tabs',
-    viewMode === 'calendar' ? `appointments-tabs-calendar-${calendarView}` : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
+  const calendarPanelClassName = [
+    'appointments-calendar-panel',
+    `appointments-calendar-panel-${calendarView}`,
+  ].join(' ');
   const todayDateKey = useMemo(() => getTodayDateKey(), []);
   const sortedAppointments = useMemo(
     () => sortAppointmentsByStartTime(appointments),
     [appointments],
   );
+  const scheduledAppointments = useMemo(
+    () => sortedAppointments.filter(isScheduledAppointment),
+    [sortedAppointments],
+  );
   const todaysAppointments = useMemo(
     () =>
-      sortedAppointments.filter(
+      scheduledAppointments.filter(
         (appointment) => getAppointmentDateKey(appointment) === todayDateKey,
       ),
-    [sortedAppointments, todayDateKey],
+    [scheduledAppointments, todayDateKey],
   );
-  const otherAppointments = useMemo(
+  const scheduledOtherAppointments = useMemo(
     () =>
-      sortedAppointments.filter(
+      scheduledAppointments.filter(
         (appointment) => getAppointmentDateKey(appointment) !== todayDateKey,
       ),
-    [sortedAppointments, todayDateKey],
+    [scheduledAppointments, todayDateKey],
   );
-  const activeTabAppointments =
-    activeAppointmentTab === 'today' ? todaysAppointments : otherAppointments;
+  const cancelledAppointments = useMemo(
+    () =>
+      sortedAppointments.filter(
+        (appointment) => !isScheduledAppointment(appointment),
+      ),
+    [sortedAppointments],
+  );
 
   useEffect(() => {
     if (!open) {
       hasInitializedCalendarDateRef.current = false;
+      setViewMode('cards');
+      setCalendarView('month');
+      setActiveAppointmentTab('today');
+      timeGridScrollTopRef.current = 0;
       return;
     }
 
@@ -738,11 +857,6 @@ export default function MyAppointments({
       setError(null);
       return;
     }
-
-    // always the default view will be card view.
-    setViewMode('cards');
-    // always the default view within the calendar would be month view
-    setCalendarView('month');
 
     setLoading(true);
     setError(null);
@@ -765,45 +879,86 @@ export default function MyAppointments({
       !open ||
       viewMode !== 'calendar' ||
       hasInitializedCalendarDateRef.current ||
-      activeTabAppointments.length === 0
+      sortedAppointments.length === 0
     ) {
       return;
     }
 
-    setCalendarDate(getCalendarSelectedDate(activeTabAppointments));
+    setCalendarDate(getCalendarSelectedDate(sortedAppointments));
     hasInitializedCalendarDateRef.current = true;
-  }, [activeTabAppointments, open, viewMode]);
+  }, [open, sortedAppointments, viewMode]);
 
   const handleTimeGridScrollTopChange = useCallback((scrollTop: number) => {
     timeGridScrollTopRef.current = scrollTop;
   }, []);
 
+  const renderViewSwitch = () => (
+    <Segmented<AppointmentViewMode>
+      className="appointments-view-switch"
+      value={viewMode}
+      onChange={setViewMode}
+      options={[
+        { label: 'Cards', value: 'cards' },
+        { label: 'Calendar', value: 'calendar' },
+      ]}
+    />
+  );
+
+  const renderCalendarLegend = () => (
+    <div className="appointments-calendar-legend" aria-label="Calendar legend">
+      <span className="appointments-calendar-legend-item">
+        <span className="appointments-calendar-legend-dot appointments-calendar-legend-dot-scheduled" />
+        Scheduled
+      </span>
+      <span className="appointments-calendar-legend-item">
+        <span className="appointments-calendar-legend-dot appointments-calendar-legend-dot-client" />
+        Cancelled by client
+      </span>
+      <span className="appointments-calendar-legend-item">
+        <span className="appointments-calendar-legend-dot appointments-calendar-legend-dot-barber" />
+        Cancelled by barber
+      </span>
+    </div>
+  );
+
   const handleCancelAppointment = (appointment: AppointmentRecord) => {
-    Modal.confirm({
-      title: 'Cancel appointment?',
-      content: `${appointment.serviceName} at ${formatAppointmentWindow(
-        appointment,
-      )} will be cancelled.`,
-      okText: 'Cancel appointment',
-      okButtonProps: { danger: true },
-      cancelText: 'Keep appointment',
-      async onOk() {
-        try {
-          await cancelAppointment(appointment.id);
-          setAppointments((currentAppointments) =>
-            currentAppointments.filter(
-              (currentAppointment) => currentAppointment.id !== appointment.id,
-            ),
-          );
-          messageApi.success('Appointment cancelled successfully');
-        } catch (cancelError) {
-          messageApi.error(
-            getGenericErrorMessage('Cancel appointment', cancelError),
-          );
-          throw cancelError;
-        }
-      },
-    });
+    setAppointmentPendingCancellation(appointment);
+  };
+
+  const handleCancelConfirmationClose = () => {
+    if (isCancellingAppointment) {
+      return;
+    }
+
+    setAppointmentPendingCancellation(null);
+  };
+
+  const handleCancelConfirmationOk = async () => {
+    if (!appointmentPendingCancellation) {
+      return;
+    }
+
+    setIsCancellingAppointment(true);
+
+    try {
+      const cancelledAppointment = await cancelAppointment(
+        appointmentPendingCancellation.id,
+      );
+
+      setAppointments((currentAppointments) =>
+        currentAppointments.map((currentAppointment) =>
+          currentAppointment.id === cancelledAppointment.id
+            ? cancelledAppointment
+            : currentAppointment,
+        ),
+      );
+      setAppointmentPendingCancellation(null);
+      messageApi.success('Appointment cancelled successfully');
+    } catch (cancelError) {
+      messageApi.error(getGenericErrorMessage('Cancel appointment', cancelError));
+    } finally {
+      setIsCancellingAppointment(false);
+    }
   };
 
   const renderAppointmentsContent = (
@@ -811,25 +966,6 @@ export default function MyAppointments({
     emptyDescription: string,
     emptyActionLabel: string,
   ) => {
-    if (viewMode === 'calendar') {
-      return (
-        <AppointmentsCalendar
-          appointments={appointmentGroup}
-          emptyDescription={emptyDescription}
-          emptyActionLabel={emptyActionLabel}
-          calendarView={calendarView}
-          calendarDate={calendarDate}
-          timeGridScrollTop={timeGridScrollTopRef.current}
-          onCalendarViewChange={setCalendarView}
-          onCalendarDateChange={setCalendarDate}
-          onTimeGridScrollTopChange={handleTimeGridScrollTopChange}
-          onMakeAppointment={onMakeAppointment}
-          onUpdateAppointment={onUpdateAppointment}
-          onCancelAppointment={handleCancelAppointment}
-        />
-      );
-    }
-
     return (
       <AppointmentsList
         appointments={appointmentGroup}
@@ -841,6 +977,23 @@ export default function MyAppointments({
       />
     );
   };
+
+  const renderCalendarContent = () => (
+    <AppointmentsCalendar
+      appointments={sortedAppointments}
+      emptyDescription="No appointments found for this account yet."
+      emptyActionLabel="Book an Appointment"
+      calendarView={calendarView}
+      calendarDate={calendarDate}
+      timeGridScrollTop={timeGridScrollTopRef.current}
+      onCalendarViewChange={setCalendarView}
+      onCalendarDateChange={setCalendarDate}
+      onTimeGridScrollTopChange={handleTimeGridScrollTopChange}
+      onMakeAppointment={onMakeAppointment}
+      onUpdateAppointment={onUpdateAppointment}
+      onCancelAppointment={handleCancelAppointment}
+    />
+  );
 
   return (
     <Modal
@@ -858,7 +1011,7 @@ export default function MyAppointments({
       onCancel={onClose}
       footer={null}
       centered
-      width={viewMode === 'calendar' ? 1080 : 920}
+      width={getAppointmentsModalWidth(viewMode, calendarView)}
       styles={{
         body: {
           height: '70vh',
@@ -868,6 +1021,31 @@ export default function MyAppointments({
       }}
     >
       {contextHolder}
+      <Modal
+        title={
+          <span className="cancel-appointment-confirmation-title">
+            <ExclamationCircleFilled />
+            Are you sure you want to cancel this appointment?
+          </span>
+        }
+        open={appointmentPendingCancellation !== null}
+        onOk={handleCancelConfirmationOk}
+        onCancel={handleCancelConfirmationClose}
+        okText="Yes, cancel appointment"
+        okButtonProps={{ danger: true, loading: isCancellingAppointment }}
+        cancelText="No, keep appointment"
+        confirmLoading={isCancellingAppointment}
+        centered
+        zIndex={3000}
+      >
+        {appointmentPendingCancellation ? (
+          <Typography.Text>
+            {appointmentPendingCancellation.serviceName} at{' '}
+            {formatAppointmentWindow(appointmentPendingCancellation)} will be
+            marked as cancelled and kept in your appointment history.
+          </Typography.Text>
+        ) : null}
+      </Modal>
       {!authSession ? (
         <Alert
           type="info"
@@ -881,24 +1059,25 @@ export default function MyAppointments({
         </div>
       ) : error ? (
         <Alert type="error" message={error} showIcon />
+      ) : viewMode === 'calendar' ? (
+        <div className={calendarPanelClassName}>
+          <div className="appointments-calendar-view-header">
+            {renderCalendarLegend()}
+            {renderViewSwitch()}
+          </div>
+
+          <div className="appointments-calendar-panel-content">
+            {renderCalendarContent()}
+          </div>
+        </div>
       ) : (
         <Tabs
-          className={tabsClassName}
+          className="appointments-tabs"
           activeKey={activeAppointmentTab}
           onChange={(nextActiveKey) => {
             setActiveAppointmentTab(nextActiveKey as AppointmentTabKey);
           }}
-          tabBarExtraContent={
-            <Segmented<AppointmentViewMode>
-              className="appointments-view-switch"
-              value={viewMode}
-              onChange={setViewMode}
-              options={[
-                { label: 'Cards', value: 'cards' },
-                { label: 'Calendar', value: 'calendar' },
-              ]}
-            />
-          }
+          tabBarExtraContent={renderViewSwitch()}
           items={[
             {
               key: 'today',
@@ -914,16 +1093,29 @@ export default function MyAppointments({
               ),
             },
             {
-              key: 'other',
+              key: 'scheduled',
               label: (
                 <span style={{ fontSize: 16, fontWeight: 600 }}>
-                  Other Appointments ({otherAppointments.length})
+                  Scheduled ({scheduledOtherAppointments.length})
                 </span>
               ),
               children: renderAppointmentsContent(
-                otherAppointments,
-                'No other appointments found for this account yet.',
+                scheduledOtherAppointments,
+                'No scheduled appointments found for this account yet.',
                 'Book Your First Appointment',
+              ),
+            },
+            {
+              key: 'cancelled',
+              label: (
+                <span style={{ fontSize: 16, fontWeight: 600 }}>
+                  Cancelled ({cancelledAppointments.length})
+                </span>
+              ),
+              children: renderAppointmentsContent(
+                cancelledAppointments,
+                'No cancelled appointments found for this account yet.',
+                'Book an Appointment',
               ),
             },
           ]}

@@ -66,6 +66,38 @@ function getAppointmentSlot(appointment: AppointmentRecord) {
   return `${startAt.format("HH:mm")}-${endAt.format("HH:mm")}`;
 }
 
+function formatSlotTime(timeText: string) {
+  const [hourText = "", minuteText = ""] = timeText.split(":");
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+
+  if (
+    !Number.isInteger(hour) ||
+    !Number.isInteger(minute) ||
+    hour < 0 ||
+    hour > 23 ||
+    minute < 0 ||
+    minute > 59
+  ) {
+    return timeText;
+  }
+
+  const displayHour = hour % 12 || 12;
+  const period = hour >= 12 ? "PM" : "AM";
+
+  return `${displayHour}:${minuteText.padStart(2, "0")} ${period}`;
+}
+
+function formatAppointmentSlot(slot: string) {
+  const [startTime = "", endTime = ""] = slot.split("-");
+
+  if (!startTime || !endTime) {
+    return slot;
+  }
+
+  return `${formatSlotTime(startTime)} - ${formatSlotTime(endTime)}`;
+}
+
 export default function MakeAppointmentModal({
   open,
   authSession,
@@ -80,14 +112,53 @@ export default function MakeAppointmentModal({
   const [services, setServices] = useState<ServiceOption[]>([]);
   const [slots, setSlots] = useState<string[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+  const [currentSlotPulseKey, setCurrentSlotPulseKey] = useState(0);
   const [form] = Form.useForm<AppointmentFormValues>();
   const selectedServiceId = Form.useWatch("serviceId", form);
   const selectedAppointmentDate = Form.useWatch("appointmentDate", form);
   const isEditMode = Boolean(editingAppointment);
+  const currentAppointmentDate = editingAppointment
+    ? parseAppointmentDateTime(editingAppointment.startAt)
+    : null;
+  const currentAppointmentDateKey = currentAppointmentDate?.format(
+    "YYYY-MM-DD",
+  );
+  const selectedAppointmentDateKey =
+    selectedAppointmentDate?.format("YYYY-MM-DD");
+  const isCurrentAppointmentDateSelected =
+    isEditMode &&
+    Boolean(currentAppointmentDateKey) &&
+    currentAppointmentDateKey === selectedAppointmentDateKey;
+  const currentAppointmentSlot = editingAppointment
+    ? getAppointmentSlot(editingAppointment)
+    : "";
+  const currentAppointmentServiceName = editingAppointment?.serviceName ?? "";
+  const shouldShowCurrentAppointmentSlot =
+    isCurrentAppointmentDateSelected && Boolean(currentAppointmentSlot);
+  const availableSlots = isEditMode
+    ? slots.filter(
+        (slot) =>
+          !shouldShowCurrentAppointmentSlot || slot !== currentAppointmentSlot,
+      )
+    : slots;
+  const hasAppointmentChange =
+    !isEditMode ||
+    Boolean(
+      selectedSlot &&
+        selectedAppointmentDateKey &&
+        (selectedSlot !== currentAppointmentSlot ||
+          selectedAppointmentDateKey !== currentAppointmentDateKey),
+    );
   const showNoAvailabilityMessage =
     Boolean(selectedServiceId && selectedAppointmentDate) &&
     !slotsLoading &&
+    !shouldShowCurrentAppointmentSlot &&
     slots.length === 0;
+  const showNoAlternativeSlotsMessage =
+    isEditMode &&
+    shouldShowCurrentAppointmentSlot &&
+    !slotsLoading &&
+    availableSlots.length === 0;
 
   const loadAvailabilityFor = useCallback(
     async (
@@ -130,6 +201,7 @@ export default function MakeAppointmentModal({
     form.resetFields();
     setSlots([]);
     setSelectedSlot(null);
+    setCurrentSlotPulseKey(0);
     setServicesLoading(true);
 
     getServices()
@@ -216,6 +288,7 @@ export default function MakeAppointmentModal({
     try {
       if (editingAppointment) {
         await updateAppointment(editingAppointment.id, {
+          date: values.appointmentDate.format("YYYY-MM-DD"),
           slot: values.appointmentTime,
         });
         messageApi.success("Appointment updated successfully");
@@ -257,6 +330,7 @@ export default function MakeAppointmentModal({
         onCancel={onClose}
         footer={null}
         centered
+        zIndex={1300}
         width={660}
         styles={{
           body: {
@@ -320,10 +394,40 @@ export default function MakeAppointmentModal({
             >
               <DatePicker
                 size="large"
+                cellRender={(current, info) => {
+                  const currentDate = dayjs.isDayjs(current) ? current : null;
+
+                  if (
+                    info.type !== "date" ||
+                    !currentDate ||
+                    !currentAppointmentDateKey ||
+                    currentDate.format("YYYY-MM-DD") !==
+                      currentAppointmentDateKey
+                  ) {
+                    return info.originNode;
+                  }
+
+                  return (
+                    <div className="appointment-original-date-cell">
+                      {info.originNode}
+                      <span className="appointment-original-date-marker">
+                        Original
+                      </span>
+                    </div>
+                  );
+                }}
                 style={{ width: "100%" }}
-                disabled={isEditMode || !form.getFieldValue("serviceId")}
+                disabled={!form.getFieldValue("serviceId")}
                 disabledDate={(current) => {
                   if (!current) {
+                    return false;
+                  }
+
+                  if (
+                    isEditMode &&
+                    currentAppointmentDateKey &&
+                    current.format("YYYY-MM-DD") === currentAppointmentDateKey
+                  ) {
                     return false;
                   }
 
@@ -365,26 +469,78 @@ export default function MakeAppointmentModal({
                   No appointments available for the selected service and date.
                 </div>
               ) : (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-                  {slots.map((slot) => (
-                    <Button
-                      key={slot}
-                      type={selectedSlot === slot ? "primary" : "default"}
-                      size="large"
-                      style={{
-                        minWidth: 96,
-                        height: 44,
-                        fontSize: 16,
-                        fontWeight: 600,
-                      }}
+                <div className="appointment-slot-section">
+                  {shouldShowCurrentAppointmentSlot ? (
+                    <button
+                      type="button"
+                      className={[
+                        "appointment-current-slot-card",
+                        selectedSlot === currentAppointmentSlot
+                          ? "appointment-current-slot-card-selected"
+                          : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      aria-pressed={selectedSlot === currentAppointmentSlot}
                       onClick={() => {
-                        setSelectedSlot(slot);
-                        form.setFieldValue("appointmentTime", slot);
+                        setSelectedSlot(currentAppointmentSlot);
+                        setCurrentSlotPulseKey((currentKey) => currentKey + 1);
+                        form.setFieldValue(
+                          "appointmentTime",
+                          currentAppointmentSlot,
+                        );
                       }}
                     >
-                      {slot}
-                    </Button>
-                  ))}
+                      <span className="appointment-current-slot-kicker">
+                        Current appointment
+                      </span>
+                      <span className="appointment-current-slot-time">
+                        {formatAppointmentSlot(currentAppointmentSlot)}
+                      </span>
+                      <span className="appointment-current-slot-service">
+                        {currentAppointmentServiceName}
+                      </span>
+                      <span className="appointment-current-slot-badge">
+                        {selectedSlot === currentAppointmentSlot
+                          ? "Selected"
+                          : "Current"}
+                      </span>
+                      {currentSlotPulseKey > 0 ? (
+                        <span
+                          key={currentSlotPulseKey}
+                          className="appointment-current-slot-pulse"
+                        />
+                      ) : null}
+                    </button>
+                  ) : null}
+
+                  {showNoAlternativeSlotsMessage ? (
+                    <div className="appointment-slot-empty">
+                      No other time slots are available for this appointment.
+                    </div>
+                  ) : (
+                    <div className="appointment-slot-grid">
+                      {availableSlots.map((slot) => (
+                        <Button
+                          key={slot}
+                          type={selectedSlot === slot ? "primary" : "default"}
+                          size="large"
+                          style={{
+                            minWidth: 132,
+                            height: 44,
+                            fontSize: 16,
+                            fontWeight: 600,
+                          }}
+                          onClick={() => {
+                            setSelectedSlot(slot);
+                            form.setFieldValue("appointmentTime", slot);
+                          }}
+                        >
+                          {formatAppointmentSlot(slot)}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </Form.Item>
@@ -404,7 +560,7 @@ export default function MakeAppointmentModal({
                   type="primary"
                   htmlType="submit"
                   loading={confirmLoading}
-                  disabled={!slots.length}
+                  disabled={!selectedSlot || !hasAppointmentChange}
                   size="large"
                 >
                   {isEditMode ? "Update Appointment" : "Book Appointment"}

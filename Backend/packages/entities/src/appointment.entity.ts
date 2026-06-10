@@ -17,13 +17,13 @@ export class Appointment {
   id: string;
 
   // many-to-one relationship with users. - many appointments, one user.
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'customer_id' }) // ✅ map relation column
+  @ManyToOne(() => User, { onDelete: 'CASCADE' }) // If a user is deleted, all appointments belonging to that user are automatically deleted by the database.
+  @JoinColumn({ name: 'customer_id' }) // map relation column
   customer: User;
 
   // many-to-one relationship with services. - many appointments, one service.
-  @ManyToOne(() => Service, { onDelete: 'RESTRICT' })
-  @JoinColumn({ name: 'service_id' }) // ✅ map relation column
+  @ManyToOne(() => Service, { onDelete: 'RESTRICT' }) // the referenced Service cannot be deleted if there are existing Appointment records pointing to it.
+  @JoinColumn({ name: 'service_id' }) // map relation column
   service: Service;
 
   // start and end time of the appointment with timezone support.
@@ -46,7 +46,7 @@ export class Appointment {
   })
   createdAt: Date;
 
-  // many-to-one relationship with staff. - many appointments, one staff member.
+  // many-to-one relationship with staff. - many appointments, one staff member. (is there is an appointment pointing to the staff, the appointment will also be deleted)
   @ManyToOne(() => Staff, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'staff_id' })
   staff: Staff;

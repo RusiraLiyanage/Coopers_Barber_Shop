@@ -17,8 +17,11 @@ EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 DO $$ BEGIN
-  CREATE TYPE appointment_status AS ENUM ('booked','cancelled');
+  CREATE TYPE appointment_status AS ENUM ('booked','cancelled','cancelled_by_client','cancelled_by_barber');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+ALTER TYPE appointment_status ADD VALUE IF NOT EXISTS 'cancelled_by_client';
+ALTER TYPE appointment_status ADD VALUE IF NOT EXISTS 'cancelled_by_barber';
 
 -- 3) Tables ------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS users (

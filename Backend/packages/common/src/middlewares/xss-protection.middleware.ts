@@ -2,6 +2,8 @@ import { Injectable, NestMiddleware } from '@nestjs/common';
 
 type MutableRecord = Record<string, unknown>;
 
+// This Middleware protects the backend from malicious user's inputs (XSS)
+
 export type XssProtectionRequest = {
   body?: unknown;
   query?: unknown;

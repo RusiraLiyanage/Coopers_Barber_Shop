@@ -1,5 +1,7 @@
 import { AppEnvironment, getAppEnvironment } from '../configs/app.config';
 
+// this service helps to check for the system health when it's in production.
+
 export type HealthStatus = 'ok';
 
 export type HealthResponse = {

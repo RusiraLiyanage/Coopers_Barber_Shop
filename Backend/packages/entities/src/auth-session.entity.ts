@@ -15,7 +15,7 @@ export class AuthSession {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => User, { nullable: false, onDelete: 'CASCADE' })
+  @ManyToOne(() => User, { nullable: false, onDelete: 'CASCADE' }) // One User for many appointments (if the user is deleted, the corrosponding Auth session will also be deleted)
   @JoinColumn({ name: 'user_id' })
   user: User;
 
