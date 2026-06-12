@@ -19,6 +19,7 @@ export type ApiRateLimitOptions = {
   maxRequests?: number;
 };
 
+// convert the incase string values from the env file into integer values
 function toPositiveNumber(
   value: RateLimitConfigValue,
   fallback: number,
@@ -26,7 +27,7 @@ function toPositiveNumber(
   const parsedValue = typeof value === 'number' ? value : Number(value);
 
   return Number.isFinite(parsedValue) && parsedValue > 0
-    ? Math.floor(parsedValue)
+    ? Math.floor(parsedValue) // if it is finite, then it will be rounded.
     : fallback;
 }
 
@@ -48,7 +49,7 @@ export class ApiRateLimitModule {
       module: ApiRateLimitModule,
       imports: [
         ThrottlerModule.forRootAsync({
-          inject: [ConfigService],
+          inject: [ConfigService], // config service is from the configModule
           useFactory: (config: ConfigService): ThrottlerModuleOptions =>
             createApiRateLimitOptions({
               ttlSeconds: toPositiveNumber(

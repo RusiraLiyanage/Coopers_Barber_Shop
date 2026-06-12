@@ -40,8 +40,8 @@ export class JwtTokenService {
     sessionId: string,
   ): AuthTokensResponse {
     return {
-      ...this.signAccessToken(user, sessionId),
-      ...this.generateRefreshToken(),
+      ...this.signAccessToken(user, sessionId), // creates JWT Access Token
+      ...this.generateRefreshToken(), // creates JWT refresh Token
     };
   }
 }

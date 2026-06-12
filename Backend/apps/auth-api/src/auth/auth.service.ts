@@ -151,8 +151,8 @@ export class AuthService {
     });
 
     return {
-      ...this.jwtTokenService.signAccessToken(authenticatedUser, newSession.id),
-      ...newRefreshToken,
+      ...this.jwtTokenService.signAccessToken(authenticatedUser, newSession.id), // generates the new access token
+      ...newRefreshToken, // the new refresh token
     };
   }
 

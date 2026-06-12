@@ -2,7 +2,7 @@ import { ConfigModuleOptions } from '@nestjs/config';
 
 export const APP_ENVIRONMENTS = ['develop', 'staging', 'production'] as const;
 
-export type AppEnvironment = (typeof APP_ENVIRONMENTS)[number];
+export type AppEnvironment = (typeof APP_ENVIRONMENTS)[number]; // Whatever values exist inside APP_ENVIRONMENTS, use those as the allowed environment type.
 
 const REQUIRED_ENV_KEYS = [
   'DB_HOST',

@@ -13,16 +13,17 @@ function parseFrontendOrigins(frontendUrl: string): string | string[] {
   const origins = frontendUrl
     .split(',')
     .map((origin) => origin.trim())
-    .filter(Boolean);
+    .filter(Boolean); // this will remove the empty values from the array
 
   return origins.length === 1 ? origins[0] : origins;
 }
 
+// token headers are only readable by this frontend
 export function createFrontendCorsOptions(frontendUrl: string): CorsOptions {
   return {
     origin: parseFrontendOrigins(frontendUrl),
     credentials: true,
-    exposedHeaders: ['x-access-token', 'x-refresh-token'],
+    exposedHeaders: ['x-access-token', 'x-refresh-token'], // exposing the access token and refresh token to these frontends. (otherwise the browser cannot read them)
   };
 }
 

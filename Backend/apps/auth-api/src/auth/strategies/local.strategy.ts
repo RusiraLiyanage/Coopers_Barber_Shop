@@ -4,6 +4,7 @@ import { Strategy } from 'passport-local';
 import type { AuthenticatedUser } from '@coopers/common';
 import { AuthService } from '../auth.service';
 
+// local auth guard will call the Local strategy
 @Injectable()
 export class LocalStrategy extends PassportStrategy(Strategy) {
   constructor(private readonly authService: AuthService) {

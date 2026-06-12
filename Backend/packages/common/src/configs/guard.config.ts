@@ -8,7 +8,7 @@ export type GuardUpstreamConfig = {
 };
 
 function normalizeServiceUrl(value: string): string {
-  return value.replace(/\/+$/, '');
+  return value.replace(/\/+$/, ''); // get rid of any end slashes
 }
 
 function getRequiredString(config: ConfigService, key: string): string {

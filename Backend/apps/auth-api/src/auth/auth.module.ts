@@ -27,7 +27,7 @@ function getAccessTokenTtlSeconds(config: ConfigService): number {
 
 @Module({
   imports: [
-    UsersModule,
+    UsersModule, // imports will make thing easier to import within the Auth Service.
     EmailModule,
     TypeOrmModule.forFeature([AuthSession, PasswordResetToken]),
     PassportModule,

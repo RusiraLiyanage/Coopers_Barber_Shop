@@ -43,7 +43,7 @@ export class GuardAuthenticationService {
         await this.jwtService.verifyAsync<Record<string, unknown>>(token);
 
       if (!isJwtPayload(payload)) {
-        throw new UnauthorizedException('Invalid token payload.');
+        throw new UnauthorizedException('Invalid token payload.'); // the frontend needs to provide a valid token payload
       }
 
       return {

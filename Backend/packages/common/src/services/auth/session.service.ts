@@ -27,7 +27,7 @@ export class SessionService {
     const session = this.sessionsRepo.create({
       user: { id: input.userId },
       refreshTokenHash: this.hashRefreshToken(input.refreshToken),
-      expiresAt: this.createRefreshTokenExpiresAt(),
+      expiresAt: this.createRefreshTokenExpiresAt(), // expires in 14 days
       revokedAt: null,
       lastUsedAt: null,
     });
@@ -119,11 +119,11 @@ export class SessionService {
 
   private createRefreshTokenExpiresAt(): Date {
     const configuredTtlDays =
-      this.configService.get<string>('REFRESH_TOKEN_TTL_DAYS') ?? '14';
+      this.configService.get<string>('REFRESH_TOKEN_TTL_DAYS') ?? '14'; // based on the environment of the primary service.
     const ttlDays = Number(configuredTtlDays);
     const expiresAt = new Date();
 
-    expiresAt.setDate(expiresAt.getDate() + ttlDays);
+    expiresAt.setDate(expiresAt.getDate() + ttlDays); // adding the number of days to the date from current
 
     return expiresAt;
   }
