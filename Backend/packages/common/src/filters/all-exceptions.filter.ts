@@ -78,6 +78,7 @@ function logException(
     return;
   }
 
+  // logging will only be happen for non http exceptions
   console.error('API exception caught:', {
     statusCode,
     method: request.method ?? '',
@@ -112,6 +113,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     logException(exception, request, statusCode);
 
+    // this is how the response looks like to the user. (when exception is there)
     response.status(statusCode).json({
       success: false,
       statusCode,

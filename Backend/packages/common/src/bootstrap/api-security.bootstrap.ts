@@ -37,7 +37,7 @@ export function configureApiSecurity(
     app.enableCors();
   }
 
-  app.use(helmet(options.helmet));
-  app.useGlobalFilters(new AllExceptionsFilter());
-  app.useGlobalPipes(createGlobalValidationPipe());
+  app.use(helmet(options.helmet)); // helmet is the xss protection layer
+  app.useGlobalFilters(new AllExceptionsFilter()); // all exception filter --> HTTP exceptions will have a message while others have internal error message
+  app.useGlobalPipes(createGlobalValidationPipe()); // validation pipeline for DTO validation
 }
