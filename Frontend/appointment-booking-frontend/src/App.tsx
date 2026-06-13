@@ -21,6 +21,7 @@ import {
 const { Content, Footer } = Layout;
 const LEGACY_AUTH_TOKEN_KEY = 'booking_auth_token';
 const SESSION_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+const SESSION_EXTENSION_GRACE_MS = 5 * 60 * 1000;
 const SESSION_ACTIVITY_EVENTS = [
   'click',
   'keydown',
@@ -51,6 +52,17 @@ function App() {
     localStorage.removeItem(LEGACY_AUTH_TOKEN_KEY);
     setAuthSessionState(session);
   }, []);
+
+  const showLoggedOutSessionTimeout = useCallback(() => {
+    setSessionTimeoutFlowState('logged_out');
+    setAuthSession(null);
+    setEditingAppointment(null);
+    setOpenAppointmentModal(false);
+    navigate('/');
+    setOpenAuthModal(true);
+
+    void logout().catch(() => undefined);
+  }, [navigate, setAuthSession]);
 
   useEffect(() => {
     let isMounted = true;
@@ -162,6 +174,21 @@ function App() {
     };
   }, [isAuthenticated, isSessionTimeoutPromptOpen, navigate, setAuthSession]);
 
+  useEffect(() => {
+    if (sessionTimeoutFlowState !== 'extend_prompt') {
+      return;
+    }
+
+    const graceTimeoutId = window.setTimeout(
+      showLoggedOutSessionTimeout,
+      SESSION_EXTENSION_GRACE_MS,
+    );
+
+    return () => {
+      window.clearTimeout(graceTimeoutId);
+    };
+  }, [sessionTimeoutFlowState, showLoggedOutSessionTimeout]);
+
   const handleLogout = () => {
     setSessionTimeoutFlowState('none'); // no need to show the extend prompt
     setAuthSession(null);
@@ -169,6 +196,15 @@ function App() {
     navigate('/');
 
     void logout().catch(() => undefined);
+  };
+
+  const handleSessionTimeoutLogout = () => {
+    showLoggedOutSessionTimeout();
+  };
+
+  const handleSessionTimeoutAcknowledged = () => {
+    setSessionTimeoutFlowState('none');
+    setOpenAuthModal(true);
   };
 
   const handleExtendSession = async () => {
@@ -240,10 +276,11 @@ function App() {
 
       <UserAuthModal
         open={openAuthModal}
-        sessionExpired={isSessionTimeoutPromptOpen}
+        sessionTimeoutState={sessionTimeoutFlowState}
         onClose={() => setOpenAuthModal(false)}
         onExtendSession={handleExtendSession}
-        onSessionLogout={handleLogout}
+        onSessionLogout={handleSessionTimeoutLogout}
+        onSessionTimeoutAcknowledged={handleSessionTimeoutAcknowledged}
         onAuthSuccess={(session) => {
           sessionLastActivityAtRef.current = Date.now();
           setAuthSession(session);

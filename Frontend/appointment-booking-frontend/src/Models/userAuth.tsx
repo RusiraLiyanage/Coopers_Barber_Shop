@@ -28,10 +28,11 @@ import {
 
 interface UserAuthModalProps {
   open: boolean;
-  sessionExpired?: boolean;
+  sessionTimeoutState?: "none" | "extend_prompt" | "logged_out";
   onClose: () => void;
   onExtendSession?: () => Promise<void>;
   onSessionLogout?: () => void;
+  onSessionTimeoutAcknowledged?: () => void;
   onAuthSuccess: (session: AuthSession) => void;
 }
 
@@ -82,10 +83,11 @@ function getLoginErrorMessage(error: unknown) {
 
 export default function UserAuthModal({
   open,
-  sessionExpired = false,
+  sessionTimeoutState = "none",
   onClose,
   onExtendSession,
   onSessionLogout,
+  onSessionTimeoutAcknowledged,
   onAuthSuccess,
 }: UserAuthModalProps) {
   const [confirmLoading, setConfirmLoading] = useState(false);
@@ -101,6 +103,9 @@ export default function UserAuthModal({
   const [passwordResetForm] = Form.useForm<FieldType>();
   const isLoginMode = authMode === "login";
   const isForgotPasswordMode = authMode === "forgot-password";
+  const isSessionTimeoutMode = sessionTimeoutState !== "none";
+  const isExtendPrompt = sessionTimeoutState === "extend_prompt";
+  const isLoggedOutAfterTimeout = sessionTimeoutState === "logged_out";
 
   useEffect(() => {
     if (open) {
@@ -144,6 +149,14 @@ export default function UserAuthModal({
     setLogoutLoading(true);
     onSessionLogout();
     setLogoutLoading(false);
+  };
+
+  const handleSessionTimeoutAcknowledged = () => {
+    if (!onSessionTimeoutAcknowledged) {
+      return;
+    }
+
+    onSessionTimeoutAcknowledged();
   };
 
   const moveExistingAccountToLogin = (email: string) => {
@@ -354,7 +367,7 @@ export default function UserAuthModal({
   };
 
   const getModalTitle = () => {
-    if (sessionExpired) {
+    if (isSessionTimeoutMode) {
       return "Session expired";
     }
 
@@ -366,8 +379,12 @@ export default function UserAuthModal({
   };
 
   const getModalSubtitle = () => {
-    if (sessionExpired) {
+    if (isExtendPrompt) {
       return "Do you want to extend your session or logout?";
+    }
+
+    if (isLoggedOutAfterTimeout) {
+      return "Please log in again to continue.";
     }
 
     if (!isForgotPasswordMode) {
@@ -406,10 +423,10 @@ export default function UserAuthModal({
         title=""
         open={open}
         confirmLoading={confirmLoading}
-        onCancel={sessionExpired ? undefined : onClose}
-        closable={!sessionExpired}
-        maskClosable={!sessionExpired}
-        keyboard={!sessionExpired}
+        onCancel={isSessionTimeoutMode ? undefined : onClose}
+        closable={!isSessionTimeoutMode}
+        maskClosable={!isSessionTimeoutMode}
+        keyboard={!isSessionTimeoutMode}
         style={{ top: 72 }}
         footer={null}
         width={560}
@@ -430,13 +447,21 @@ export default function UserAuthModal({
             </Typography.Text>
           </div>
 
-          {sessionExpired ? (
+          {isSessionTimeoutMode ? (
             <>
               <Alert
-                type="warning"
+                type={isLoggedOutAfterTimeout ? "error" : "warning"}
                 showIcon
-                message="Session inactive"
-                description="Your session was paused because there has been no recent activity."
+                message={
+                  isLoggedOutAfterTimeout
+                    ? "Session expired"
+                    : "Session inactive"
+                }
+                description={
+                  isLoggedOutAfterTimeout
+                    ? "Your session has ended. Please log in again."
+                    : "Your session was paused because there has been no recent activity."
+                }
                 style={{ marginBottom: 20 }}
               />
 
@@ -458,22 +483,34 @@ export default function UserAuthModal({
                   marginTop: 24,
                 }}
               >
-                <Button
-                  type="primary"
-                  size="large"
-                  loading={extendLoading}
-                  onClick={handleExtendSession}
-                >
-                  Extend session
-                </Button>
-                <Button
-                  size="large"
-                  danger
-                  loading={logoutLoading}
-                  onClick={handleSessionLogout}
-                >
-                  Logout
-                </Button>
+                {isExtendPrompt ? (
+                  <>
+                    <Button
+                      type="primary"
+                      size="large"
+                      loading={extendLoading}
+                      onClick={handleExtendSession}
+                    >
+                      Extend session
+                    </Button>
+                    <Button
+                      size="large"
+                      danger
+                      loading={logoutLoading}
+                      onClick={handleSessionLogout}
+                    >
+                      Logout
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    type="primary"
+                    size="large"
+                    onClick={handleSessionTimeoutAcknowledged}
+                  >
+                    OK
+                  </Button>
+                )}
               </div>
             </>
           ) : (
