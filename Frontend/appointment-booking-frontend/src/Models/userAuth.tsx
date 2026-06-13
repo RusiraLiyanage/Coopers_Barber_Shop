@@ -31,7 +31,7 @@ interface UserAuthModalProps {
   sessionTimeoutState?: "none" | "extend_prompt" | "logged_out";
   onClose: () => void;
   onExtendSession?: () => Promise<void>;
-  onSessionLogout?: () => void;
+  onSessionLogout?: () => Promise<void>;
   onSessionTimeoutAcknowledged?: () => void;
   onAuthSuccess: (session: AuthSession) => void;
 }
@@ -141,14 +141,26 @@ export default function UserAuthModal({
     }
   };
 
-  const handleSessionLogout = () => {
+  const handleSessionLogout = async () => {
     if (!onSessionLogout) {
       return;
     }
 
     setLogoutLoading(true);
-    onSessionLogout();
-    setLogoutLoading(false);
+    setAuthAlert(null);
+
+    try {
+      await onSessionLogout();
+    } catch (error) {
+      logDevelopmentError("Session logout", error);
+      setAuthAlert({
+        type: "error",
+        message: "Logout failed",
+        description: "Please try again.",
+      });
+    } finally {
+      setLogoutLoading(false);
+    }
   };
 
   const handleSessionTimeoutAcknowledged = () => {
@@ -497,7 +509,9 @@ export default function UserAuthModal({
                       size="large"
                       danger
                       loading={logoutLoading}
-                      onClick={handleSessionLogout}
+                      onClick={() => {
+                        void handleSessionLogout();
+                      }}
                     >
                       Logout
                     </Button>

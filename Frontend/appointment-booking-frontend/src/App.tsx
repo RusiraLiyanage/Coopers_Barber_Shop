@@ -44,6 +44,7 @@ function App() {
   const [sessionTimeoutFlowState, setSessionTimeoutFlowState] =
     useState<SessionTimeoutFlowState>('none');
   const sessionLastActivityAtRef = useRef(Date.now());
+  const sessionTimeoutLogoutInProgressRef = useRef(false);
 
   const isAuthenticated = Boolean(authSession?.authenticated);
   const isSessionTimeoutPromptOpen = sessionTimeoutFlowState !== 'none';
@@ -53,7 +54,12 @@ function App() {
     setAuthSessionState(session);
   }, []);
 
-  const showLoggedOutSessionTimeout = useCallback(() => {
+  const revokeTimedOutSession = useCallback(async () => {
+    if (sessionTimeoutLogoutInProgressRef.current) {
+      return;
+    }
+
+    sessionTimeoutLogoutInProgressRef.current = true;
     setSessionTimeoutFlowState('logged_out');
     setAuthSession(null);
     setEditingAppointment(null);
@@ -61,7 +67,11 @@ function App() {
     navigate('/');
     setOpenAuthModal(true);
 
-    void logout().catch(() => undefined);
+    try {
+      await logout();
+    } finally {
+      sessionTimeoutLogoutInProgressRef.current = false;
+    }
   }, [navigate, setAuthSession]);
 
   useEffect(() => {
@@ -179,15 +189,14 @@ function App() {
       return;
     }
 
-    const graceTimeoutId = window.setTimeout(
-      showLoggedOutSessionTimeout,
-      SESSION_EXTENSION_GRACE_MS,
-    );
+    const graceTimeoutId = window.setTimeout(() => {
+      void revokeTimedOutSession().catch(() => undefined);
+    }, SESSION_EXTENSION_GRACE_MS);
 
     return () => {
       window.clearTimeout(graceTimeoutId);
     };
-  }, [sessionTimeoutFlowState, showLoggedOutSessionTimeout]);
+  }, [sessionTimeoutFlowState, revokeTimedOutSession]);
 
   const handleLogout = () => {
     setSessionTimeoutFlowState('none'); // no need to show the extend prompt
@@ -198,8 +207,8 @@ function App() {
     void logout().catch(() => undefined);
   };
 
-  const handleSessionTimeoutLogout = () => {
-    showLoggedOutSessionTimeout();
+  const handleSessionTimeoutLogout = async () => {
+    await revokeTimedOutSession();
   };
 
   const handleSessionTimeoutAcknowledged = () => {
