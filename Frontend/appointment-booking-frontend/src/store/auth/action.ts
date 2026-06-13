@@ -1,4 +1,4 @@
-import { createAsyncThunk } from '@reduxjs/toolkit';
+import { createAppAsyncThunk } from '../createAppAsyncThunk';
 import {
   confirmPasswordReset,
   extendSession,
@@ -23,55 +23,55 @@ import type {
   RegisterPayload,
 } from './types';
 
-const BASE_URL = 'auth';
+const SLICE_NAME = 'auth';
 
-export const getCurrentSessionAction = createAsyncThunk<AuthResponse>(
-  `${BASE_URL}/getCurrentSession`,
+export const getCurrentSessionAction = createAppAsyncThunk<AuthResponse>(
+  `${SLICE_NAME}/getCurrentSession`,
   async () => getCurrentSession(),
 );
 
-export const refreshSessionAction = createAsyncThunk<AuthResponse>(
-  `${BASE_URL}/refreshSession`,
+export const refreshSessionAction = createAppAsyncThunk<AuthResponse>(
+  `${SLICE_NAME}/refreshSession`,
   async () => refreshSession(),
 );
 
-export const extendSessionAction = createAsyncThunk<AuthResponse>(
-  `${BASE_URL}/extendSession`,
+export const extendSessionAction = createAppAsyncThunk<AuthResponse>(
+  `${SLICE_NAME}/extendSession`,
   async () => extendSession(),
 );
 
-export const loginAction = createAsyncThunk<AuthResponse, LoginPayload>(
-  `${BASE_URL}/login`,
+export const loginAction = createAppAsyncThunk<AuthResponse, LoginPayload>(
+  `${SLICE_NAME}/login`,
   async ({ email, password, remember }) => login(email, password, remember),
 );
 
-export const registerAction = createAsyncThunk<AuthResponse, RegisterPayload>(
-  `${BASE_URL}/register`,
+export const registerAction = createAppAsyncThunk<AuthResponse, RegisterPayload>(
+  `${SLICE_NAME}/register`,
   async (payload) => register(payload),
 );
 
-export const logoutAction = createAsyncThunk<LogoutResponse>(
-  `${BASE_URL}/logout`,
+export const logoutAction = createAppAsyncThunk<LogoutResponse>(
+  `${SLICE_NAME}/logout`,
   async () => logout(),
 );
 
-export const requestPasswordResetAction = createAsyncThunk<
+export const requestPasswordResetAction = createAppAsyncThunk<
   PasswordResetRequestResponse,
   PasswordResetRequestPayload
->(`${BASE_URL}/requestPasswordReset`, async (payload) =>
+>(`${SLICE_NAME}/requestPasswordReset`, async (payload) =>
   requestPasswordReset(payload),
 );
 
-export const verifyPasswordResetCodeAction = createAsyncThunk<
+export const verifyPasswordResetCodeAction = createAppAsyncThunk<
   PasswordResetVerifyResponse,
   PasswordResetVerifyPayload
->(`${BASE_URL}/verifyPasswordResetCode`, async (payload) =>
+>(`${SLICE_NAME}/verifyPasswordResetCode`, async (payload) =>
   verifyPasswordResetCode(payload),
 );
 
-export const confirmPasswordResetAction = createAsyncThunk<
+export const confirmPasswordResetAction = createAppAsyncThunk<
   PasswordResetConfirmResponse,
   PasswordResetConfirmPayload
->(`${BASE_URL}/confirmPasswordReset`, async (payload) =>
+>(`${SLICE_NAME}/confirmPasswordReset`, async (payload) =>
   confirmPasswordReset(payload),
 );

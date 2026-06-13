@@ -1,4 +1,4 @@
-import { createAsyncThunk } from '@reduxjs/toolkit';
+import { createAppAsyncThunk } from '../createAppAsyncThunk';
 import {
   cancelAppointment,
   createAppointment,
@@ -13,17 +13,17 @@ import type {
   UpdateAppointmentPayload,
 } from './types';
 
-const BASE_URL = 'appointments';
+const SLICE_NAME = 'appointments';
 
-export const getAppointmentsAction = createAsyncThunk<AppointmentRecord[]>(
-  `${BASE_URL}/getAppointments`,
+export const getAppointmentsAction = createAppAsyncThunk<AppointmentRecord[]>(
+  `${SLICE_NAME}/getAppointments`,
   async () => getAppointments(),
 );
 
-export const getAppointmentAvailabilityAction = createAsyncThunk<
+export const getAppointmentAvailabilityAction = createAppAsyncThunk<
   string[],
   AppointmentAvailabilityPayload
->(`${BASE_URL}/getAppointmentAvailability`, async (payload) =>
+>(`${SLICE_NAME}/getAppointmentAvailability`, async (payload) =>
   getAvailability(
     payload.serviceId,
     payload.date,
@@ -31,23 +31,23 @@ export const getAppointmentAvailabilityAction = createAsyncThunk<
   ),
 );
 
-export const createAppointmentAction = createAsyncThunk<
+export const createAppointmentAction = createAppAsyncThunk<
   AppointmentRecord,
   CreateAppointmentPayload
->(`${BASE_URL}/createAppointment`, async (payload) =>
+>(`${SLICE_NAME}/createAppointment`, async (payload) =>
   createAppointment(payload),
 );
 
-export const updateAppointmentAction = createAsyncThunk<
+export const updateAppointmentAction = createAppAsyncThunk<
   AppointmentRecord,
   UpdateAppointmentPayload
->(`${BASE_URL}/updateAppointment`, async ({ appointmentId, data }) =>
+>(`${SLICE_NAME}/updateAppointment`, async ({ appointmentId, data }) =>
   updateAppointment(appointmentId, data),
 );
 
-export const cancelAppointmentAction = createAsyncThunk<
+export const cancelAppointmentAction = createAppAsyncThunk<
   AppointmentRecord,
   string
->(`${BASE_URL}/cancelAppointment`, async (appointmentId) =>
+>(`${SLICE_NAME}/cancelAppointment`, async (appointmentId) =>
   cancelAppointment(appointmentId),
 );

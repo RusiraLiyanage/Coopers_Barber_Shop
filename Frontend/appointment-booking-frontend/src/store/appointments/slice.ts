@@ -15,7 +15,6 @@ const initialState: AppointmentsState = {
   loadingAvailability: false,
   mutating: false,
   cancelling: false,
-  error: null,
 };
 
 function upsertAppointment(
@@ -40,7 +39,6 @@ const appointmentsSlice = createSlice({
   reducers: {
     clearAppointments(state) {
       state.items = [];
-      state.error = null;
     },
     clearAvailabilitySlots(state) {
       state.availabilitySlots = [];
@@ -48,23 +46,18 @@ const appointmentsSlice = createSlice({
     setAvailabilitySlots(state, action: PayloadAction<string[]>) {
       state.availabilitySlots = action.payload;
     },
-    setResetStore() {
-      return initialState;
-    },
   },
   extraReducers: (builder) => {
     builder
       .addCase(getAppointmentsAction.pending, (state) => {
         state.loading = true;
-        state.error = null;
       })
       .addCase(getAppointmentsAction.fulfilled, (state, action) => {
         state.items = action.payload;
         state.loading = false;
       })
-      .addCase(getAppointmentsAction.rejected, (state, action) => {
+      .addCase(getAppointmentsAction.rejected, (state) => {
         state.loading = false;
-        state.error = action.error.message ?? 'Unable to load appointments';
       })
       .addCase(getAppointmentAvailabilityAction.pending, (state) => {
         state.loadingAvailability = true;
@@ -111,11 +104,7 @@ const appointmentsSlice = createSlice({
   },
 });
 
-export const {
-  clearAppointments,
-  clearAvailabilitySlots,
-  setAvailabilitySlots,
-  setResetStore,
-} = appointmentsSlice.actions;
+export const { clearAppointments, clearAvailabilitySlots, setAvailabilitySlots } =
+  appointmentsSlice.actions;
 
 export default appointmentsSlice.reducer;

@@ -29,5 +29,4 @@ export type AppointmentsState = {
   loadingAvailability: boolean;
   mutating: boolean;
   cancelling: boolean;
-  error: string | null;
 };

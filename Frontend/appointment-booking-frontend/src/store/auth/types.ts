@@ -40,6 +40,4 @@ export type PasswordResetConfirmResponse = {
 
 export type AuthState = {
   session: AuthSession | null;
-  loading: boolean;
-  error: string | null;
 };

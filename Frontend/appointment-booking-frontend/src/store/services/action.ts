@@ -1,10 +1,10 @@
-import { createAsyncThunk } from '@reduxjs/toolkit';
+import { createAppAsyncThunk } from '../createAppAsyncThunk';
 import { getServices } from '../../lib/api';
 import type { ServiceOption } from './types';
 
-const BASE_URL = 'services';
+const SLICE_NAME = 'services';
 
-export const getServicesAction = createAsyncThunk<ServiceOption[]>(
-  `${BASE_URL}/getServices`,
+export const getServicesAction = createAppAsyncThunk<ServiceOption[]>(
+  `${SLICE_NAME}/getServices`,
   async () => getServices(),
 );

@@ -16,6 +16,7 @@ import {
   type AppointmentRecord,
   type AuthSession,
 } from './lib/api';
+import { resetStore } from './store';
 import { useAppDispatch, useAppSelector } from './store/hooks';
 import {
   extendSessionAction,
@@ -156,6 +157,7 @@ function App() {
     setSessionTimeoutFlowState('none'); // no need to show the extend prompt
     setAuthSession(null);
     setEditingAppointment(null);
+    dispatch(resetStore());
     navigate('/');
 
     void dispatch(logoutAction())
@@ -168,6 +170,7 @@ function App() {
     setAuthSession(null);
     setEditingAppointment(null);
     setOpenAppointmentModal(false);
+    dispatch(resetStore());
     navigate('/');
     setOpenAuthModal(true);
 

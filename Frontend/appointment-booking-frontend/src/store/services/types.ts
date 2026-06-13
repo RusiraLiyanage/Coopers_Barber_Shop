@@ -5,5 +5,4 @@ export type { ServiceOption };
 export type ServicesState = {
   items: ServiceOption[];
   loading: boolean;
-  error: string | null;
 };

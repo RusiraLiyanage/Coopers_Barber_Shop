@@ -1,17 +1,17 @@
-import { createAsyncThunk } from '@reduxjs/toolkit';
+import { createAppAsyncThunk } from '../createAppAsyncThunk';
 import { getAccountProfile, updateAccountProfile } from '../../lib/api';
 import type { AccountProfile, UpdateAccountPayload } from './types';
 
-const BASE_URL = 'account';
+const SLICE_NAME = 'account';
 
-export const getAccountProfileAction = createAsyncThunk<AccountProfile>(
-  `${BASE_URL}/getAccountProfile`,
+export const getAccountProfileAction = createAppAsyncThunk<AccountProfile>(
+  `${SLICE_NAME}/getAccountProfile`,
   async () => getAccountProfile(),
 );
 
-export const updateAccountProfileAction = createAsyncThunk<
+export const updateAccountProfileAction = createAppAsyncThunk<
   AccountProfile,
   UpdateAccountPayload
->(`${BASE_URL}/updateAccountProfile`, async (payload) =>
+>(`${SLICE_NAME}/updateAccountProfile`, async (payload) =>
   updateAccountProfile(payload),
 );

@@ -6,5 +6,4 @@ export type AccountState = {
   profile: AccountProfile | null;
   loading: boolean;
   saving: boolean;
-  error: string | null;
 };

@@ -6,9 +6,6 @@ export const selectAppointments = (state: RootState) =>
 export const selectAppointmentsLoading = (state: RootState) =>
   state.appointments.loading;
 
-export const selectAppointmentsError = (state: RootState) =>
-  state.appointments.error;
-
 export const selectAppointmentAvailabilitySlots = (state: RootState) =>
   state.appointments.availabilitySlots;
 
