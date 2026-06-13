@@ -12,7 +12,7 @@ export class VerifyPasswordResetCodeDto {
   @IsEmail()
   @IsNotEmpty()
   @IsString()
-  email: string;
+  email!: string;
 
   @ApiProperty({ example: '123456' })
   @IsString()
@@ -20,5 +20,5 @@ export class VerifyPasswordResetCodeDto {
   @Matches(/^\d{6}$/, {
     message: 'Reset code must be a 6 digit number',
   })
-  code: string;
+  code!: string;
 }

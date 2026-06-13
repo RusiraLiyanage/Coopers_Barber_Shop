@@ -6,5 +6,5 @@ export class RequestPasswordResetDto {
   @IsEmail()
   @IsNotEmpty()
   @IsString()
-  email: string;
+  email!: string;
 }

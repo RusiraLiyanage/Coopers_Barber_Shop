@@ -11,6 +11,8 @@ export type ApiErrorResponse = {
   statusCode: number;
   error: string;
   message: string | string[];
+  code?: string;
+  canExtend?: boolean;
   timestamp: string;
   path: string;
   method: string;
@@ -29,6 +31,8 @@ type HttpResponseLike = {
 };
 
 type HttpExceptionResponse = {
+  code?: unknown;
+  canExtend?: unknown;
   error?: unknown;
   message?: unknown;
 };
@@ -57,6 +61,14 @@ function normalizeMessage(value: unknown): string | string[] {
 
 function normalizeError(value: unknown, fallback: string): string {
   return typeof value === 'string' ? value : fallback;
+}
+
+function normalizeCode(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+function normalizeCanExtend(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined;
 }
 
 function shouldLogDetailedError(exception: unknown): boolean {
@@ -97,6 +109,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
     let error = 'Internal Server Error';
     let message: string | string[] = 'Something went wrong';
+    let code: string | undefined;
+    let canExtend: boolean | undefined;
 
     if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
@@ -108,6 +122,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
       } else if (isHttpExceptionResponse(exceptionResponse)) {
         message = normalizeMessage(exceptionResponse.message);
         error = normalizeError(exceptionResponse.error, exception.name);
+        code = normalizeCode(exceptionResponse.code);
+        canExtend = normalizeCanExtend(exceptionResponse.canExtend);
       }
     }
 
@@ -119,6 +135,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
       statusCode,
       error,
       message,
+      ...(code ? { code } : {}),
+      ...(canExtend !== undefined ? { canExtend } : {}),
       timestamp: new Date().toISOString(),
       path: request.originalUrl ?? request.url ?? '',
       method: request.method ?? '',

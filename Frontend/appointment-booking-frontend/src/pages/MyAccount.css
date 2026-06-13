@@ -1,0 +1,19 @@
+.account-error-alert {
+  margin-bottom: 20px;
+}
+
+.account-type-section {
+  margin-bottom: 20px;
+  color: #8c8c8c;
+}
+
+.account-type-tag-row {
+  margin-top: 6px;
+}
+
+.account-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+}

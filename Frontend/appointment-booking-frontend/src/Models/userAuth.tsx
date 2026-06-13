@@ -25,6 +25,8 @@ import {
   getRawErrorMessage,
   logDevelopmentError,
 } from "../lib/errors";
+import { SAModalHeader } from "../components/common";
+import "./userAuth.css";
 
 interface UserAuthModalProps {
   open: boolean;
@@ -93,6 +95,7 @@ export default function UserAuthModal({
   const [confirmLoading, setConfirmLoading] = useState(false);
   const [extendLoading, setExtendLoading] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
+  const [sessionExtendFailed, setSessionExtendFailed] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [passwordResetStep, setPasswordResetStep] =
     useState<PasswordResetStep>("request");
@@ -106,11 +109,14 @@ export default function UserAuthModal({
   const isSessionTimeoutMode = sessionTimeoutState !== "none";
   const isExtendPrompt = sessionTimeoutState === "extend_prompt";
   const isLoggedOutAfterTimeout = sessionTimeoutState === "logged_out";
+  const shouldShowSessionExtendFailure =
+    isSessionTimeoutMode && sessionExtendFailed && authAlert !== null;
 
   useEffect(() => {
     if (open) {
       setAuthMode("login");
       setPasswordResetStep("request");
+      setSessionExtendFailed(false);
       setAuthAlert(null);
       loginForm.resetFields();
       registerForm.resetFields();
@@ -118,12 +124,19 @@ export default function UserAuthModal({
     }
   }, [open, loginForm, passwordResetForm, registerForm]);
 
+  useEffect(() => {
+    if (sessionTimeoutState !== "extend_prompt") {
+      setSessionExtendFailed(false);
+    }
+  }, [sessionTimeoutState]);
+
   const handleExtendSession = async () => {
     if (!onExtendSession) {
       return;
     }
 
     setExtendLoading(true);
+    setSessionExtendFailed(false);
     setAuthAlert(null);
 
     try {
@@ -131,6 +144,7 @@ export default function UserAuthModal({
       messageApi.success("Session extended");
     } catch (error) {
       logDevelopmentError("Extend session", error);
+      setSessionExtendFailed(true);
       setAuthAlert({
         type: "error",
         message: "Session could not be extended",
@@ -147,6 +161,7 @@ export default function UserAuthModal({
     }
 
     setLogoutLoading(true);
+    setSessionExtendFailed(false);
     setAuthAlert(null);
 
     try {
@@ -168,6 +183,8 @@ export default function UserAuthModal({
       return;
     }
 
+    setSessionExtendFailed(false);
+    setAuthAlert(null);
     onSessionTimeoutAcknowledged();
   };
 
@@ -379,6 +396,10 @@ export default function UserAuthModal({
   };
 
   const getModalTitle = () => {
+    if (shouldShowSessionExtendFailure) {
+      return "";
+    }
+
     if (isSessionTimeoutMode) {
       return "Session expired";
     }
@@ -391,6 +412,10 @@ export default function UserAuthModal({
   };
 
   const getModalSubtitle = () => {
+    if (shouldShowSessionExtendFailure) {
+      return "";
+    }
+
     if (isExtendPrompt) {
       return "Do you want to extend your session or logout?";
     }
@@ -450,74 +475,29 @@ export default function UserAuthModal({
           },
         }}
       >
-        <div style={{ maxWidth: 460, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 24 }}>
-            <Typography.Title level={2} style={{ marginBottom: 4 }}>
-              {getModalTitle()}
-            </Typography.Title>
-            <Typography.Text type="secondary">
-              {getModalSubtitle()}
-            </Typography.Text>
-          </div>
+        <div className="auth-modal-content">
+          {shouldShowSessionExtendFailure ? null : (
+            <SAModalHeader
+              title={getModalTitle()}
+              subtitle={getModalSubtitle()}
+              level={2}
+              centered
+              className="auth-modal-header"
+            />
+          )}
 
           {isSessionTimeoutMode ? (
-            <>
-              <Alert
-                type={isLoggedOutAfterTimeout ? "error" : "warning"}
-                showIcon
-                message={
-                  isLoggedOutAfterTimeout
-                    ? "Session expired"
-                    : "Session inactive"
-                }
-                description={
-                  isLoggedOutAfterTimeout
-                    ? "Your session has ended. Please log in again."
-                    : "Your session was paused because there has been no recent activity."
-                }
-                style={{ marginBottom: 20 }}
-              />
-
-              {authAlert ? (
+            shouldShowSessionExtendFailure ? (
+              <>
                 <Alert
                   type={authAlert.type}
                   showIcon
                   message={authAlert.message}
                   description={authAlert.description}
-                  style={{ marginBottom: 20 }}
+                  className="auth-modal-alert"
                 />
-              ) : null}
 
-              <div
-                style={{
-                  display: "flex",
-                  gap: 12,
-                  justifyContent: "center",
-                  marginTop: 24,
-                }}
-              >
-                {isExtendPrompt ? (
-                  <>
-                    <Button
-                      type="primary"
-                      size="large"
-                      loading={extendLoading}
-                      onClick={handleExtendSession}
-                    >
-                      Extend session
-                    </Button>
-                    <Button
-                      size="large"
-                      danger
-                      loading={logoutLoading}
-                      onClick={() => {
-                        void handleSessionLogout();
-                      }}
-                    >
-                      Logout
-                    </Button>
-                  </>
-                ) : (
+                <div className="auth-session-actions">
                   <Button
                     type="primary"
                     size="large"
@@ -525,9 +505,70 @@ export default function UserAuthModal({
                   >
                     OK
                   </Button>
-                )}
-              </div>
-            </>
+                </div>
+              </>
+            ) : (
+              <>
+                <Alert
+                  type={isLoggedOutAfterTimeout ? "error" : "warning"}
+                  showIcon
+                  message={
+                    isLoggedOutAfterTimeout
+                      ? "Session expired"
+                      : "Session inactive"
+                  }
+                  description={
+                    isLoggedOutAfterTimeout
+                      ? "Your session has ended. Please log in again."
+                      : "Your session was paused because there has been no recent activity."
+                  }
+                  className="auth-modal-alert"
+                />
+
+                {authAlert ? (
+                  <Alert
+                    type={authAlert.type}
+                    showIcon
+                    message={authAlert.message}
+                    description={authAlert.description}
+                    className="auth-modal-alert"
+                  />
+                ) : null}
+
+                <div className="auth-session-actions">
+                  {isExtendPrompt ? (
+                    <>
+                      <Button
+                        type="primary"
+                        size="large"
+                        loading={extendLoading}
+                        onClick={handleExtendSession}
+                      >
+                        Extend session
+                      </Button>
+                      <Button
+                        size="large"
+                        danger
+                        loading={logoutLoading}
+                        onClick={() => {
+                          void handleSessionLogout();
+                        }}
+                      >
+                        Logout
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      type="primary"
+                      size="large"
+                      onClick={handleSessionTimeoutAcknowledged}
+                    >
+                      OK
+                    </Button>
+                  )}
+                </div>
+              </>
+            )
           ) : (
             <>
               {authAlert ? (
@@ -538,7 +579,7 @@ export default function UserAuthModal({
                   message={authAlert.message}
                   description={authAlert.description}
                   onClose={() => setAuthAlert(null)}
-                  style={{ marginBottom: 20 }}
+                  className="auth-modal-alert"
                 />
               ) : null}
 
@@ -664,7 +705,7 @@ export default function UserAuthModal({
 
                     void handleRequestPasswordReset({ email });
                   }}
-                  style={{ marginTop: 8 }}
+                  className="auth-resend-code-action"
                 >
                   Send a new code
                 </Button>
@@ -709,13 +750,7 @@ export default function UserAuthModal({
                 <Input.Password autoComplete="current-password" />
               </Form.Item>
 
-              <div
-                style={{
-                  textAlign: "right",
-                  marginTop: -12,
-                  marginBottom: 16,
-                }}
-              >
+              <div className="auth-forgot-password-action">
                 <Typography.Link onClick={moveToForgotPassword}>
                   Forgot password?
                 </Typography.Link>
@@ -861,7 +896,7 @@ export default function UserAuthModal({
             </Form>
               )}
 
-              <div style={{ textAlign: "center", marginTop: 20 }}>
+              <div className="auth-secondary-action">
             {isForgotPasswordMode ? (
               <>
                 <Typography.Text type="secondary">
@@ -869,7 +904,7 @@ export default function UserAuthModal({
                 </Typography.Text>
                 <Typography.Link
                   onClick={() => moveToLogin(passwordResetForm.getFieldValue("email"))}
-                  style={{ marginLeft: 6 }}
+                  className="auth-secondary-action-link"
                 >
                   Log in
                 </Typography.Link>
@@ -887,7 +922,7 @@ export default function UserAuthModal({
                     setPasswordResetStep("request");
                     setAuthMode(isLoginMode ? "register" : "login");
                   }}
-                  style={{ marginLeft: 6 }}
+                  className="auth-secondary-action-link"
                 >
                   {isLoginMode ? "Sign up" : "Log in"}
                 </Typography.Link>

@@ -1,0 +1,79 @@
+.home-page {
+  display: flex;
+  width: 100%;
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  background-attachment: fixed;
+  background-image: url('/Coopers_barber_background.png');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  color: #fff;
+  text-align: center;
+}
+
+.home-page-content {
+  width: min(92vw, 760px);
+}
+
+.home-page-title {
+  margin: 0 0 16px;
+  color: #fff;
+  font-size: 4rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.home-page-copy {
+  margin: 0 0 20px;
+  color: #fff;
+  font-size: 2.25rem;
+}
+
+.home-page-services {
+  display: flex;
+  justify-content: center;
+  margin-top: 50px;
+}
+
+.home-services-card {
+  width: min(100%, 400px);
+  border-radius: 16px;
+  background: linear-gradient(135deg, #f9f9f9, #fff);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.home-services-card .ant-card-head-title {
+  color: #333;
+  font-size: 1.8rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.home-services-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.home-services-list-item {
+  margin-bottom: 10px;
+  color: #555;
+  font-size: 1.2rem;
+}
+
+.home-appointment-action {
+  margin-top: 42px;
+}
+
+@media (max-width: 768px) {
+  .home-page-title {
+    font-size: 3rem;
+  }
+
+  .home-page-copy {
+    font-size: 1.6rem;
+  }
+}

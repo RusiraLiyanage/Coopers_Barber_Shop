@@ -6,9 +6,6 @@ import {
   Input,
   Modal,
   Row,
-  Spin,
-  Tag,
-  Typography,
   message,
 } from "antd";
 import { useEffect, useState } from "react";
@@ -21,6 +18,8 @@ import {
   type UpdateAccountPayload,
 } from "../lib/api";
 import { GENERIC_ERROR_MESSAGE, logDevelopmentError } from "../lib/errors";
+import { SALoadingPanel, SAModalHeader, SAStatusTag } from "../components/common";
+import "./MyAccount.css";
 
 interface MyAccountProps {
   open: boolean;
@@ -143,14 +142,10 @@ export default function MyAccount({
       {contextHolder}
       <Modal
         title={
-          <div>
-            <Typography.Title level={3} style={{ margin: 0 }}>
-              My Account
-            </Typography.Title>
-            <Typography.Text type="secondary">
-              Review and update the profile details linked to your bookings.
-            </Typography.Text>
-          </div>
+          <SAModalHeader
+            title="My Account"
+            subtitle="Review and update the profile details linked to your bookings."
+          />
         }
         open={open}
         onCancel={onClose}
@@ -173,11 +168,7 @@ export default function MyAccount({
             showIcon
           />
         ) : loading ? (
-          <div
-            style={{ display: "flex", justifyContent: "center", padding: 48 }}
-          >
-            <Spin size="large" />
-          </div>
+          <SALoadingPanel />
         ) : (
           <>
             {error ? (
@@ -185,19 +176,19 @@ export default function MyAccount({
                 type="error"
                 message={error}
                 showIcon
-                style={{ marginBottom: 20 }}
+                className="account-error-alert"
               />
             ) : null}
 
             {error && !profile ? null : (
               <>
                 {profile ? (
-                  <div style={{ marginBottom: 20 }}>
-                    <Typography.Text type="secondary">
-                      Account type
-                    </Typography.Text>
-                    <div style={{ marginTop: 6 }}>
-                      <Tag color="blue">{profile.role.toUpperCase()}</Tag>
+                  <div className="account-type-section">
+                    <span>Account type</span>
+                    <div className="account-type-tag-row">
+                      <SAStatusTag color="blue">
+                        {profile.role.toUpperCase()}
+                      </SAStatusTag>
                     </div>
                   </div>
                 ) : null}
@@ -306,14 +297,7 @@ export default function MyAccount({
                     <Input autoComplete="email" />
                   </Form.Item>
 
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "flex-end",
-                      gap: 12,
-                      marginTop: 8,
-                    }}
-                  >
+                  <div className="account-form-actions">
                     <Button onClick={onClose}>Cancel</Button>
                     <Button type="primary" htmlType="submit" loading={saving}>
                       Save Changes

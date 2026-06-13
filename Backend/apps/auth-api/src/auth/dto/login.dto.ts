@@ -8,10 +8,10 @@ export class LoginDto {
   @ApiProperty({ example: 'customer@example.com' })
   @IsEmail()
   @IsString()
-  email: string;
+  email!: string;
 
   // The password of the user trying to log in.
   @ApiProperty({ example: 'securePassword123', minLength: 6 })
   @IsString()
-  password: string;
+  password!: string;
 }

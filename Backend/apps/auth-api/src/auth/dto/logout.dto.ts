@@ -8,5 +8,5 @@ export class LogoutDto {
   @ApiProperty({ example: 'refresh-token-value' })
   @IsString()
   @IsNotEmpty()
-  refresh_token: string;
+  refresh_token!: string;
 }

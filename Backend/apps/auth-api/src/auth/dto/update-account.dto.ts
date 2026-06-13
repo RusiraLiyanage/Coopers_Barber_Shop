@@ -8,17 +8,17 @@ export class UpdateAccountDto {
   @IsEmail()
   @IsNotEmpty()
   @IsString()
-  email: string;
+  email!: string;
 
   @ApiProperty({ example: 'Cooper' })
   @IsString()
   @IsNotEmpty()
-  firstName: string;
+  firstName!: string;
 
   @ApiProperty({ example: 'Smith' })
   @IsString()
   @IsNotEmpty()
-  lastName: string;
+  lastName!: string;
 
   @ApiProperty({ example: '+61412345678' })
   @IsString()
@@ -26,10 +26,10 @@ export class UpdateAccountDto {
   @Matches(AU_MOBILE_PATTERN, {
     message: 'Mobile must be a valid Australian mobile number',
   })
-  mobile: string;
+  mobile!: string;
 
   @ApiProperty({ example: 'Surry Hills' })
   @IsString()
   @IsNotEmpty()
-  suburb: string;
+  suburb!: string;
 }

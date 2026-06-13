@@ -15,12 +15,12 @@ export class RegisterDto {
   @ApiProperty({ example: 'Cooper' })
   @IsString()
   @IsNotEmpty()
-  firstName: string;
+  firstName!: string;
 
   @ApiProperty({ example: 'Smith' })
   @IsString()
   @IsNotEmpty()
-  lastName: string;
+  lastName!: string;
 
   @ApiProperty({ example: '+61412345678' })
   @IsString()
@@ -28,23 +28,23 @@ export class RegisterDto {
   @Matches(AU_MOBILE_PATTERN, {
     message: 'Mobile must be a valid Australian mobile number',
   })
-  mobile: string;
+  mobile!: string;
 
   @ApiProperty({ example: 'Surry Hills' })
   @IsString()
   @IsNotEmpty()
-  suburb: string;
+  suburb!: string;
 
   // The email of the user trying to register.
   @ApiProperty({ example: 'customer@example.com' })
   @IsEmail()
   @IsNotEmpty()
   @IsString()
-  email: string;
+  email!: string;
 
   // The password of the user trying to register. (type string, min length 6)
   @ApiProperty({ example: 'securePassword123', minLength: 6 })
   @IsString()
   @MinLength(6)
-  password: string;
+  password!: string;
 }

@@ -274,6 +274,36 @@ export class PublicProxyController {
     );
   }
 
+  @ApiOperation({ summary: 'Extend an idle guard cookie session' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['refresh_token'],
+      properties: {
+        refresh_token: { type: 'string', example: 'refresh-token-value' },
+      },
+    },
+  })
+  @Post('auth/extend')
+  async extend(
+    @Body() body: RefreshTokenRequestBody,
+    @Headers('x-refresh-token') refreshTokenHeader: string | undefined,
+    @Headers('cookie') cookieHeader: string | undefined,
+    @Res({ passthrough: true }) response: AuthCookieResponse,
+  ): Promise<AuthStatusResponse> {
+    const tokens = await this.protectedProxyService.extendSession(
+      createRefreshTokenBody(refreshTokenHeader, cookieHeader, body)
+        .refresh_token,
+    );
+
+    setAuthCookies(response, tokens, {
+      rememberMe: getRememberMeFromCookie(cookieHeader) ?? true,
+    });
+    writeStatus(response, 200);
+
+    return { authenticated: true };
+  }
+
   @ApiOperation({ summary: 'Proxy logout to auth-api' })
   @ApiBody({
     schema: {

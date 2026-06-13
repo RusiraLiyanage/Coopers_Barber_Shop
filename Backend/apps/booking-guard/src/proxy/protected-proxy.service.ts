@@ -6,6 +6,7 @@ import {
 import {
   ExpiredAccessTokenException,
   GuardAuthenticationService,
+  SESSION_IDLE_EXPIRED_CODE,
   type AuthTokensResponse,
   type JwtRequestUser,
   type SessionValidationResponse,
@@ -60,6 +61,40 @@ function isSessionValidationResponse(
   const response = value as Partial<SessionValidationResponse>;
 
   return typeof response.active === 'boolean';
+}
+
+function isIdleExpiredSessionResponse(
+  value: unknown,
+): value is Extract<SessionValidationResponse, { active: false }> {
+  if (!isSessionValidationResponse(value) || value.active) {
+    return false;
+  }
+
+  const response = value as { code?: unknown; canExtend?: unknown };
+
+  return (
+    response.code === SESSION_IDLE_EXPIRED_CODE && response.canExtend === true
+  );
+}
+
+function isIdleExpiredErrorResponse(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const response = value as { code?: unknown; canExtend?: unknown };
+
+  return (
+    response.code === SESSION_IDLE_EXPIRED_CODE && response.canExtend === true
+  );
+}
+
+function createIdleExpiredException(): UnauthorizedException {
+  return new UnauthorizedException({
+    code: SESSION_IDLE_EXPIRED_CODE,
+    message: 'Session expired due to inactivity',
+    canExtend: true,
+  });
 }
 
 function createUserContextHeaders(
@@ -122,6 +157,33 @@ export class ProtectedProxyService {
       },
       refreshedTokens: context.refreshedTokens,
     };
+  }
+
+  async extendSession(
+    refreshToken: string | undefined,
+  ): Promise<AuthTokensResponse> {
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token is required.');
+    }
+
+    const result = await this.proxyService.forward({
+      target: 'auth',
+      method: 'POST',
+      path: '/auth/extend',
+      body: {
+        refresh_token: refreshToken,
+      },
+    });
+
+    if (result.statusCode === 401) {
+      throw new UnauthorizedException('Session expired. Please login again.');
+    }
+
+    if (result.statusCode >= 400 || !isAuthTokensResponse(result.body)) {
+      throw new ServiceUnavailableException('Unable to extend session.');
+    }
+
+    return result.body;
   }
 
   private async authenticateOrRefresh(
@@ -188,6 +250,10 @@ export class ProtectedProxyService {
     });
 
     if (result.statusCode === 401) {
+      if (isIdleExpiredErrorResponse(result.body)) {
+        throw createIdleExpiredException();
+      }
+
       throw new UnauthorizedException('Session expired. Please login again.');
     }
 
@@ -209,6 +275,10 @@ export class ProtectedProxyService {
     });
 
     if (result.statusCode === 200 && isSessionValidationResponse(result.body)) {
+      if (isIdleExpiredSessionResponse(result.body)) {
+        throw createIdleExpiredException();
+      }
+
       if (!result.body.active) {
         throw new UnauthorizedException('Session expired. Please login again.');
       }

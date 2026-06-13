@@ -156,6 +156,30 @@ export class AuthService {
     };
   }
 
+  async extend(refreshToken: string): Promise<AuthTokensResponse> {
+    const currentSession =
+      await this.sessionService.findExtendableSession(refreshToken);
+    const user = currentSession.user;
+
+    const authenticatedUser: AuthenticatedUser = {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    };
+
+    const newRefreshToken = this.jwtTokenService.generateRefreshToken();
+
+    const newSession = await this.sessionService.extendSession({
+      currentRefreshToken: refreshToken,
+      newRefreshToken: newRefreshToken.refresh_token,
+    });
+
+    return {
+      ...this.jwtTokenService.signAccessToken(authenticatedUser, newSession.id),
+      ...newRefreshToken,
+    };
+  }
+
   async logout(refreshToken: string): Promise<LogoutResponse> {
     await this.sessionService.revokeSession(refreshToken);
 
@@ -165,9 +189,7 @@ export class AuthService {
   }
 
   async validateSession(sessionId: string): Promise<SessionValidationResponse> {
-    return {
-      active: await this.sessionService.isSessionActive(sessionId),
-    };
+    return this.sessionService.validateSessionStatus(sessionId);
   }
 
   async getAccountProfile(userId: string): Promise<AccountProfileResponse> {

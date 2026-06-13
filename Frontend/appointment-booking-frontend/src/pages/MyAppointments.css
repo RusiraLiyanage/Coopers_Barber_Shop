@@ -1,0 +1,490 @@
+@import 'react-big-calendar/lib/css/react-big-calendar.css';
+
+.appointments-tabs {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.appointments-tabs > .ant-tabs-nav {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 10px 0 16px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+.appointments-tabs > .ant-tabs-nav::before {
+  border-bottom: 0;
+}
+
+.appointments-tabs > .ant-tabs-content-holder {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-top: 14px;
+}
+
+.appointments-tabs > .ant-tabs-content-holder > .ant-tabs-content,
+.appointments-tabs
+  > .ant-tabs-content-holder
+  > .ant-tabs-content
+  > .ant-tabs-tabpane {
+  height: 100%;
+}
+
+.appointments-tabs > .ant-tabs-content-holder > .ant-tabs-content {
+  min-height: 100%;
+}
+
+.appointments-tabs > .ant-tabs-nav .ant-tabs-extra-content {
+  margin-left: auto;
+}
+
+.appointments-tab-label {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.appointments-list-item {
+  padding: 10px 0;
+}
+
+.appointments-list-card-content {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.appointments-list-card-title.ant-typography {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+.appointments-list-card-time.ant-typography {
+  margin-bottom: 10px;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.appointments-list-card-staff {
+  font-size: 16px;
+}
+
+.appointments-list-card-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.appointments-view-switch {
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.14);
+}
+
+.appointments-view-switch.ant-segmented {
+  padding: 4px;
+}
+
+.appointments-view-switch .ant-segmented-item {
+  min-width: 92px;
+  border-radius: 6px;
+  color: #1e3a8a;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.appointments-view-switch .ant-segmented-item-selected {
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.28);
+}
+
+.appointments-view-switch
+  .ant-segmented-item-selected
+  .ant-segmented-item-label {
+  color: #fff;
+}
+
+.appointments-calendar-panel {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.appointments-calendar-view-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0 16px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+.appointments-calendar-panel-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-top: 14px;
+}
+
+.appointments-calendar-panel-week .appointments-calendar-panel-content,
+.appointments-calendar-panel-day .appointments-calendar-panel-content {
+  overflow-y: hidden;
+}
+
+.appointments-calendar {
+  min-height: 680px;
+}
+
+.appointments-calendar-panel-week .appointments-calendar,
+.appointments-calendar-panel-day .appointments-calendar {
+  height: 100%;
+  min-height: 0 !important;
+}
+
+.appointments-calendar .rbc-calendar {
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.appointments-calendar-panel-week .appointments-calendar .rbc-calendar,
+.appointments-calendar-panel-day .appointments-calendar .rbc-calendar {
+  height: 100% !important;
+}
+
+.appointments-calendar .rbc-event {
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.appointments-calendar .rbc-toolbar {
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.appointments-calendar-toolbar {
+  display: grid;
+  align-items: center;
+  grid-template-columns: auto minmax(180px, 1fr) auto;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.appointments-calendar-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.appointments-calendar-toolbar-label {
+  justify-self: center;
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.appointments-calendar .rbc-row-segment .rbc-event-content {
+  overflow: visible;
+  text-overflow: unset;
+  white-space: normal;
+}
+
+.appointments-calendar .rbc-month-view .rbc-event {
+  margin-top: 2px;
+  padding: 4px 6px;
+  line-height: 1.25;
+}
+
+.appointments-calendar .rbc-time-view .rbc-timeslot-group {
+  min-height: 52px;
+}
+
+.appointments-calendar .rbc-time-view .rbc-event {
+  min-height: 50px;
+  overflow: hidden;
+  padding: 0;
+  border-left: 4px solid #1d4ed8;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.24);
+}
+
+.appointments-calendar .rbc-time-view .rbc-event-label {
+  display: none;
+}
+
+.appointments-calendar .rbc-time-view .rbc-event-content {
+  height: 100%;
+}
+
+.appointments-calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  color: #4b5563;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.appointments-calendar-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.appointments-calendar-legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.appointments-calendar-legend-dot-scheduled {
+  background: #2563eb;
+}
+
+.appointments-calendar-legend-dot-client {
+  border: 1px solid #fecaca;
+  background: #fee2e2;
+}
+
+.appointments-calendar-legend-dot-barber {
+  border: 1px solid #fde68a;
+  background: #fef3c7;
+}
+
+.appointments-calendar .appointment-event-booked,
+.appointments-calendar .appointment-event-scheduled {
+  background-color: #2563eb;
+}
+
+.appointments-calendar .rbc-time-view .appointment-event-booked,
+.appointments-calendar .rbc-time-view .appointment-event-scheduled {
+  background-color: #2563eb;
+  color: #fff;
+}
+
+.appointments-calendar .appointment-event-cancelledClient {
+  background: #fee2e2;
+  color: #7f1d1d;
+}
+
+.appointments-calendar .rbc-time-view .appointment-event-cancelledClient {
+  border-left-color: #ef4444;
+  background: #fee2e2;
+  color: #7f1d1d;
+}
+
+.appointments-calendar .appointment-event-cancelledBarber {
+  background: #fef3c7;
+  color: #713f12;
+}
+
+.appointments-calendar .rbc-time-view .appointment-event-cancelledBarber {
+  border-left-color: #f59e0b;
+  background: #fef3c7;
+  color: #713f12;
+}
+
+.appointment-calendar-event {
+  min-width: 0;
+}
+
+.appointment-action-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.appointment-action-trigger-full {
+  display: block;
+  height: 100%;
+}
+
+.appointment-calendar-event-month {
+  display: grid;
+  gap: 4px;
+}
+
+.appointment-calendar-event-week,
+.appointment-calendar-event-day {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 5px;
+  padding: 7px 8px;
+  color: #fff;
+}
+
+.appointment-calendar-event-main {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 5px;
+}
+
+.appointment-calendar-event-time {
+  flex: 0 0 auto;
+  font-size: 11px;
+  opacity: 0.9;
+}
+
+.appointment-calendar-event-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.appointment-calendar-event-week .appointment-calendar-event-main,
+.appointment-calendar-event-day .appointment-calendar-event-main {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.appointment-calendar-event-week .appointment-calendar-event-time,
+.appointment-calendar-event-day .appointment-calendar-event-time {
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.appointment-calendar-event-week .appointment-calendar-event-title,
+.appointment-calendar-event-day .appointment-calendar-event-title {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: normal;
+}
+
+.appointment-calendar-event-summary {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.appointment-calendar-event-summary > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.appointment-calendar-event-status {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.appointment-calendar-event-short {
+  min-height: 50px;
+  justify-content: flex-start;
+  gap: 3px;
+  padding: 6px 8px;
+}
+
+.appointment-calendar-event-short .appointment-calendar-event-main {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.appointment-calendar-event-short .appointment-calendar-event-time {
+  font-size: 10.5px;
+}
+
+.appointment-calendar-event-short .appointment-calendar-event-title {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: normal;
+}
+
+.appointment-calendar-event-day .appointment-calendar-event-summary {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.appointment-event-cancelledClient .appointment-calendar-event-week,
+.appointment-event-cancelledClient .appointment-calendar-event-day,
+.appointment-event-cancelledClient .appointment-calendar-event-time,
+.appointment-event-cancelledClient .appointment-calendar-event-title,
+.appointment-event-cancelledClient .appointment-calendar-event-summary,
+.appointment-event-cancelledClient .appointment-calendar-event-status {
+  color: #7f1d1d;
+}
+
+.appointment-event-cancelledBarber .appointment-calendar-event-week,
+.appointment-event-cancelledBarber .appointment-calendar-event-day,
+.appointment-event-cancelledBarber .appointment-calendar-event-time,
+.appointment-event-cancelledBarber .appointment-calendar-event-title,
+.appointment-event-cancelledBarber .appointment-calendar-event-summary,
+.appointment-event-cancelledBarber .appointment-calendar-event-status {
+  color: #713f12;
+}
+
+.appointment-event-cancelledClient .appointment-calendar-event-status {
+  background: rgba(248, 113, 113, 0.24);
+}
+
+.appointment-event-cancelledBarber .appointment-calendar-event-status {
+  background: rgba(245, 158, 11, 0.26);
+}
+
+.appointment-calendar-event-details {
+  display: grid;
+  gap: 2px;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.36);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.appointment-event-cancelledClient .appointment-calendar-event-details {
+  border-top-color: rgba(239, 68, 68, 0.26);
+}
+
+.appointment-event-cancelledBarber .appointment-calendar-event-details {
+  border-top-color: rgba(245, 158, 11, 0.32);
+}
+
+.appointment-calendar-event-month .appointment-calendar-event-details {
+  overflow: hidden;
+}
+
+.appointment-calendar-event-month .appointment-calendar-event-details span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cancel-appointment-confirmation-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cancel-appointment-confirmation-title .anticon {
+  color: #faad14;
+  font-size: 20px;
+}

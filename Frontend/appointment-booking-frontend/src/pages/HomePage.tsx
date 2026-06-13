@@ -1,5 +1,7 @@
 // src/pages/HomePage.tsx
-import { Button, Card } from "antd";
+import { Button } from "antd";
+import { SACard } from "../components/common";
+import "./HomePage.css";
 
 interface HomePageProps {
   onMakeAppointment: () => void; // ✅ renamed to match new App.tsx
@@ -7,76 +9,23 @@ interface HomePageProps {
 
 const HomePage: React.FC<HomePageProps> = ({ onMakeAppointment }) => {
   return (
-    <div
-      style={{
-        height: "100vh",
-        width: "100%",
-        backgroundImage: "url('Coopers_barber_background.png')",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-        backgroundAttachment: "fixed",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "white",
-        textAlign: "center",
-      }}
-    >
-      <div>
-        <h1 style={{ fontSize: "4rem", fontWeight: "bold", color: "white" }}>
-          Cooper's Barber Shop
-        </h1>
-        <p
-          style={{
-            fontSize: "2.25rem",
-            marginBottom: "20px",
-            color: "white",
-          }}
-        >
+    <div className="home-page">
+      <div className="home-page-content">
+        <h1 className="home-page-title">Cooper's Barber Shop</h1>
+        <p className="home-page-copy">
           We provide top-notch barber services tailored to your style.
         </p>
-        <p
-          style={{
-            fontSize: "2.25rem",
-            marginBottom: "20px",
-            color: "white",
-          }}
-        >
-          Book your appointments with ease.
-        </p>
+        <p className="home-page-copy">Book your appointments with ease.</p>
 
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            marginTop: "50px",
-          }}
-        >
-          <Card
+        <div className="home-page-services">
+          <SACard
             title="Our Services"
             bordered={false}
-            style={{
-              width: 400,
-              borderRadius: "16px",
-              boxShadow: "0 8px 20px rgba(0, 0, 0, 0.15)",
-              background: "linear-gradient(135deg, #f9f9f9, #ffffff)",
-            }}
-            headStyle={{
-              textAlign: "center",
-              fontSize: "1.8rem",
-              fontWeight: "bold",
-              color: "#333",
-            }}
+            radius={16}
+            bodyPadding={24}
+            className="home-services-card"
           >
-            <ul
-              style={{
-                listStyle: "none",
-                padding: 0,
-                margin: 0,
-                textAlign: "left",
-              }}
-            >
+            <ul className="home-services-list">
               {[
                 "💈 Hair Cut",
                 "💇 Hair Styling",
@@ -84,27 +33,18 @@ const HomePage: React.FC<HomePageProps> = ({ onMakeAppointment }) => {
                 "🧑‍💼 Consultation",
                 "💆 Deep Conditioning Treatment",
               ].map((service, index) => (
-                <li
-                  key={index}
-                  style={{
-                    fontSize: "1.2rem",
-                    marginBottom: "10px",
-                    color: "#555",
-                  }}
-                >
+                <li key={index} className="home-services-list-item">
                   {service}
                 </li>
               ))}
             </ul>
-          </Card>
+          </SACard>
         </div>
-
-        <br />
-        <br />
 
         <Button
           type="primary"
           size="large"
+          className="home-appointment-action"
           onClick={onMakeAppointment} // ✅ uses new prop name
         >
           Make your Appointment

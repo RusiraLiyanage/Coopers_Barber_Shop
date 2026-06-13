@@ -5,7 +5,6 @@ import {
   Modal,
   Select,
   Spin,
-  Typography,
   message,
 } from "antd";
 import { useCallback, useEffect, useState } from "react";
@@ -20,6 +19,8 @@ import {
   type ServiceOption,
 } from "../lib/api";
 import { getGenericErrorMessage } from "../lib/errors";
+import { SAModalHeader } from "../components/common";
+import "./makeAppointment.css";
 
 interface MakeAppointmentModalProps {
   open: boolean;
@@ -322,9 +323,9 @@ export default function MakeAppointmentModal({
       {contextHolder}
       <Modal
         title={
-          <Typography.Title level={3} style={{ margin: 0 }}>
-            {isEditMode ? "Update Appointment" : "New Appointment"}
-          </Typography.Title>
+          <SAModalHeader
+            title={isEditMode ? "Update Appointment" : "New Appointment"}
+          />
         }
         open={open}
         onCancel={onClose}
@@ -353,13 +354,11 @@ export default function MakeAppointmentModal({
               }
             }}
             autoComplete="off"
-            style={{ fontSize: 16 }}
+            className="appointment-form"
           >
             <Form.Item
               name="serviceId"
-              label={
-                <span style={{ fontSize: 16, fontWeight: 600 }}>Service</span>
-              }
+              label={<span className="appointment-form-label">Service</span>}
               rules={[
                 {
                   required: true,
@@ -381,7 +380,7 @@ export default function MakeAppointmentModal({
             <Form.Item
               name="appointmentDate"
               label={
-                <span style={{ fontSize: 16, fontWeight: 600 }}>
+                <span className="appointment-form-label">
                   Appointment Date
                 </span>
               }
@@ -416,7 +415,7 @@ export default function MakeAppointmentModal({
                     </div>
                   );
                 }}
-                style={{ width: "100%" }}
+                className="appointment-date-picker"
                 disabled={!form.getFieldValue("serviceId")}
                 disabledDate={(current) => {
                   if (!current) {
@@ -451,7 +450,7 @@ export default function MakeAppointmentModal({
             <Form.Item
               name="appointmentTime"
               label={
-                <span style={{ fontSize: 16, fontWeight: 600 }}>
+                <span className="appointment-form-label">
                   Available Time Slots
                 </span>
               }
@@ -465,7 +464,7 @@ export default function MakeAppointmentModal({
               {slotsLoading ? (
                 <Spin />
               ) : showNoAvailabilityMessage ? (
-                <div style={{ color: "#8c8c8c", fontSize: 16 }}>
+                <div className="appointment-slot-unavailable">
                   No appointments available for the selected service and date.
                 </div>
               ) : (
@@ -525,12 +524,7 @@ export default function MakeAppointmentModal({
                           key={slot}
                           type={selectedSlot === slot ? "primary" : "default"}
                           size="large"
-                          style={{
-                            minWidth: 132,
-                            height: 44,
-                            fontSize: 16,
-                            fontWeight: 600,
-                          }}
+                          className="appointment-slot-button"
                           onClick={() => {
                             setSelectedSlot(slot);
                             form.setFieldValue("appointmentTime", slot);
@@ -545,14 +539,8 @@ export default function MakeAppointmentModal({
               )}
             </Form.Item>
 
-            <Form.Item style={{ marginBottom: 0 }}>
-              <div
-                style={{
-                  display: "flex",
-                  gap: 12,
-                  justifyContent: "flex-end",
-                }}
-              >
+            <Form.Item className="appointment-form-actions-item">
+              <div className="appointment-form-actions">
                 <Button size="large" onClick={onClose}>
                   Cancel
                 </Button>

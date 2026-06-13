@@ -68,6 +68,12 @@ export class AuthController {
     return this.authService.refresh(dto.refresh_token);
   }
 
+  @ApiOperation({ summary: 'Extend an idle auth session during grace period' })
+  @Post('extend')
+  extend(@Body() dto: RefreshTokenDto): Promise<AuthTokensResponse> {
+    return this.authService.extend(dto.refresh_token);
+  }
+
   @ApiOperation({ summary: 'Logout and revoke the refresh token session' })
   @Post('logout')
   logout(@Body() dto: LogoutDto): Promise<LogoutResponse> {

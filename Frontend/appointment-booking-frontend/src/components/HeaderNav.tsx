@@ -2,6 +2,7 @@ import { Avatar, Dropdown, Menu } from "antd";
 import { Header } from "antd/es/layout/layout";
 import { UserOutlined } from "@ant-design/icons";
 import { useLocation, useNavigate } from "react-router-dom";
+import "./HeaderNav.css";
 
 interface HeaderNavProps {
   isAuthenticated: boolean;
@@ -56,23 +57,9 @@ export default function HeaderNav({
 
   return (
     <>
-      <Header
-        style={{
-          position: "fixed",
-          top: 0,
-          width: "100%",
-          zIndex: 1000,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          background: "#fff",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-          height: 64,
-          paddingBottom: 10,
-        }}
-      >
+      <Header className="app-header">
         <div
-          style={{ fontSize: "23px", fontWeight: "bold", cursor: "pointer" }}
+          className="app-header-brand"
           onClick={() => navigate("/")}
         >
           Cooper's BarberShop
@@ -89,20 +76,14 @@ export default function HeaderNav({
                 ? ["create"]
                 : []
           }
-          style={{
-            flex: 1,
-            justifyContent: "right",
-            background: "transparent",
-            borderBottom: "none",
-            fontWeight: "bold",
-          }}
+          className="app-header-menu"
         />
 
         <Dropdown menu={profileMenu} placement="bottomRight">
           <Avatar
             size="large"
             icon={<UserOutlined />}
-            style={{ cursor: "pointer" }}
+            className="app-header-avatar"
           />
         </Dropdown>
       </Header>

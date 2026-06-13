@@ -2,6 +2,8 @@ const API_BASE_URL = import.meta.env.VITE_API_URL ?? "";
 const AUTH_BROWSER_SESSION_KEY = "coopers_auth_browser_session";
 const AUTH_REMEMBERED_SESSION_KEY = "coopers_auth_remembered_session";
 const AUTH_HAD_SESSION_KEY = "coopers_auth_had_session";
+export const SESSION_IDLE_EXPIRED_CODE = "SESSION_IDLE_EXPIRED";
+export const SESSION_IDLE_EXPIRED_EVENT = "coopers-session-idle-expired";
 
 export interface AuthResponse {
   authenticated: boolean;
@@ -72,6 +74,8 @@ export type PasswordResetConfirmPayload = PasswordResetVerifyPayload & {
 
 type ApiErrorPayload = {
   message?: string | string[];
+  code?: string;
+  canExtend?: boolean;
 };
 
 type ParsedResponse<T> = T | ApiErrorPayload | string | null;
@@ -80,6 +84,8 @@ export class ApiRequestError extends Error {
   constructor(
     message: string,
     public readonly statusCode: number,
+    public readonly code?: string,
+    public readonly canExtend?: boolean,
   ) {
     super(message);
     this.name = 'ApiRequestError';
@@ -197,8 +203,20 @@ async function request<T>(
     const message = Array.isArray(errorMessage)
       ? errorMessage.join(", ")
       : errorMessage || response.statusText;
+    const code = getApiErrorCode(data);
+    const canExtend = getApiErrorCanExtend(data);
+    const error = new ApiRequestError(
+      message || "Request failed",
+      response.status,
+      code,
+      canExtend,
+    );
 
-    throw new ApiRequestError(message || "Request failed", response.status);
+    if (isSessionIdleExpiredError(error)) {
+      dispatchSessionIdleExpiredEvent();
+    }
+
+    throw error;
   }
 
   return data as T;
@@ -238,6 +256,34 @@ function getApiErrorMessage<T>(
   return data.message;
 }
 
+function getApiErrorCode<T>(data: ParsedResponse<T>): string | undefined {
+  if (typeof data !== "object" || data === null || !("code" in data)) {
+    return undefined;
+  }
+
+  return typeof data.code === "string" ? data.code : undefined;
+}
+
+function getApiErrorCanExtend<T>(data: ParsedResponse<T>): boolean | undefined {
+  if (typeof data !== "object" || data === null || !("canExtend" in data)) {
+    return undefined;
+  }
+
+  return typeof data.canExtend === "boolean" ? data.canExtend : undefined;
+}
+
+function dispatchSessionIdleExpiredEvent(): void {
+  window.dispatchEvent(new Event(SESSION_IDLE_EXPIRED_EVENT));
+}
+
+export function isSessionIdleExpiredError(error: unknown): boolean {
+  return (
+    error instanceof ApiRequestError &&
+    error.code === SESSION_IDLE_EXPIRED_CODE &&
+    error.canExtend === true
+  );
+}
+
 export function toAuthSession(response: AuthResponse): AuthSession {
   if (!response.authenticated) {
     throw new Error("Authentication failed");
@@ -262,6 +308,20 @@ export async function getCurrentSession() {
 
 export async function refreshSession() {
   const response = await request<AuthResponse>("/auth/refresh", {
+    method: "POST",
+    headers: buildHeaders(),
+    body: JSON.stringify({}),
+  });
+
+  if (response.authenticated) {
+    markRestoredClientAuthSession();
+  }
+
+  return response;
+}
+
+export async function extendSession() {
+  const response = await request<AuthResponse>("/auth/extend", {
     method: "POST",
     headers: buildHeaders(),
     body: JSON.stringify({}),

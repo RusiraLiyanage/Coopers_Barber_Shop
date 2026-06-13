@@ -1,11 +1,17 @@
 import { createHash } from 'node:crypto';
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { AuthSession } from '@coopers/entities';
 import type { Repository } from 'typeorm';
+import {
+  SESSION_IDLE_EXPIRED_CODE,
+  type SessionValidationResponse,
+} from './auth.types';
 
 const DEFAULT_SESSION_IDLE_TIMEOUT_SECONDS = 10 * 60;
+const DEFAULT_SESSION_EXTENSION_GRACE_SECONDS = 5 * 60;
+const SESSION_IDLE_EXPIRED_MESSAGE = 'Session expired due to inactivity';
 
 type CreateAuthSessionInput = {
   userId: string;
@@ -17,8 +23,20 @@ type RotateAuthSessionInput = {
   newRefreshToken: string;
 };
 
+export class SessionIdleExpiredException extends UnauthorizedException {
+  constructor() {
+    super({
+      code: SESSION_IDLE_EXPIRED_CODE,
+      message: SESSION_IDLE_EXPIRED_MESSAGE,
+      canExtend: true,
+    });
+  }
+}
+
 @Injectable()
 export class SessionService {
+  private readonly logger = new Logger(SessionService.name);
+
   constructor(
     @InjectRepository(AuthSession)
     private readonly sessionsRepo: Repository<AuthSession>,
@@ -59,9 +77,42 @@ export class SessionService {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
-    if (this.isSessionIdleExpired(session, now)) {
+    if (this.isSessionPastExtensionGrace(session, now)) {
       await this.revokeSessionById(session.id, now);
-      throw new UnauthorizedException('Session expired due to inactivity');
+      throw new UnauthorizedException('Session expired. Please login again.');
+    }
+
+    if (this.isSessionIdleExpired(session, now)) {
+      throw new SessionIdleExpiredException();
+    }
+
+    return session;
+  }
+
+  async findExtendableSession(refreshToken: string): Promise<AuthSession> {
+    const session = await this.sessionsRepo.findOne({
+      where: {
+        refreshTokenHash: this.hashRefreshToken(refreshToken),
+      },
+      relations: {
+        user: true,
+      },
+    });
+
+    const now = new Date();
+
+    if (!session) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    if (this.isSessionExpired(session, now)) {
+      await this.revokeSessionById(session.id, now);
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    if (this.isSessionPastExtensionGrace(session, now)) {
+      await this.revokeSessionById(session.id, now);
+      throw new UnauthorizedException('Session expired. Please login again.');
     }
 
     return session;
@@ -73,7 +124,9 @@ export class SessionService {
     });
   }
 
-  async isSessionActive(sessionId: string): Promise<boolean> {
+  async validateSessionStatus(
+    sessionId: string,
+  ): Promise<SessionValidationResponse> {
     const session = await this.sessionsRepo.findOne({
       where: {
         id: sessionId,
@@ -83,22 +136,45 @@ export class SessionService {
     const now = new Date();
 
     if (!session) {
-      return false;
+      return {
+        active: false,
+      };
     }
 
     if (this.isSessionExpired(session, now)) {
       await this.revokeSessionById(session.id, now);
-      return false;
+      return {
+        active: false,
+      };
+    }
+
+    if (this.isSessionPastExtensionGrace(session, now)) {
+      await this.revokeSessionById(session.id, now);
+      return {
+        active: false,
+      };
     }
 
     if (this.isSessionIdleExpired(session, now)) {
-      await this.revokeSessionById(session.id, now);
-      return false;
+      return {
+        active: false,
+        code: SESSION_IDLE_EXPIRED_CODE,
+        message: SESSION_IDLE_EXPIRED_MESSAGE,
+        canExtend: true,
+      };
     }
 
     await this.markSessionUsed(session.id);
 
-    return true;
+    return {
+      active: true,
+    };
+  }
+
+  async isSessionActive(sessionId: string): Promise<boolean> {
+    const result = await this.validateSessionStatus(sessionId);
+
+    return result.active;
   }
 
   async revokeSession(refreshToken: string): Promise<void> {
@@ -114,6 +190,7 @@ export class SessionService {
 
     session.revokedAt = new Date();
     await this.sessionsRepo.save(session);
+    this.logger.log(`Revoked auth session ${session.id} by logout.`);
   }
 
   async revokeUserSessions(userId: string): Promise<void> {
@@ -129,7 +206,10 @@ export class SessionService {
   }
 
   async revokeExpiredSessions(now = new Date()): Promise<number> {
-    const idleCutoff = new Date(now.getTime() - this.getSessionIdleTimeoutMs());
+    const idleCutoff = new Date(
+      now.getTime() -
+        (this.getSessionIdleTimeoutMs() + this.getSessionExtensionGraceMs()),
+    );
     const result = await this.sessionsRepo
       .createQueryBuilder()
       .update(AuthSession)
@@ -154,6 +234,21 @@ export class SessionService {
       input.currentRefreshToken,
     );
 
+    return this.replaceSession(currentSession, input.newRefreshToken);
+  }
+
+  async extendSession(input: RotateAuthSessionInput): Promise<AuthSession> {
+    const currentSession = await this.findExtendableSession(
+      input.currentRefreshToken,
+    );
+
+    return this.replaceSession(currentSession, input.newRefreshToken);
+  }
+
+  private async replaceSession(
+    currentSession: AuthSession,
+    newRefreshToken: string,
+  ): Promise<AuthSession> {
     await this.sessionsRepo.update(currentSession.id, {
       lastUsedAt: new Date(),
       revokedAt: new Date(),
@@ -161,7 +256,7 @@ export class SessionService {
 
     return this.createSession({
       userId: currentSession.user.id,
-      refreshToken: input.newRefreshToken,
+      refreshToken: newRefreshToken,
     });
   }
 
@@ -178,6 +273,19 @@ export class SessionService {
     const idleForMs = now.getTime() - lastActivityAt.getTime();
 
     return idleForMs >= this.getSessionIdleTimeoutMs();
+  }
+
+  private isSessionPastExtensionGrace(
+    session: AuthSession,
+    now: Date,
+  ): boolean {
+    const lastActivityAt = session.lastUsedAt ?? session.createdAt;
+    const idleForMs = now.getTime() - lastActivityAt.getTime();
+
+    return (
+      idleForMs >=
+      this.getSessionIdleTimeoutMs() + this.getSessionExtensionGraceMs()
+    );
   }
 
   private async revokeSessionById(
@@ -207,6 +315,20 @@ export class SessionService {
         : DEFAULT_SESSION_IDLE_TIMEOUT_SECONDS;
 
     return Math.floor(timeoutSeconds) * 1000;
+  }
+
+  private getSessionExtensionGraceMs(): number {
+    const configuredGraceSeconds = Number(
+      this.configService.get<string>('SESSION_EXTENSION_GRACE_SECONDS') ??
+        DEFAULT_SESSION_EXTENSION_GRACE_SECONDS,
+    );
+
+    const graceSeconds =
+      Number.isFinite(configuredGraceSeconds) && configuredGraceSeconds > 0
+        ? configuredGraceSeconds
+        : DEFAULT_SESSION_EXTENSION_GRACE_SECONDS;
+
+    return Math.floor(graceSeconds) * 1000;
   }
 
   private createRefreshTokenExpiresAt(): Date {

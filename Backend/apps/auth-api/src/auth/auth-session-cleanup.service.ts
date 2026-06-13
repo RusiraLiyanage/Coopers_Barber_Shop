@@ -37,7 +37,6 @@ export class AuthSessionCleanupService
 
   private async revokeExpiredSessions(): Promise<void> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const revokedCount = await this.sessionService.revokeExpiredSessions();
 
       if (revokedCount > 0) {

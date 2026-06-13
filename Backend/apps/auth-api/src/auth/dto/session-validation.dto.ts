@@ -5,5 +5,5 @@ export class SessionValidationDto {
   @ApiProperty({ example: 'auth-session-id' })
   @IsString()
   @IsNotEmpty()
-  sessionId: string;
+  sessionId!: string;
 }

@@ -44,6 +44,19 @@ export interface LogoutResponse {
   success: boolean;
 }
 
-export interface SessionValidationResponse {
-  active: boolean;
+export const SESSION_IDLE_EXPIRED_CODE = 'SESSION_IDLE_EXPIRED';
+
+export interface ActiveSessionValidationResponse {
+  active: true;
 }
+
+export interface InactiveSessionValidationResponse {
+  active: false;
+  code?: typeof SESSION_IDLE_EXPIRED_CODE;
+  message?: string;
+  canExtend?: boolean;
+}
+
+export type SessionValidationResponse =
+  | ActiveSessionValidationResponse
+  | InactiveSessionValidationResponse;

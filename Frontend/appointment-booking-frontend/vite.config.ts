@@ -25,6 +25,9 @@ const guardOnlyDevServer: Plugin = {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), guardOnlyDevServer],
+  resolve: {
+    dedupe: ['react', 'react-dom'],
+  },
   server: {
     host: '127.0.0.1',
     port: 5173,

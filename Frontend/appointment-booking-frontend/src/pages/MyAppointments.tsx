@@ -1,14 +1,11 @@
 import {
   Alert,
   Button,
-  Card,
   Dropdown,
   Empty,
   List,
   Modal,
   Segmented,
-  Spin,
-  Tag,
   Tabs,
   Typography,
   message,
@@ -45,6 +42,8 @@ import {
   getGenericErrorMessage,
   logDevelopmentError,
 } from '../lib/errors';
+import { SACard, SALoadingPanel, SAModalHeader, SAStatusTag } from '../components/common';
+import './MyAppointments.css';
 
 interface MyAppointmentsProps {
   open: boolean;
@@ -507,58 +506,36 @@ function AppointmentsList({
         const isScheduled = isScheduledAppointment(appointment);
 
         return (
-          <List.Item style={{ padding: '10px 0' }}>
-            <Card
-              style={{ width: '100%', borderRadius: 8 }}
-              styles={{
-                body: {
-                  padding: 24,
-                },
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  gap: 20,
-                  flexWrap: 'wrap',
-                }}
-              >
+          <List.Item className="appointments-list-item">
+            <SACard radius={8} bodyPadding={24}>
+              <div className="appointments-list-card-content">
                 <div>
                   <Typography.Title
                     level={3}
-                    style={{ marginTop: 0, marginBottom: 8 }}
+                    className="appointments-list-card-title"
                   >
                     {appointment.serviceName}
                   </Typography.Title>
                   <Typography.Paragraph
-                    style={{ marginBottom: 10, fontSize: 16, fontWeight: 500 }}
+                    className="appointments-list-card-time"
                   >
                     {formatAppointmentWindow(appointment)}
                   </Typography.Paragraph>
-                  <Typography.Text type="secondary" style={{ fontSize: 16 }}>
+                  <Typography.Text
+                    type="secondary"
+                    className="appointments-list-card-staff"
+                  >
                     Staff: {appointment.staffName}
                   </Typography.Text>
                 </div>
 
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: 8,
-                  }}
-                >
-                  <Tag
+                <div className="appointments-list-card-actions">
+                  <SAStatusTag
                     color={getAppointmentTagColor(appointment.status)}
-                    style={{
-                      alignSelf: 'flex-start',
-                      fontSize: 14,
-                      fontWeight: 600,
-                      padding: '4px 10px',
-                    }}
+                    size="large"
                   >
                     {getAppointmentStatusLabel(appointment.status)}
-                  </Tag>
+                  </SAStatusTag>
 
                   {isScheduled ? (
                     <AppointmentActionsDropdown
@@ -576,7 +553,7 @@ function AppointmentsList({
                   ) : null}
                 </div>
               </div>
-            </Card>
+            </SACard>
           </List.Item>
         );
       }}
@@ -998,14 +975,10 @@ export default function MyAppointments({
   return (
     <Modal
       title={
-        <div>
-          <Typography.Title level={3} style={{ margin: 0 }}>
-            My Appointments
-          </Typography.Title>
-          <Typography.Text type="secondary">
-            Upcoming bookings linked to your current account.
-          </Typography.Text>
-        </div>
+        <SAModalHeader
+          title="My Appointments"
+          subtitle="Upcoming bookings linked to your current account."
+        />
       }
       open={open}
       onCancel={onClose}
@@ -1054,9 +1027,7 @@ export default function MyAppointments({
           showIcon
         />
       ) : loading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-          <Spin size="large" />
-        </div>
+        <SALoadingPanel />
       ) : error ? (
         <Alert type="error" message={error} showIcon />
       ) : viewMode === 'calendar' ? (
@@ -1082,7 +1053,7 @@ export default function MyAppointments({
             {
               key: 'today',
               label: (
-                <span style={{ fontSize: 16, fontWeight: 600 }}>
+                <span className="appointments-tab-label">
                   Today ({todaysAppointments.length})
                 </span>
               ),
@@ -1095,7 +1066,7 @@ export default function MyAppointments({
             {
               key: 'scheduled',
               label: (
-                <span style={{ fontSize: 16, fontWeight: 600 }}>
+                <span className="appointments-tab-label">
                   Scheduled ({scheduledOtherAppointments.length})
                 </span>
               ),
@@ -1108,7 +1079,7 @@ export default function MyAppointments({
             {
               key: 'cancelled',
               label: (
-                <span style={{ fontSize: 16, fontWeight: 600 }}>
+                <span className="appointments-tab-label">
                   Cancelled ({cancelledAppointments.length})
                 </span>
               ),
