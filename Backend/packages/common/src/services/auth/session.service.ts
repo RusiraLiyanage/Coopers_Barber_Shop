@@ -5,6 +5,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { AuthSession } from '@coopers/entities';
 import type { Repository } from 'typeorm';
 
+const DEFAULT_SESSION_IDLE_TIMEOUT_SECONDS = 10 * 60;
+
 type CreateAuthSessionInput = {
   userId: string;
   refreshToken: string;
@@ -24,12 +26,13 @@ export class SessionService {
   ) {}
 
   async createSession(input: CreateAuthSessionInput): Promise<AuthSession> {
+    const now = new Date();
     const session = this.sessionsRepo.create({
       user: { id: input.userId },
       refreshTokenHash: this.hashRefreshToken(input.refreshToken),
       expiresAt: this.createRefreshTokenExpiresAt(), // expires in 14 days
       revokedAt: null,
-      lastUsedAt: null,
+      lastUsedAt: now,
     });
 
     return this.sessionsRepo.save(session);
@@ -45,8 +48,15 @@ export class SessionService {
       },
     });
 
-    if (!session || session.revokedAt || session.expiresAt <= new Date()) {
+    const now = new Date();
+
+    if (!session || this.isSessionExpired(session, now)) {
       throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    if (this.isSessionIdleExpired(session, now)) {
+      await this.revokeSessionById(session.id, now);
+      throw new UnauthorizedException('Session expired due to inactivity');
     }
 
     return session;
@@ -65,9 +75,20 @@ export class SessionService {
       },
     });
 
-    return Boolean(
-      session && !session.revokedAt && session.expiresAt > new Date(),
-    );
+    const now = new Date();
+
+    if (!session || this.isSessionExpired(session, now)) {
+      return false;
+    }
+
+    if (this.isSessionIdleExpired(session, now)) {
+      await this.revokeSessionById(session.id, now);
+      return false;
+    }
+
+    await this.markSessionUsed(session.id);
+
+    return true;
   }
 
   async revokeSession(refreshToken: string): Promise<void> {
@@ -115,6 +136,40 @@ export class SessionService {
 
   private hashRefreshToken(refreshToken: string): string {
     return createHash('sha256').update(refreshToken).digest('hex');
+  }
+
+  private isSessionExpired(session: AuthSession, now: Date): boolean {
+    return Boolean(session.revokedAt || session.expiresAt <= now);
+  }
+
+  private isSessionIdleExpired(session: AuthSession, now: Date): boolean {
+    const lastActivityAt = session.lastUsedAt ?? session.createdAt;
+    const idleForMs = now.getTime() - lastActivityAt.getTime();
+
+    return idleForMs >= this.getSessionIdleTimeoutMs();
+  }
+
+  private async revokeSessionById(
+    sessionId: string,
+    revokedAt = new Date(),
+  ): Promise<void> {
+    await this.sessionsRepo.update(sessionId, {
+      revokedAt,
+    });
+  }
+
+  private getSessionIdleTimeoutMs(): number {
+    const configuredTimeoutSeconds = Number(
+      this.configService.get<string>('SESSION_IDLE_TIMEOUT_SECONDS') ??
+        DEFAULT_SESSION_IDLE_TIMEOUT_SECONDS,
+    );
+
+    const timeoutSeconds =
+      Number.isFinite(configuredTimeoutSeconds) && configuredTimeoutSeconds > 0
+        ? configuredTimeoutSeconds
+        : DEFAULT_SESSION_IDLE_TIMEOUT_SECONDS;
+
+    return Math.floor(timeoutSeconds) * 1000;
   }
 
   private createRefreshTokenExpiresAt(): Date {
