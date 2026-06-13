@@ -6,7 +6,7 @@ import {
   ensureNodeCryptoGlobal,
 } from '@coopers/common';
 
-ensureNodeCryptoGlobal();
+ensureNodeCryptoGlobal(); // uuid needs crypto
 
 async function bootstrap() {
   const [{ NestFactory }, { AppModule }] = await Promise.all([

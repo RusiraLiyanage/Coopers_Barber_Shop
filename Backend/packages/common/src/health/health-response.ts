@@ -18,6 +18,6 @@ export function createHealthResponse(service: string): HealthResponse {
     status: 'ok',
     environment: getAppEnvironment(),
     timestamp: new Date().toISOString(),
-    uptimeSeconds: Math.floor(process.uptime()),
+    uptimeSeconds: Math.floor(process.uptime()), // process is from the node js object
   };
 }

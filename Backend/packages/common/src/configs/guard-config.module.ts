@@ -5,4 +5,4 @@ import { GuardConfigService } from './guard.config';
   providers: [GuardConfigService],
   exports: [GuardConfigService],
 })
-export class GuardConfigModule {}
+export class GuardConfigModule {} // to be imported by the guard module, booking guard app.module

@@ -9,7 +9,7 @@ import { PublicProxyController } from './public-proxy.controller';
 import { ProxyService } from './proxy.service';
 
 @Module({
-  imports: [GuardConfigModule, GuardAuthenticationModule],
+  imports: [GuardConfigModule, GuardAuthenticationModule], // booking guard needs the environment configurations
   controllers: [
     AccountProxyController,
     PublicProxyController,

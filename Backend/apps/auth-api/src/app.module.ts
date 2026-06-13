@@ -11,7 +11,7 @@ import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot(createAppConfigOptions()),
+    ConfigModule.forRoot(createAppConfigOptions()), // configuration key and values are injected into the App Module
     ApiRateLimitModule.forRoot(),
     DatabaseModule.forRoot(),
     AuthModule,

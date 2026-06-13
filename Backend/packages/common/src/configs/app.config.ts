@@ -28,6 +28,7 @@ export const getAppEnvironment = (): AppEnvironment => {
   return env as AppEnvironment;
 };
 
+// will provde the data to the application
 export const createAppConfigOptions = (): ConfigModuleOptions => ({
   isGlobal: true,
   envFilePath: [`.env.${getAppEnvironment()}`],

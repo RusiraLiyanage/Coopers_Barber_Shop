@@ -6,7 +6,7 @@ import {
   GuardConfigService,
 } from '@coopers/common';
 
-ensureNodeCryptoGlobal();
+ensureNodeCryptoGlobal(); // UUID needs crypto
 
 async function bootstrap() {
   const [{ NestFactory }, { AppModule }] = await Promise.all([

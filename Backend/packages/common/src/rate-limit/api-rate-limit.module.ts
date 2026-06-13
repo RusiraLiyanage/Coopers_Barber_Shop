@@ -10,7 +10,7 @@ import {
 export const DEFAULT_RATE_LIMIT_TTL_SECONDS = 300;
 export const DEFAULT_RATE_LIMIT_MAX_REQUESTS = 10;
 
-// only 10 requests per 300 seconds are allowed.
+// only 10 requests per 300 seconds are allowed. --> this rate limiting approach is to disallow brute force attacks
 
 type RateLimitConfigValue = string | number | undefined;
 

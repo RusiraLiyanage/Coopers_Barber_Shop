@@ -9,10 +9,11 @@ export type ApiSecurityOptions = {
   helmet?: HelmetOptions;
 };
 
+// there might be a time multiple frontend urls are passed
 function parseFrontendOrigins(frontendUrl: string): string | string[] {
   const origins = frontendUrl
     .split(',')
-    .map((origin) => origin.trim())
+    .map((origin) => origin.trim()) // no spaces in the values
     .filter(Boolean); // this will remove the empty values from the array
 
   return origins.length === 1 ? origins[0] : origins;
@@ -37,7 +38,7 @@ export function configureApiSecurity(
     app.enableCors();
   }
 
-  app.use(helmet(options.helmet)); // helmet is the xss protection layer
+  app.use(helmet(options.helmet)); // adds browser security headers to HTTP responses.
   app.useGlobalFilters(new AllExceptionsFilter()); // all exception filter --> HTTP exceptions will have a message while others have internal error message
   app.useGlobalPipes(createGlobalValidationPipe()); // validation pipeline for DTO validation
 }

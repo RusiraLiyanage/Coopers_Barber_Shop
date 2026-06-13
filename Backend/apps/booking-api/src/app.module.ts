@@ -16,8 +16,8 @@ import { HealthController } from './health.controller';
 
 @Module({
   imports: [
-    ConfigModule.forRoot(createAppConfigOptions()),
-    ApiRateLimitModule.forRoot(),
+    ConfigModule.forRoot(createAppConfigOptions()), // configuration key and values are injected into the App Module
+    ApiRateLimitModule.forRoot(), // adding rate limitor to the application
     DatabaseModule.forRoot(),
     UsersModule,
     AuthModule,
