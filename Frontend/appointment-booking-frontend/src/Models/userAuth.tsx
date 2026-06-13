@@ -31,6 +31,7 @@ interface UserAuthModalProps {
   sessionExpired?: boolean;
   onClose: () => void;
   onExtendSession?: () => Promise<void>;
+  onSessionLogout?: () => void;
   onAuthSuccess: (session: AuthSession) => void;
 }
 
@@ -84,10 +85,12 @@ export default function UserAuthModal({
   sessionExpired = false,
   onClose,
   onExtendSession,
+  onSessionLogout,
   onAuthSuccess,
 }: UserAuthModalProps) {
   const [confirmLoading, setConfirmLoading] = useState(false);
   const [extendLoading, setExtendLoading] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [passwordResetStep, setPasswordResetStep] =
     useState<PasswordResetStep>("request");
@@ -131,6 +134,16 @@ export default function UserAuthModal({
     } finally {
       setExtendLoading(false);
     }
+  };
+
+  const handleSessionLogout = () => {
+    if (!onSessionLogout) {
+      return;
+    }
+
+    setLogoutLoading(true);
+    onSessionLogout();
+    setLogoutLoading(false);
   };
 
   const moveExistingAccountToLogin = (email: string) => {
@@ -341,6 +354,10 @@ export default function UserAuthModal({
   };
 
   const getModalTitle = () => {
+    if (sessionExpired) {
+      return "Session expired";
+    }
+
     if (isForgotPasswordMode) {
       return "Reset password";
     }
@@ -349,6 +366,10 @@ export default function UserAuthModal({
   };
 
   const getModalSubtitle = () => {
+    if (sessionExpired) {
+      return "Do you want to extend your session or logout?";
+    }
+
     if (!isForgotPasswordMode) {
       return isLoginMode
         ? "Enter your details to continue."
@@ -410,38 +431,66 @@ export default function UserAuthModal({
           </div>
 
           {sessionExpired ? (
-            <Alert
-              type="warning"
-              showIcon
-              message="Session expired"
-              description="Your session has expired due to inactivity. Do you want to extend it?"
-              action={
+            <>
+              <Alert
+                type="warning"
+                showIcon
+                message="Session inactive"
+                description="Your session was paused because there has been no recent activity."
+                style={{ marginBottom: 20 }}
+              />
+
+              {authAlert ? (
+                <Alert
+                  type={authAlert.type}
+                  showIcon
+                  message={authAlert.message}
+                  description={authAlert.description}
+                  style={{ marginBottom: 20 }}
+                />
+              ) : null}
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: 12,
+                  justifyContent: "center",
+                  marginTop: 24,
+                }}
+              >
                 <Button
-                  size="small"
                   type="primary"
+                  size="large"
                   loading={extendLoading}
                   onClick={handleExtendSession}
                 >
                   Extend session
                 </Button>
-              }
-              style={{ marginBottom: 20 }}
-            />
-          ) : null}
+                <Button
+                  size="large"
+                  danger
+                  loading={logoutLoading}
+                  onClick={handleSessionLogout}
+                >
+                  Logout
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              {authAlert ? (
+                <Alert
+                  type={authAlert.type}
+                  showIcon
+                  closable
+                  message={authAlert.message}
+                  description={authAlert.description}
+                  onClose={() => setAuthAlert(null)}
+                  style={{ marginBottom: 20 }}
+                />
+              ) : null}
 
-          {authAlert ? (
-            <Alert
-              type={authAlert.type}
-              showIcon
-              closable
-              message={authAlert.message}
-              description={authAlert.description}
-              onClose={() => setAuthAlert(null)}
-              style={{ marginBottom: 20 }}
-            />
-          ) : null}
-
-          {isForgotPasswordMode ? (
+              {isForgotPasswordMode ? (
             <Form
               name="Password Reset Form"
               form={passwordResetForm}
@@ -569,7 +618,7 @@ export default function UserAuthModal({
                 </Button>
               ) : null}
             </Form>
-          ) : isLoginMode ? (
+              ) : isLoginMode ? (
             <Form
               name="Login Form"
               form={loginForm}
@@ -633,7 +682,7 @@ export default function UserAuthModal({
                 Log in
               </Button>
             </Form>
-          ) : (
+              ) : (
             <Form
               name="Register Form"
               form={registerForm}
@@ -758,9 +807,9 @@ export default function UserAuthModal({
                 Sign up
               </Button>
             </Form>
-          )}
+              )}
 
-          <div style={{ textAlign: "center", marginTop: 20 }}>
+              <div style={{ textAlign: "center", marginTop: 20 }}>
             {isForgotPasswordMode ? (
               <>
                 <Typography.Text type="secondary">
@@ -792,7 +841,9 @@ export default function UserAuthModal({
                 </Typography.Link>
               </>
             )}
-          </div>
+              </div>
+            </>
+          )}
         </div>
       </Modal>
     </>

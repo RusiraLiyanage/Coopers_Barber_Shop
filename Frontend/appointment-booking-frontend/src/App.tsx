@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Layout } from "antd";
-import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import HeaderNav from "./components/HeaderNav";
-import Home from "./pages/HomePage";
-import MyAppointments from "./pages/MyAppointments";
-import MyAccount from "./pages/MyAccount";
-import UserAuthModal from "./Models/userAuth";
-import MakeAppointmentModal from "./Models/makeAppointment";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Layout } from 'antd';
+import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import HeaderNav from './components/HeaderNav';
+import Home from './pages/HomePage';
+import MyAppointments from './pages/MyAppointments';
+import MyAccount from './pages/MyAccount';
+import UserAuthModal from './Models/userAuth';
+import MakeAppointmentModal from './Models/makeAppointment';
 import {
   canRestoreClientAuthSession,
   getCurrentSession,
@@ -16,20 +16,20 @@ import {
   toAuthSession,
   type AppointmentRecord,
   type AuthSession,
-} from "./lib/api";
+} from './lib/api';
 
 const { Content, Footer } = Layout;
-const LEGACY_AUTH_TOKEN_KEY = "booking_auth_token";
+const LEGACY_AUTH_TOKEN_KEY = 'booking_auth_token';
 const SESSION_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 const SESSION_ACTIVITY_EVENTS = [
-  "click",
-  "keydown",
-  "mousemove",
-  "scroll",
-  "touchstart",
+  'click',
+  'keydown',
+  'mousemove',
+  'scroll',
+  'touchstart',
 ] as const;
 
-type SessionTimeoutState = "active" | "extend_prompt" | "logged_out";
+type SessionTimeoutFlowState = 'none' | 'extend_prompt' | 'logged_out';
 
 function App() {
   const location = useLocation();
@@ -40,12 +40,12 @@ function App() {
   const [editingAppointment, setEditingAppointment] =
     useState<AppointmentRecord | null>(null);
   const [appointmentsRefreshKey, setAppointmentsRefreshKey] = useState(0);
-  const [sessionTimeoutState, setSessionTimeoutState] =
-    useState<SessionTimeoutState>("active");
+  const [sessionTimeoutFlowState, setSessionTimeoutFlowState] =
+    useState<SessionTimeoutFlowState>('none');
   const sessionLastActivityAtRef = useRef(Date.now());
 
   const isAuthenticated = Boolean(authSession?.authenticated);
-  const isSessionTimeoutActive = sessionTimeoutState !== "active";
+  const isSessionTimeoutPromptOpen = sessionTimeoutFlowState !== 'none';
 
   const setAuthSession = useCallback((session: AuthSession | null) => {
     localStorage.removeItem(LEGACY_AUTH_TOKEN_KEY);
@@ -85,7 +85,7 @@ function App() {
   }, [setAuthSession]);
 
   useEffect(() => {
-    if (!isAuthenticated || isSessionTimeoutActive) {
+    if (!isAuthenticated || isSessionTimeoutPromptOpen) {
       return;
     }
 
@@ -102,10 +102,10 @@ function App() {
         window.clearTimeout(timeoutId);
       }
       setAuthSession(null);
-      setSessionTimeoutState("extend_prompt");
+      setSessionTimeoutFlowState('extend_prompt'); // asking to extend the session
       setOpenAppointmentModal(false);
       setEditingAppointment(null);
-      navigate("/");
+      navigate('/');
       setOpenAuthModal(true);
     };
 
@@ -135,7 +135,7 @@ function App() {
     };
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
+      if (document.visibilityState === 'visible') {
         checkIdleWhenTabReturns();
       }
     };
@@ -143,9 +143,9 @@ function App() {
     SESSION_ACTIVITY_EVENTS.forEach((eventName) => {
       window.addEventListener(eventName, recordActivity, { passive: true });
     });
-    window.addEventListener("focus", checkIdleWhenTabReturns);
-    window.addEventListener("pageshow", checkIdleWhenTabReturns);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener('focus', checkIdleWhenTabReturns);
+    window.addEventListener('pageshow', checkIdleWhenTabReturns);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     sessionLastActivityAtRef.current = Date.now();
     scheduleIdleCheck();
 
@@ -156,17 +156,17 @@ function App() {
       SESSION_ACTIVITY_EVENTS.forEach((eventName) => {
         window.removeEventListener(eventName, recordActivity);
       });
-      window.removeEventListener("focus", checkIdleWhenTabReturns);
-      window.removeEventListener("pageshow", checkIdleWhenTabReturns);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener('focus', checkIdleWhenTabReturns);
+      window.removeEventListener('pageshow', checkIdleWhenTabReturns);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isAuthenticated, isSessionTimeoutActive, navigate, setAuthSession]);
+  }, [isAuthenticated, isSessionTimeoutPromptOpen, navigate, setAuthSession]);
 
   const handleLogout = () => {
-    setSessionTimeoutState("active");
+    setSessionTimeoutFlowState('none'); // no need to show the extend prompt
     setAuthSession(null);
     setEditingAppointment(null);
-    navigate("/");
+    navigate('/');
 
     void logout().catch(() => undefined);
   };
@@ -176,7 +176,7 @@ function App() {
 
     sessionLastActivityAtRef.current = Date.now();
     setAuthSession(toAuthSession(session));
-    setSessionTimeoutState("active");
+    setSessionTimeoutFlowState('none');
     setOpenAuthModal(false);
   };
 
@@ -191,12 +191,12 @@ function App() {
   };
 
   return (
-    <Layout style={{ minHeight: "100vh" }}>
+    <Layout style={{ minHeight: '100vh' }}>
       <HeaderNav
         isAuthenticated={isAuthenticated}
         onLogout={handleLogout}
         onOpenAuthModal={() => setOpenAuthModal(true)}
-        onOpenMyAccount={() => navigate("/account")}
+        onOpenMyAccount={() => navigate('/account')}
         onOpenAppointmentModal={() => {
           setEditingAppointment(null);
           setOpenAppointmentModal(true);
@@ -220,10 +220,10 @@ function App() {
         </Routes>
 
         <MyAppointments
-          open={location.pathname === "/appointments"}
+          open={location.pathname === '/appointments'}
           authSession={authSession}
           refreshKey={appointmentsRefreshKey}
-          onClose={() => navigate("/")}
+          onClose={() => navigate('/')}
           onMakeAppointment={openBookingFlow}
           onUpdateAppointment={(appointment) => {
             setEditingAppointment(appointment);
@@ -232,21 +232,22 @@ function App() {
         />
 
         <MyAccount
-          open={location.pathname === "/account"}
+          open={location.pathname === '/account'}
           authSession={authSession}
-          onClose={() => navigate("/")}
+          onClose={() => navigate('/')}
         />
       </Content>
 
       <UserAuthModal
         open={openAuthModal}
-        sessionExpired={isSessionTimeoutActive}
+        sessionExpired={isSessionTimeoutPromptOpen}
         onClose={() => setOpenAuthModal(false)}
         onExtendSession={handleExtendSession}
+        onSessionLogout={handleLogout}
         onAuthSuccess={(session) => {
           sessionLastActivityAtRef.current = Date.now();
           setAuthSession(session);
-          setSessionTimeoutState("active");
+          setSessionTimeoutFlowState('none'); // none means no need to show the extend screen
           setOpenAuthModal(false);
           setEditingAppointment(null);
           setOpenAppointmentModal(true);
@@ -265,11 +266,11 @@ function App() {
           setOpenAppointmentModal(false);
           setEditingAppointment(null);
           setAppointmentsRefreshKey((current) => current + 1);
-          navigate("/appointments");
+          navigate('/appointments');
         }}
       />
 
-      <Footer style={{ textAlign: "center" }}>
+      <Footer style={{ textAlign: 'center' }}>
         ©2025 Cooper's Barber Shop | All Rights Reserved
       </Footer>
     </Layout>
