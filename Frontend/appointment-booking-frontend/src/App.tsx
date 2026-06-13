@@ -20,8 +20,8 @@ import {
 
 const { Content, Footer } = Layout;
 const LEGACY_AUTH_TOKEN_KEY = 'booking_auth_token';
-const SESSION_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
-const SESSION_EXTENSION_GRACE_MS = 5 * 60 * 1000;
+const DEFAULT_SESSION_IDLE_TIMEOUT_SECONDS = 5 * 60;
+const DEFAULT_SESSION_EXTENSION_GRACE_SECONDS = 5 * 60;
 const SESSION_ACTIVITY_EVENTS = [
   'click',
   'keydown',
@@ -31,6 +31,26 @@ const SESSION_ACTIVITY_EVENTS = [
 ] as const;
 
 type SessionTimeoutFlowState = 'none' | 'extend_prompt' | 'logged_out';
+
+function getPositiveEnvNumber(value: unknown, fallback: number): number {
+  const parsedValue = typeof value === 'number' ? value : Number(value);
+
+  return Number.isFinite(parsedValue) && parsedValue > 0
+    ? Math.floor(parsedValue)
+    : fallback;
+}
+
+const SESSION_IDLE_TIMEOUT_MS =
+  getPositiveEnvNumber(
+    import.meta.env.VITE_SESSION_IDLE_TIMEOUT_SECONDS,
+    DEFAULT_SESSION_IDLE_TIMEOUT_SECONDS,
+  ) * 1000;
+
+const SESSION_EXTENSION_GRACE_MS =
+  getPositiveEnvNumber(
+    import.meta.env.VITE_SESSION_EXTENSION_GRACE_SECONDS,
+    DEFAULT_SESSION_EXTENSION_GRACE_SECONDS,
+  ) * 1000;
 
 function App() {
   const location = useLocation();
