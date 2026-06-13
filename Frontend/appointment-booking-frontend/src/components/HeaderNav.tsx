@@ -29,8 +29,7 @@ export default function HeaderNav({
 
   const handleNavClick = (e: { key: string }) => {
     if (e.key === "create") {
-      if (!isAuthenticated) onOpenAuthModal();
-      else onOpenAppointmentModal();
+      onOpenAppointmentModal();
     }
 
     if (e.key === "appointments") {
@@ -84,7 +83,11 @@ export default function HeaderNav({
           items={navItems}
           onClick={handleNavClick}
           selectedKeys={
-            location.pathname === "/appointments" ? ["appointments"] : []
+            location.pathname === "/appointments"
+              ? ["appointments"]
+              : location.pathname === "/new-appointment"
+                ? ["create"]
+                : []
           }
           style={{
             flex: 1,

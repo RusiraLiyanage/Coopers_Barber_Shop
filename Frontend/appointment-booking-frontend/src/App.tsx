@@ -20,6 +20,8 @@ import {
 
 const { Content, Footer } = Layout;
 const LEGACY_AUTH_TOKEN_KEY = 'booking_auth_token';
+const SESSION_TIMEOUT_DEADLINE_STORAGE_KEY =
+  'coopers_session_timeout_deadline_at';
 const DEFAULT_SESSION_IDLE_TIMEOUT_SECONDS = 5 * 60;
 const DEFAULT_SESSION_EXTENSION_GRACE_SECONDS = 5 * 60;
 const SESSION_ACTIVITY_EVENTS = [
@@ -52,10 +54,53 @@ const SESSION_EXTENSION_GRACE_MS =
     DEFAULT_SESSION_EXTENSION_GRACE_SECONDS,
   ) * 1000;
 
+function getStoredSessionTimeoutDeadline(): number | null {
+  try {
+    const storedValue = window.sessionStorage.getItem(
+      SESSION_TIMEOUT_DEADLINE_STORAGE_KEY,
+    );
+    const parsedValue = Number(storedValue);
+
+    return Number.isFinite(parsedValue) && parsedValue > 0
+      ? parsedValue
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeSessionTimeoutDeadline(deadlineAt: number): void {
+  try {
+    window.sessionStorage.setItem(
+      SESSION_TIMEOUT_DEADLINE_STORAGE_KEY,
+      String(deadlineAt),
+    );
+  } catch {
+    return;
+  }
+}
+
+function clearSessionTimeoutDeadline(): void {
+  try {
+    window.sessionStorage.removeItem(SESSION_TIMEOUT_DEADLINE_STORAGE_KEY);
+  } catch {
+    return;
+  }
+}
+
+function createSessionTimeoutDeadline(): number {
+  const deadlineAt = Date.now() + SESSION_EXTENSION_GRACE_MS;
+
+  storeSessionTimeoutDeadline(deadlineAt);
+
+  return deadlineAt;
+}
+
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const [authSession, setAuthSessionState] = useState<AuthSession | null>(null);
+  const [authSessionResolved, setAuthSessionResolved] = useState(false);
   const [openAuthModal, setOpenAuthModal] = useState(false);
   const [openAppointmentModal, setOpenAppointmentModal] = useState(false);
   const [editingAppointment, setEditingAppointment] =
@@ -68,6 +113,9 @@ function App() {
 
   const isAuthenticated = Boolean(authSession?.authenticated);
   const isSessionTimeoutPromptOpen = sessionTimeoutFlowState !== 'none';
+  const isNewAppointmentRoute = location.pathname === '/new-appointment';
+  const isAppointmentModalOpen =
+    openAppointmentModal || (isNewAppointmentRoute && isAuthenticated);
 
   const setAuthSession = useCallback((session: AuthSession | null) => {
     localStorage.removeItem(LEGACY_AUTH_TOKEN_KEY);
@@ -80,6 +128,7 @@ function App() {
     }
 
     sessionTimeoutLogoutInProgressRef.current = true;
+    clearSessionTimeoutDeadline();
     setSessionTimeoutFlowState('logged_out');
     setAuthSession(null);
     setEditingAppointment(null);
@@ -96,6 +145,26 @@ function App() {
 
   useEffect(() => {
     let isMounted = true;
+    const sessionTimeoutDeadline = getStoredSessionTimeoutDeadline();
+
+    if (sessionTimeoutDeadline !== null) {
+      setAuthSession(null);
+      setAuthSessionResolved(true);
+      setOpenAppointmentModal(false);
+      setEditingAppointment(null);
+      navigate('/');
+      setOpenAuthModal(true);
+
+      if (sessionTimeoutDeadline <= Date.now()) {
+        void revokeTimedOutSession().catch(() => undefined);
+      } else {
+        setSessionTimeoutFlowState('extend_prompt');
+      }
+
+      return () => {
+        isMounted = false;
+      };
+    }
 
     if (!canRestoreClientAuthSession()) {
       if (shouldClearStaleClientAuthSession()) {
@@ -103,6 +172,7 @@ function App() {
       }
 
       setAuthSession(null);
+      setAuthSessionResolved(true);
 
       return () => {
         isMounted = false;
@@ -119,12 +189,35 @@ function App() {
         if (isMounted) {
           setAuthSession(null);
         }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setAuthSessionResolved(true);
+        }
       });
 
     return () => {
       isMounted = false;
     };
-  }, [setAuthSession]);
+  }, [navigate, revokeTimedOutSession, setAuthSession]);
+
+  useEffect(() => {
+    if (
+      !authSessionResolved ||
+      !isNewAppointmentRoute ||
+      isAuthenticated ||
+      isSessionTimeoutPromptOpen
+    ) {
+      return;
+    }
+
+    setOpenAuthModal(true);
+  }, [
+    authSessionResolved,
+    isAuthenticated,
+    isNewAppointmentRoute,
+    isSessionTimeoutPromptOpen,
+  ]);
 
   useEffect(() => {
     if (!isAuthenticated || isSessionTimeoutPromptOpen) {
@@ -143,6 +236,7 @@ function App() {
       if (timeoutId !== undefined) {
         window.clearTimeout(timeoutId);
       }
+      createSessionTimeoutDeadline();
       setAuthSession(null);
       setSessionTimeoutFlowState('extend_prompt'); // asking to extend the session
       setOpenAppointmentModal(false);
@@ -209,9 +303,18 @@ function App() {
       return;
     }
 
+    const sessionTimeoutDeadline =
+      getStoredSessionTimeoutDeadline() ?? createSessionTimeoutDeadline();
+    const remainingMs = sessionTimeoutDeadline - Date.now();
+
+    if (remainingMs <= 0) {
+      void revokeTimedOutSession().catch(() => undefined);
+      return;
+    }
+
     const graceTimeoutId = window.setTimeout(() => {
       void revokeTimedOutSession().catch(() => undefined);
-    }, SESSION_EXTENSION_GRACE_MS);
+    }, remainingMs);
 
     return () => {
       window.clearTimeout(graceTimeoutId);
@@ -219,6 +322,7 @@ function App() {
   }, [sessionTimeoutFlowState, revokeTimedOutSession]);
 
   const handleLogout = () => {
+    clearSessionTimeoutDeadline();
     setSessionTimeoutFlowState('none'); // no need to show the extend prompt
     setAuthSession(null);
     setEditingAppointment(null);
@@ -232,6 +336,7 @@ function App() {
   };
 
   const handleSessionTimeoutAcknowledged = () => {
+    clearSessionTimeoutDeadline();
     setSessionTimeoutFlowState('none');
     setOpenAuthModal(true);
   };
@@ -240,19 +345,20 @@ function App() {
     const session = await refreshSession();
 
     sessionLastActivityAtRef.current = Date.now();
+    clearSessionTimeoutDeadline();
     setAuthSession(toAuthSession(session));
     setSessionTimeoutFlowState('none');
     setOpenAuthModal(false);
   };
 
   const openBookingFlow = () => {
-    if (isAuthenticated) {
-      setEditingAppointment(null);
-      setOpenAppointmentModal(true);
-      return;
-    }
+    setEditingAppointment(null);
+    setOpenAppointmentModal(false);
+    navigate('/new-appointment');
 
-    setOpenAuthModal(true);
+    if (!isAuthenticated) {
+      setOpenAuthModal(true);
+    }
   };
 
   return (
@@ -262,10 +368,7 @@ function App() {
         onLogout={handleLogout}
         onOpenAuthModal={() => setOpenAuthModal(true)}
         onOpenMyAccount={() => navigate('/account')}
-        onOpenAppointmentModal={() => {
-          setEditingAppointment(null);
-          setOpenAppointmentModal(true);
-        }}
+        onOpenAppointmentModal={openBookingFlow}
       />
 
       <Content style={{ paddingTop: 64 }}>
@@ -280,6 +383,10 @@ function App() {
           />
           <Route
             path="/account"
+            element={<Home onMakeAppointment={openBookingFlow} />}
+          />
+          <Route
+            path="/new-appointment"
             element={<Home onMakeAppointment={openBookingFlow} />}
           />
         </Routes>
@@ -312,21 +419,24 @@ function App() {
         onSessionTimeoutAcknowledged={handleSessionTimeoutAcknowledged}
         onAuthSuccess={(session) => {
           sessionLastActivityAtRef.current = Date.now();
+          clearSessionTimeoutDeadline();
           setAuthSession(session);
           setSessionTimeoutFlowState('none'); // none means no need to show the extend screen
           setOpenAuthModal(false);
           setEditingAppointment(null);
-          setOpenAppointmentModal(true);
         }}
       />
 
       <MakeAppointmentModal
-        open={openAppointmentModal}
+        open={isAppointmentModalOpen}
         authSession={authSession}
         editingAppointment={editingAppointment}
         onClose={() => {
           setOpenAppointmentModal(false);
           setEditingAppointment(null);
+          if (isNewAppointmentRoute) {
+            navigate('/');
+          }
         }}
         onBooked={() => {
           setOpenAppointmentModal(false);

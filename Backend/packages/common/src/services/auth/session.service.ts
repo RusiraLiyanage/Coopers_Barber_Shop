@@ -50,7 +50,12 @@ export class SessionService {
 
     const now = new Date();
 
-    if (!session || this.isSessionExpired(session, now)) {
+    if (!session) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    if (this.isSessionExpired(session, now)) {
+      await this.revokeSessionById(session.id, now);
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
@@ -77,7 +82,12 @@ export class SessionService {
 
     const now = new Date();
 
-    if (!session || this.isSessionExpired(session, now)) {
+    if (!session) {
+      return false;
+    }
+
+    if (this.isSessionExpired(session, now)) {
+      await this.revokeSessionById(session.id, now);
       return false;
     }
 
@@ -118,6 +128,27 @@ export class SessionService {
       .execute();
   }
 
+  async revokeExpiredSessions(now = new Date()): Promise<number> {
+    const idleCutoff = new Date(now.getTime() - this.getSessionIdleTimeoutMs());
+    const result = await this.sessionsRepo
+      .createQueryBuilder()
+      .update(AuthSession)
+      .set({
+        revokedAt: now,
+      })
+      .where('revoked_at IS NULL')
+      .andWhere(
+        '(expires_at <= :now OR COALESCE(last_used_at, created_at) <= :idleCutoff)',
+        {
+          now,
+          idleCutoff,
+        },
+      )
+      .execute();
+
+    return result.affected ?? 0;
+  }
+
   async rotateSession(input: RotateAuthSessionInput): Promise<AuthSession> {
     const currentSession = await this.findActiveSession(
       input.currentRefreshToken,
@@ -153,9 +184,15 @@ export class SessionService {
     sessionId: string,
     revokedAt = new Date(),
   ): Promise<void> {
-    await this.sessionsRepo.update(sessionId, {
-      revokedAt,
-    });
+    await this.sessionsRepo
+      .createQueryBuilder()
+      .update(AuthSession)
+      .set({
+        revokedAt,
+      })
+      .where('id = :sessionId', { sessionId })
+      .andWhere('revoked_at IS NULL')
+      .execute();
   }
 
   private getSessionIdleTimeoutMs(): number {

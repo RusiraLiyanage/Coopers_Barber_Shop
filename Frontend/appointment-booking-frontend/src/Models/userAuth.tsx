@@ -439,7 +439,8 @@ export default function UserAuthModal({
         closable={!isSessionTimeoutMode}
         maskClosable={!isSessionTimeoutMode}
         keyboard={!isSessionTimeoutMode}
-        style={{ top: 72 }}
+        centered={isSessionTimeoutMode}
+        style={isSessionTimeoutMode ? undefined : { top: 72 }}
         footer={null}
         width={560}
         styles={{

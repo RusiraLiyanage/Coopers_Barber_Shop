@@ -13,6 +13,7 @@ import { AuthSession, PasswordResetToken } from '@coopers/entities';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { AuthSessionCleanupService } from './auth-session-cleanup.service';
 import { LocalStrategy } from './strategies/local.strategy';
 
 function getAccessTokenTtlSeconds(config: ConfigService): number {
@@ -49,6 +50,7 @@ function getAccessTokenTtlSeconds(config: ConfigService): number {
     PasswordService,
     JwtTokenService,
     SessionService,
+    AuthSessionCleanupService,
   ],
   exports: [AuthService],
 })
