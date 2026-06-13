@@ -9,16 +9,21 @@ import UserAuthModal from './Models/userAuth';
 import MakeAppointmentModal from './Models/makeAppointment';
 import {
   canRestoreClientAuthSession,
-  extendSession,
-  getCurrentSession,
   isSessionIdleExpiredError,
-  logout,
   SESSION_IDLE_EXPIRED_EVENT,
   shouldClearStaleClientAuthSession,
   toAuthSession,
   type AppointmentRecord,
   type AuthSession,
 } from './lib/api';
+import { useAppDispatch, useAppSelector } from './store/hooks';
+import {
+  extendSessionAction,
+  getCurrentSessionAction,
+  logoutAction,
+} from './store/auth/action';
+import { selectAuthSession } from './store/auth/selector';
+import { setAuthSession as setAuthSessionStore } from './store/auth/slice';
 import './App.css';
 
 const { Content, Footer } = Layout;
@@ -27,9 +32,10 @@ const LEGACY_AUTH_TOKEN_KEY = 'booking_auth_token';
 type SessionTimeoutFlowState = 'none' | 'extend_prompt' | 'logged_out';
 
 function App() {
+  const dispatch = useAppDispatch();
   const location = useLocation();
   const navigate = useNavigate();
-  const [authSession, setAuthSessionState] = useState<AuthSession | null>(null);
+  const authSession = useAppSelector(selectAuthSession);
   const [authSessionResolved, setAuthSessionResolved] = useState(false);
   const [openAuthModal, setOpenAuthModal] = useState(false);
   const [openAppointmentModal, setOpenAppointmentModal] = useState(false);
@@ -45,10 +51,13 @@ function App() {
   const isAppointmentModalOpen =
     openAppointmentModal || (isNewAppointmentRoute && isAuthenticated);
 
-  const setAuthSession = useCallback((session: AuthSession | null) => {
-    localStorage.removeItem(LEGACY_AUTH_TOKEN_KEY);
-    setAuthSessionState(session);
-  }, []);
+  const setAuthSession = useCallback(
+    (session: AuthSession | null) => {
+      localStorage.removeItem(LEGACY_AUTH_TOKEN_KEY);
+      dispatch(setAuthSessionStore(session));
+    },
+    [dispatch],
+  );
 
   const showSessionExtensionPrompt = useCallback(() => {
     setAuthSession(null);
@@ -64,7 +73,9 @@ function App() {
 
     if (!canRestoreClientAuthSession()) {
       if (shouldClearStaleClientAuthSession()) {
-        void logout().catch(() => undefined);
+        void dispatch(logoutAction())
+          .unwrap()
+          .catch(() => undefined);
       }
 
       setAuthSession(null);
@@ -75,7 +86,8 @@ function App() {
       };
     }
 
-    getCurrentSession()
+    dispatch(getCurrentSessionAction())
+      .unwrap()
       .then((session) => {
         if (isMounted) {
           setAuthSession(toAuthSession(session));
@@ -102,7 +114,7 @@ function App() {
     return () => {
       isMounted = false;
     };
-  }, [setAuthSession, showSessionExtensionPrompt]);
+  }, [dispatch, setAuthSession, showSessionExtensionPrompt]);
 
   useEffect(() => {
     const handleSessionIdleExpired = () => {
@@ -146,7 +158,9 @@ function App() {
     setEditingAppointment(null);
     navigate('/');
 
-    void logout().catch(() => undefined);
+    void dispatch(logoutAction())
+      .unwrap()
+      .catch(() => undefined);
   };
 
   const handleSessionTimeoutLogout = async () => {
@@ -157,7 +171,9 @@ function App() {
     navigate('/');
     setOpenAuthModal(true);
 
-    await logout().catch(() => undefined);
+    await dispatch(logoutAction())
+      .unwrap()
+      .catch(() => undefined);
   };
 
   const handleSessionTimeoutAcknowledged = () => {
@@ -166,7 +182,7 @@ function App() {
   };
 
   const handleExtendSession = async () => {
-    const session = await extendSession();
+    const session = await dispatch(extendSessionAction()).unwrap();
 
     setAuthSession(toAuthSession(session));
     setSessionTimeoutFlowState('none');
@@ -185,7 +201,7 @@ function App() {
       }
 
       try {
-        const session = await getCurrentSession();
+        const session = await dispatch(getCurrentSessionAction()).unwrap();
 
         setAuthSession(toAuthSession(session));
         action();
@@ -205,6 +221,7 @@ function App() {
     [
       isAuthenticated,
       isSessionTimeoutPromptOpen,
+      dispatch,
       navigate,
       setAuthSession,
       showSessionExtensionPrompt,

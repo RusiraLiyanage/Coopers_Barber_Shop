@@ -32,8 +32,6 @@ import {
   type ReactNode,
 } from 'react';
 import {
-  cancelAppointment,
-  getAppointments,
   isSessionIdleExpiredError,
   type AppointmentRecord,
   type AuthSession,
@@ -49,6 +47,17 @@ import {
   SAModalHeader,
   SAStatusTag,
 } from '../components/common';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import {
+  cancelAppointmentAction,
+  getAppointmentsAction,
+} from '../store/appointments/action';
+import {
+  selectAppointmentCancelling,
+  selectAppointments,
+  selectAppointmentsLoading,
+} from '../store/appointments/selector';
+import { clearAppointments } from '../store/appointments/slice';
 import './MyAppointments.css';
 
 interface MyAppointmentsProps {
@@ -775,8 +784,10 @@ export default function MyAppointments({
   onMakeAppointment,
   onUpdateAppointment,
 }: MyAppointmentsProps) {
-  const [appointments, setAppointments] = useState<AppointmentRecord[]>([]);
-  const [loading, setLoading] = useState(false);
+  const dispatch = useAppDispatch();
+  const appointments = useAppSelector(selectAppointments);
+  const loading = useAppSelector(selectAppointmentsLoading);
+  const isCancellingAppointment = useAppSelector(selectAppointmentCancelling);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<AppointmentViewMode>('cards');
   const [calendarView, setCalendarView] = useState<View>('month');
@@ -786,7 +797,6 @@ export default function MyAppointments({
     useState<AppointmentTabKey>('today');
   const [appointmentPendingCancellation, setAppointmentPendingCancellation] =
     useState<AppointmentRecord | null>(null);
-  const [isCancellingAppointment, setIsCancellingAppointment] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();
   const hasInitializedCalendarDateRef = useRef(false);
   const calendarPanelClassName = [
@@ -835,18 +845,15 @@ export default function MyAppointments({
     }
 
     if (!authSession) {
-      setAppointments([]);
+      dispatch(clearAppointments());
       setError(null);
       return;
     }
 
-    setLoading(true);
     setError(null);
 
-    getAppointments()
-      .then((response) => {
-        setAppointments(response);
-      })
+    dispatch(getAppointmentsAction())
+      .unwrap()
       .catch((fetchError: unknown) => {
         if (isSessionIdleExpiredError(fetchError)) {
           return;
@@ -854,11 +861,8 @@ export default function MyAppointments({
 
         logDevelopmentError('Load appointments', fetchError);
         setError(GENERIC_ERROR_MESSAGE);
-      })
-      .finally(() => {
-        setLoading(false);
       });
-  }, [authSession, open, refreshKey]);
+  }, [authSession, dispatch, open, refreshKey]);
 
   useEffect(() => {
     if (
@@ -933,20 +937,10 @@ export default function MyAppointments({
       return;
     }
 
-    setIsCancellingAppointment(true);
-
     try {
-      const cancelledAppointment = await cancelAppointment(
-        appointmentPendingCancellation.id,
-      );
-
-      setAppointments((currentAppointments) =>
-        currentAppointments.map((currentAppointment) =>
-          currentAppointment.id === cancelledAppointment.id
-            ? cancelledAppointment
-            : currentAppointment,
-        ),
-      );
+      await dispatch(
+        cancelAppointmentAction(appointmentPendingCancellation.id),
+      ).unwrap();
       setAppointmentPendingCancellation(null);
       messageApi.success('Appointment cancelled successfully');
     } catch (cancelError) {
@@ -957,8 +951,6 @@ export default function MyAppointments({
       messageApi.error(
         getGenericErrorMessage('Cancel appointment', cancelError),
       );
-    } finally {
-      setIsCancellingAppointment(false);
     }
   };
 

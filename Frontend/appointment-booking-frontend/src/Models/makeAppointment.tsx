@@ -2,17 +2,32 @@ import { Button, DatePicker, Form, Modal, Select, Spin, message } from 'antd';
 import { useCallback, useEffect, useState } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 import {
-  createAppointment,
-  getAvailability,
-  getServices,
   isSessionIdleExpiredError,
-  updateAppointment,
   type AppointmentRecord,
   type AuthSession,
-  type ServiceOption,
 } from '../lib/api';
 import { getGenericErrorMessage } from '../lib/errors';
 import { SAModalHeader } from '../components/common';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import {
+  createAppointmentAction,
+  getAppointmentAvailabilityAction,
+  updateAppointmentAction,
+} from '../store/appointments/action';
+import {
+  selectAppointmentAvailabilityLoading,
+  selectAppointmentAvailabilitySlots,
+  selectAppointmentMutating,
+} from '../store/appointments/selector';
+import {
+  clearAvailabilitySlots,
+  setAvailabilitySlots,
+} from '../store/appointments/slice';
+import { getServicesAction } from '../store/services/action';
+import {
+  selectActiveServices,
+  selectServicesLoading,
+} from '../store/services/selector';
 import './makeAppointment.css';
 
 interface MakeAppointmentModalProps {
@@ -99,12 +114,13 @@ export default function MakeAppointmentModal({
   onClose,
   onBooked,
 }: MakeAppointmentModalProps) {
-  const [confirmLoading, setConfirmLoading] = useState(false);
-  const [servicesLoading, setServicesLoading] = useState(false);
-  const [slotsLoading, setSlotsLoading] = useState(false);
+  const dispatch = useAppDispatch();
   const [messageApi, contextHolder] = message.useMessage();
-  const [services, setServices] = useState<ServiceOption[]>([]);
-  const [slots, setSlots] = useState<string[]>([]);
+  const services = useAppSelector(selectActiveServices);
+  const servicesLoading = useAppSelector(selectServicesLoading);
+  const slots = useAppSelector(selectAppointmentAvailabilitySlots);
+  const slotsLoading = useAppSelector(selectAppointmentAvailabilityLoading);
+  const confirmLoading = useAppSelector(selectAppointmentMutating);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [currentSlotPulseKey, setCurrentSlotPulseKey] = useState(0);
   const [form] = Form.useForm<AppointmentFormValues>();
@@ -159,35 +175,36 @@ export default function MakeAppointmentModal({
       appointmentDate: Dayjs,
       preferredSlot?: string,
     ) => {
-      setSlotsLoading(true);
       setSelectedSlot(preferredSlot ?? null);
 
       try {
-        const response = await getAvailability(
-          serviceId,
-          appointmentDate.format('YYYY-MM-DD'),
-          editingAppointment?.id,
-        );
+        const response = await dispatch(
+          getAppointmentAvailabilityAction({
+            serviceId,
+            date: appointmentDate.format('YYYY-MM-DD'),
+            excludeAppointmentId: editingAppointment?.id,
+          }),
+        ).unwrap();
         const nextSlots =
           preferredSlot && !response.includes(preferredSlot)
             ? [preferredSlot, ...response]
             : response;
 
-        setSlots(nextSlots);
+        if (nextSlots !== response) {
+          dispatch(setAvailabilitySlots(nextSlots));
+        }
       } catch (error) {
         if (isSessionIdleExpiredError(error)) {
           return;
         }
 
-        setSlots([]);
+        dispatch(clearAvailabilitySlots());
         messageApi.error(
           getGenericErrorMessage('Load appointment availability', error),
         );
-      } finally {
-        setSlotsLoading(false);
       }
     },
-    [editingAppointment?.id, messageApi],
+    [dispatch, editingAppointment?.id, messageApi],
   );
 
   useEffect(() => {
@@ -196,15 +213,13 @@ export default function MakeAppointmentModal({
     }
 
     form.resetFields();
-    setSlots([]);
+    dispatch(clearAvailabilitySlots());
     setSelectedSlot(null);
     setCurrentSlotPulseKey(0);
-    setServicesLoading(true);
 
-    getServices()
-      .then((response) => {
-        setServices(response.filter((service) => service.isActive));
-
+    dispatch(getServicesAction())
+      .unwrap()
+      .then(() => {
         if (!editingAppointment) {
           return;
         }
@@ -239,12 +254,10 @@ export default function MakeAppointmentModal({
         messageApi.error(
           getGenericErrorMessage('Load appointment services', error),
         );
-      })
-      .finally(() => {
-        setServicesLoading(false);
       });
   }, [
     authSession,
+    dispatch,
     editingAppointment,
     form,
     loadAvailabilityFor,
@@ -262,12 +275,11 @@ export default function MakeAppointmentModal({
     const appointmentDate = form.getFieldValue('appointmentDate');
 
     if (!serviceId || !appointmentDate) {
-      setSlots([]);
+      dispatch(clearAvailabilitySlots());
       setSelectedSlot(null);
       return;
     }
 
-    setSlotsLoading(true);
     setSelectedSlot(null);
 
     await loadAvailabilityFor(serviceId, appointmentDate);
@@ -284,26 +296,31 @@ export default function MakeAppointmentModal({
       return;
     }
 
-    setConfirmLoading(true);
-
     try {
       if (editingAppointment) {
-        await updateAppointment(editingAppointment.id, {
-          date: values.appointmentDate.format('YYYY-MM-DD'),
-          slot: values.appointmentTime,
-        });
+        await dispatch(
+          updateAppointmentAction({
+            appointmentId: editingAppointment.id,
+            data: {
+              date: values.appointmentDate.format('YYYY-MM-DD'),
+              slot: values.appointmentTime,
+            },
+          }),
+        ).unwrap();
         messageApi.success('Appointment updated successfully');
       } else {
-        await createAppointment({
-          serviceId: values.serviceId,
-          date: values.appointmentDate.format('YYYY-MM-DD'),
-          slot: values.appointmentTime,
-        });
+        await dispatch(
+          createAppointmentAction({
+            serviceId: values.serviceId,
+            date: values.appointmentDate.format('YYYY-MM-DD'),
+            slot: values.appointmentTime,
+          }),
+        ).unwrap();
         messageApi.success('Appointment created successfully');
       }
 
       form.resetFields();
-      setSlots([]);
+      dispatch(clearAvailabilitySlots());
       setSelectedSlot(null);
       onBooked();
     } catch (error) {
@@ -317,8 +334,6 @@ export default function MakeAppointmentModal({
           error,
         ),
       );
-    } finally {
-      setConfirmLoading(false);
     }
   };
 

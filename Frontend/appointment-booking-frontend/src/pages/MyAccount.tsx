@@ -1,10 +1,7 @@
 import { Alert, Button, Col, Form, Input, Modal, Row, message } from 'antd';
 import { useEffect, useState } from 'react';
 import {
-  getAccountProfile,
   isSessionIdleExpiredError,
-  refreshSession,
-  updateAccountProfile,
   type AccountProfile,
   type AuthSession,
   type UpdateAccountPayload,
@@ -15,6 +12,18 @@ import {
   SAModalHeader,
   SAStatusTag,
 } from '../components/common';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import {
+  getAccountProfileAction,
+  updateAccountProfileAction,
+} from '../store/account/action';
+import {
+  selectAccountLoading,
+  selectAccountProfile,
+  selectAccountSaving,
+} from '../store/account/selector';
+import { clearAccountProfile } from '../store/account/slice';
+import { refreshSessionAction } from '../store/auth/action';
 import './MyAccount.css';
 
 interface MyAccountProps {
@@ -62,11 +71,12 @@ export default function MyAccount({
   authSession,
   onClose,
 }: MyAccountProps) {
+  const dispatch = useAppDispatch();
   const [form] = Form.useForm<AccountFormValues>();
   const [messageApi, contextHolder] = message.useMessage();
-  const [profile, setProfile] = useState<AccountProfile | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const profile = useAppSelector(selectAccountProfile);
+  const loading = useAppSelector(selectAccountLoading);
+  const saving = useAppSelector(selectAccountSaving);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -75,7 +85,7 @@ export default function MyAccount({
     }
 
     if (!authSession) {
-      setProfile(null);
+      dispatch(clearAccountProfile());
       setError(null);
       form.resetFields();
       return;
@@ -83,16 +93,15 @@ export default function MyAccount({
 
     let isMounted = true;
 
-    setLoading(true);
     setError(null);
 
-    getAccountProfile()
+    dispatch(getAccountProfileAction())
+      .unwrap()
       .then((response) => {
         if (!isMounted) {
           return;
         }
 
-        setProfile(response);
         form.setFieldsValue(toFormValues(response));
       })
       .catch((fetchError: unknown) => {
@@ -106,29 +115,24 @@ export default function MyAccount({
 
         logDevelopmentError('Load account profile', fetchError);
         setError(GENERIC_ERROR_MESSAGE);
-      })
-      .finally(() => {
-        if (isMounted) {
-          setLoading(false);
-        }
       });
 
     return () => {
       isMounted = false;
     };
-  }, [authSession, form, open]);
+  }, [authSession, dispatch, form, open]);
 
   const handleSave = async (values: AccountFormValues) => {
-    setSaving(true);
     setError(null);
 
     try {
-      const updatedProfile = await updateAccountProfile(
-        toUpdatePayload(values),
-      );
+      const updatedProfile = await dispatch(
+        updateAccountProfileAction(toUpdatePayload(values)),
+      ).unwrap();
 
-      await refreshSession().catch(() => undefined);
-      setProfile(updatedProfile);
+      await dispatch(refreshSessionAction())
+        .unwrap()
+        .catch(() => undefined);
       form.setFieldsValue(toFormValues(updatedProfile));
       messageApi.success('Account details updated');
     } catch (saveError) {
@@ -138,8 +142,6 @@ export default function MyAccount({
 
       logDevelopmentError('Update account profile', saveError);
       setError(GENERIC_ERROR_MESSAGE);
-    } finally {
-      setSaving(false);
     }
   };
 
