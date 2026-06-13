@@ -60,6 +60,7 @@ export class ProxyService {
           headers: {
             accept: 'application/json',
             'content-type': 'application/json',
+            'x-internal-gateway-secret': this.guardConfig.internalGatewaySecret,
             ...options.headers,
           },
           body:

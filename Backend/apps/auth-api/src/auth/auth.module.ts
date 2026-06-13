@@ -15,6 +15,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { AuthSessionCleanupService } from './auth-session-cleanup.service';
 import { LocalStrategy } from './strategies/local.strategy';
+import { JwtStrategy } from './strategies/jwt.strategy';
 
 function getAccessTokenTtlSeconds(config: ConfigService): number {
   const configuredTtl = Number(
@@ -47,6 +48,7 @@ function getAccessTokenTtlSeconds(config: ConfigService): number {
   providers: [
     AuthService,
     LocalStrategy,
+    JwtStrategy,
     PasswordService,
     JwtTokenService,
     SessionService,

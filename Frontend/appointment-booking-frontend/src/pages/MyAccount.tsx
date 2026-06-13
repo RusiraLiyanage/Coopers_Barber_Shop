@@ -1,25 +1,21 @@
-import {
-  Alert,
-  Button,
-  Col,
-  Form,
-  Input,
-  Modal,
-  Row,
-  message,
-} from "antd";
-import { useEffect, useState } from "react";
+import { Alert, Button, Col, Form, Input, Modal, Row, message } from 'antd';
+import { useEffect, useState } from 'react';
 import {
   getAccountProfile,
+  isSessionIdleExpiredError,
   refreshSession,
   updateAccountProfile,
   type AccountProfile,
   type AuthSession,
   type UpdateAccountPayload,
-} from "../lib/api";
-import { GENERIC_ERROR_MESSAGE, logDevelopmentError } from "../lib/errors";
-import { SALoadingPanel, SAModalHeader, SAStatusTag } from "../components/common";
-import "./MyAccount.css";
+} from '../lib/api';
+import { GENERIC_ERROR_MESSAGE, logDevelopmentError } from '../lib/errors';
+import {
+  SALoadingPanel,
+  SAModalHeader,
+  SAStatusTag,
+} from '../components/common';
+import './MyAccount.css';
 
 interface MyAccountProps {
   open: boolean;
@@ -38,16 +34,16 @@ type AccountFormValues = {
 const AU_MOBILE_PATTERN = /^(?:\+?61|0)4\d{8}$/;
 
 function normalizeMobileNumber(mobile: string) {
-  return mobile.replace(/[\s-]/g, "");
+  return mobile.replace(/[\s-]/g, '');
 }
 
 function toFormValues(profile: AccountProfile): AccountFormValues {
   return {
     email: profile.email,
-    firstName: profile.firstName ?? "",
-    lastName: profile.lastName ?? "",
-    mobile: profile.mobile ?? "",
-    suburb: profile.suburb ?? "",
+    firstName: profile.firstName ?? '',
+    lastName: profile.lastName ?? '',
+    mobile: profile.mobile ?? '',
+    suburb: profile.suburb ?? '',
   };
 }
 
@@ -104,7 +100,11 @@ export default function MyAccount({
           return;
         }
 
-        logDevelopmentError("Load account profile", fetchError);
+        if (isSessionIdleExpiredError(fetchError)) {
+          return;
+        }
+
+        logDevelopmentError('Load account profile', fetchError);
         setError(GENERIC_ERROR_MESSAGE);
       })
       .finally(() => {
@@ -123,14 +123,20 @@ export default function MyAccount({
     setError(null);
 
     try {
-      const updatedProfile = await updateAccountProfile(toUpdatePayload(values));
+      const updatedProfile = await updateAccountProfile(
+        toUpdatePayload(values),
+      );
 
       await refreshSession().catch(() => undefined);
       setProfile(updatedProfile);
       form.setFieldsValue(toFormValues(updatedProfile));
-      messageApi.success("Account details updated");
+      messageApi.success('Account details updated');
     } catch (saveError) {
-      logDevelopmentError("Update account profile", saveError);
+      if (isSessionIdleExpiredError(saveError)) {
+        return;
+      }
+
+      logDevelopmentError('Update account profile', saveError);
       setError(GENERIC_ERROR_MESSAGE);
     } finally {
       setSaving(false);
@@ -154,8 +160,8 @@ export default function MyAccount({
         width={720}
         styles={{
           body: {
-            maxHeight: "72vh",
-            overflowY: "auto",
+            maxHeight: '72vh',
+            overflowY: 'auto',
             paddingTop: 12,
           },
         }}
@@ -207,7 +213,7 @@ export default function MyAccount({
                         rules={[
                           {
                             required: true,
-                            message: "Please input your first name!",
+                            message: 'Please input your first name!',
                           },
                         ]}
                       >
@@ -222,7 +228,7 @@ export default function MyAccount({
                         rules={[
                           {
                             required: true,
-                            message: "Please input your last name!",
+                            message: 'Please input your last name!',
                           },
                         ]}
                       >
@@ -239,7 +245,7 @@ export default function MyAccount({
                         rules={[
                           {
                             required: true,
-                            message: "Please input your mobile number!",
+                            message: 'Please input your mobile number!',
                           },
                           {
                             validator: (_, value?: string) => {
@@ -253,7 +259,7 @@ export default function MyAccount({
                                 ? Promise.resolve()
                                 : Promise.reject(
                                     new Error(
-                                      "Please input a valid Australian mobile number.",
+                                      'Please input a valid Australian mobile number.',
                                     ),
                                   );
                             },
@@ -271,7 +277,7 @@ export default function MyAccount({
                         rules={[
                           {
                             required: true,
-                            message: "Please input your suburb!",
+                            message: 'Please input your suburb!',
                           },
                         ]}
                       >
@@ -286,11 +292,11 @@ export default function MyAccount({
                     rules={[
                       {
                         required: true,
-                        message: "Please input your email!",
+                        message: 'Please input your email!',
                       },
                       {
-                        type: "email",
-                        message: "Please input a valid email!",
+                        type: 'email',
+                        message: 'Please input a valid email!',
                       },
                     ]}
                   >

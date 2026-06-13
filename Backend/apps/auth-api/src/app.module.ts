@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import {
   ApiRateLimitModule,
   createAppConfigOptions,
+  InternalServiceAuthModule,
   XssProtectionMiddleware,
 } from '@coopers/common';
 import { DatabaseModule } from '@coopers/database';
@@ -13,6 +14,7 @@ import { AuthModule } from './auth/auth.module';
   imports: [
     ConfigModule.forRoot(createAppConfigOptions()), // configuration key and values are injected into the App Module
     ApiRateLimitModule.forRoot(),
+    InternalServiceAuthModule, // only the booking-guard (which holds the shared secret) may reach this API
     DatabaseModule.forRoot(),
     AuthModule,
   ],

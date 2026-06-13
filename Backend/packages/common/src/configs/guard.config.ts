@@ -44,6 +44,12 @@ export class GuardConfigService {
     return getOptionalPort(this.config, 'GUARD_PORT', 7311);
   }
 
+  // Shared secret attached to every upstream request so auth-api/booking-api can
+  // verify the call originated from the guard. Fails fast at startup if missing.
+  get internalGatewaySecret(): string {
+    return getRequiredString(this.config, 'INTERNAL_GATEWAY_SECRET');
+  }
+
   getUpstreams(): GuardUpstreamConfig {
     return {
       bookingApiUrl: normalizeServiceUrl(

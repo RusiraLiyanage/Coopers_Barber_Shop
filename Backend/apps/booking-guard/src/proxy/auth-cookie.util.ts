@@ -6,7 +6,7 @@ export const REMEMBER_ME_COOKIE = 'tsm';
 
 const LEGACY_ACCESS_TOKEN_COOKIE = 'access_token';
 const LEGACY_REFRESH_TOKEN_COOKIE = 'refresh_token';
-const ACCESS_TOKEN_MAX_AGE_MS = 1000 * 60 * 5;
+const DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 300;
 const DEFAULT_REFRESH_TOKEN_TTL_DAYS = 14;
 
 type AuthCookieOptions = {
@@ -39,6 +39,18 @@ function getRefreshTokenMaxAgeMs(): number {
       : DEFAULT_REFRESH_TOKEN_TTL_DAYS;
 
   return ttlDays * 24 * 60 * 60 * 1000;
+}
+
+function getAccessTokenMaxAgeMs(): number {
+  const configuredTtlSeconds = Number(
+    process.env.ACCESS_TOKEN_TTL_SECONDS ?? DEFAULT_ACCESS_TOKEN_TTL_SECONDS,
+  );
+  const ttlSeconds =
+    Number.isFinite(configuredTtlSeconds) && configuredTtlSeconds > 0
+      ? Math.floor(configuredTtlSeconds)
+      : DEFAULT_ACCESS_TOKEN_TTL_SECONDS;
+
+  return ttlSeconds * 1000;
 }
 
 function createCookieOptions(maxAge?: number): AuthCookieOptions {
@@ -133,8 +145,8 @@ export function setAuthCookies(
   tokens: AuthTokensResponse,
   options: SetAuthCookieOptions = {},
 ): void {
-  const rememberMe = options.rememberMe ?? true;
-  const accessTokenMaxAge = rememberMe ? ACCESS_TOKEN_MAX_AGE_MS : undefined;
+  const rememberMe = options.rememberMe === true;
+  const accessTokenMaxAge = rememberMe ? getAccessTokenMaxAgeMs() : undefined;
   const refreshTokenMaxAge = rememberMe ? getRefreshTokenMaxAgeMs() : undefined;
 
   response.cookie(

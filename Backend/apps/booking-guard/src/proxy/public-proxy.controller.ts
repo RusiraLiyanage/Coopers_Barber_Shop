@@ -121,7 +121,7 @@ function writeSessionResponse(
 }
 
 function getRememberMe(body: { remember?: boolean }): boolean {
-  return body.remember !== false;
+  return body.remember === true;
 }
 
 function createLoginAuthApiBody(
@@ -239,7 +239,7 @@ export class PublicProxyController {
     return writeSessionResponse(
       response,
       result,
-      getRememberMeFromCookie(cookieHeader) ?? true,
+      getRememberMeFromCookie(cookieHeader) ?? false,
     );
   }
 
@@ -270,7 +270,7 @@ export class PublicProxyController {
     return writeAuthResponse(
       response,
       result,
-      getRememberMeFromCookie(cookieHeader) ?? true,
+      getRememberMeFromCookie(cookieHeader) ?? false,
     );
   }
 
@@ -297,7 +297,7 @@ export class PublicProxyController {
     );
 
     setAuthCookies(response, tokens, {
-      rememberMe: getRememberMeFromCookie(cookieHeader) ?? true,
+      rememberMe: getRememberMeFromCookie(cookieHeader) ?? false,
     });
     writeStatus(response, 200);
 
@@ -321,18 +321,33 @@ export class PublicProxyController {
     @Headers('cookie') cookieHeader: string | undefined,
     @Res({ passthrough: true }) response: AuthCookieResponse,
   ): Promise<unknown> {
-    clearAuthCookies(response);
+    const logoutBody = createRefreshTokenBody(
+      refreshTokenHeader,
+      cookieHeader,
+      body,
+    );
 
-    const result = await this.proxyService.forward({
-      target: 'auth',
-      method: 'POST',
-      path: '/auth/logout',
-      body: createRefreshTokenBody(refreshTokenHeader, cookieHeader, body),
-    });
+    if (!logoutBody.refresh_token) {
+      clearAuthCookies(response);
+      writeStatus(response, 200);
 
-    writeStatus(response, result.statusCode);
+      return { success: true };
+    }
 
-    return result.body;
+    try {
+      const result = await this.proxyService.forward({
+        target: 'auth',
+        method: 'POST',
+        path: '/auth/logout',
+        body: logoutBody,
+      });
+
+      writeStatus(response, result.statusCode);
+
+      return result.body;
+    } finally {
+      clearAuthCookies(response);
+    }
   }
 
   @ApiOperation({ summary: 'Proxy password reset code request to auth-api' })

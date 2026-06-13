@@ -93,7 +93,7 @@ export class ProtectedProxyController {
     writeProxyResponse(
       response,
       result,
-      getRememberMeFromCookie(cookieHeader) ?? true,
+      getRememberMeFromCookie(cookieHeader) ?? false,
     );
 
     return result.body;
@@ -126,7 +126,7 @@ export class ProtectedProxyController {
     writeProxyResponse(
       response,
       result,
-      getRememberMeFromCookie(cookieHeader) ?? true,
+      getRememberMeFromCookie(cookieHeader) ?? false,
     );
 
     return result.body;
@@ -157,7 +157,7 @@ export class ProtectedProxyController {
     writeProxyResponse(
       response,
       result,
-      getRememberMeFromCookie(cookieHeader) ?? true,
+      getRememberMeFromCookie(cookieHeader) ?? false,
     );
 
     return result.body;
@@ -189,7 +189,7 @@ export class ProtectedProxyController {
     writeProxyResponse(
       response,
       result,
-      getRememberMeFromCookie(cookieHeader) ?? true,
+      getRememberMeFromCookie(cookieHeader) ?? false,
     );
 
     return result.body;
@@ -223,7 +223,7 @@ export class ProtectedProxyController {
     writeProxyResponse(
       response,
       result,
-      getRememberMeFromCookie(cookieHeader) ?? true,
+      getRememberMeFromCookie(cookieHeader) ?? false,
     );
 
     return result.body;

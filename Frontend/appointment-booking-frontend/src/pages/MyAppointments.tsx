@@ -34,6 +34,7 @@ import {
 import {
   cancelAppointment,
   getAppointments,
+  isSessionIdleExpiredError,
   type AppointmentRecord,
   type AuthSession,
 } from '../lib/api';
@@ -42,7 +43,12 @@ import {
   getGenericErrorMessage,
   logDevelopmentError,
 } from '../lib/errors';
-import { SACard, SALoadingPanel, SAModalHeader, SAStatusTag } from '../components/common';
+import {
+  SACard,
+  SALoadingPanel,
+  SAModalHeader,
+  SAStatusTag,
+} from '../components/common';
 import './MyAppointments.css';
 
 interface MyAppointmentsProps {
@@ -340,9 +346,7 @@ function formatAppointmentWindow(appointment: AppointmentRecord) {
 
   return `${formatReadableDate(startDate)} ${formatDisplayTime(
     startTime,
-  )} - ${formatReadableDate(
-    endDate,
-  )} ${formatDisplayTime(endTime)}`;
+  )} - ${formatReadableDate(endDate)} ${formatDisplayTime(endTime)}`;
 }
 
 function getAppointmentDateKey(appointment: AppointmentRecord) {
@@ -516,9 +520,7 @@ function AppointmentsList({
                   >
                     {appointment.serviceName}
                   </Typography.Title>
-                  <Typography.Paragraph
-                    className="appointments-list-card-time"
-                  >
+                  <Typography.Paragraph className="appointments-list-card-time">
                     {formatAppointmentWindow(appointment)}
                   </Typography.Paragraph>
                   <Typography.Text
@@ -617,14 +619,17 @@ function AppointmentsCalendar({
           eventClassNames.push('appointment-calendar-event-short');
         }
 
+        const shouldShowTime = !isAgendaView;
         const eventContent = (
           <div className={eventClassNames.join(' ')}>
             <div className="appointment-calendar-event-main">
-              <span className="appointment-calendar-event-time">
-                {isAgendaView || isTimeGridView
-                  ? formatCalendarEventTime(event)
-                  : format(event.start, 'h:mm a')}
-              </span>
+              {shouldShowTime ? (
+                <span className="appointment-calendar-event-time">
+                  {isTimeGridView
+                    ? formatCalendarEventTime(event)
+                    : format(event.start, 'h:mm a')}
+                </span>
+              ) : null}
               <span className="appointment-calendar-event-title">
                 {event.title}
               </span>
@@ -843,6 +848,10 @@ export default function MyAppointments({
         setAppointments(response);
       })
       .catch((fetchError: unknown) => {
+        if (isSessionIdleExpiredError(fetchError)) {
+          return;
+        }
+
         logDevelopmentError('Load appointments', fetchError);
         setError(GENERIC_ERROR_MESSAGE);
       })
@@ -867,6 +876,15 @@ export default function MyAppointments({
 
   const handleTimeGridScrollTopChange = useCallback((scrollTop: number) => {
     timeGridScrollTopRef.current = scrollTop;
+  }, []);
+
+  const handleCalendarViewChange = useCallback((nextView: View) => {
+    setCalendarView(nextView);
+
+    if (nextView === 'week' || nextView === 'day') {
+      setCalendarDate(new Date());
+      timeGridScrollTopRef.current = 0;
+    }
   }, []);
 
   const renderViewSwitch = () => (
@@ -932,7 +950,13 @@ export default function MyAppointments({
       setAppointmentPendingCancellation(null);
       messageApi.success('Appointment cancelled successfully');
     } catch (cancelError) {
-      messageApi.error(getGenericErrorMessage('Cancel appointment', cancelError));
+      if (isSessionIdleExpiredError(cancelError)) {
+        return;
+      }
+
+      messageApi.error(
+        getGenericErrorMessage('Cancel appointment', cancelError),
+      );
     } finally {
       setIsCancellingAppointment(false);
     }
@@ -963,7 +987,7 @@ export default function MyAppointments({
       calendarView={calendarView}
       calendarDate={calendarDate}
       timeGridScrollTop={timeGridScrollTopRef.current}
-      onCalendarViewChange={setCalendarView}
+      onCalendarViewChange={handleCalendarViewChange}
       onCalendarDateChange={setCalendarDate}
       onTimeGridScrollTopChange={handleTimeGridScrollTopChange}
       onMakeAppointment={onMakeAppointment}

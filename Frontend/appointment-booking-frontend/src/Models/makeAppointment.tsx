@@ -1,26 +1,19 @@
-import {
-  Button,
-  DatePicker,
-  Form,
-  Modal,
-  Select,
-  Spin,
-  message,
-} from "antd";
-import { useCallback, useEffect, useState } from "react";
-import dayjs, { type Dayjs } from "dayjs";
+import { Button, DatePicker, Form, Modal, Select, Spin, message } from 'antd';
+import { useCallback, useEffect, useState } from 'react';
+import dayjs, { type Dayjs } from 'dayjs';
 import {
   createAppointment,
   getAvailability,
   getServices,
+  isSessionIdleExpiredError,
   updateAppointment,
   type AppointmentRecord,
   type AuthSession,
   type ServiceOption,
-} from "../lib/api";
-import { getGenericErrorMessage } from "../lib/errors";
-import { SAModalHeader } from "../components/common";
-import "./makeAppointment.css";
+} from '../lib/api';
+import { getGenericErrorMessage } from '../lib/errors';
+import { SAModalHeader } from '../components/common';
+import './makeAppointment.css';
 
 interface MakeAppointmentModalProps {
   open: boolean;
@@ -37,9 +30,9 @@ type AppointmentFormValues = {
 };
 
 function parseAppointmentDateTime(value: string) {
-  const [datePart = "", timePart = ""] = value.split(", ");
-  const [day, month, year] = datePart.split("/").map(Number);
-  const [hourText = "", minuteText = ""] = timePart.split(":");
+  const [datePart = '', timePart = ''] = value.split(', ');
+  const [day, month, year] = datePart.split('/').map(Number);
+  const [hourText = '', minuteText = ''] = timePart.split(':');
   const hour = Number(hourText);
   const minute = Number(minuteText);
 
@@ -61,14 +54,14 @@ function getAppointmentSlot(appointment: AppointmentRecord) {
   const endAt = parseAppointmentDateTime(appointment.endAt);
 
   if (!startAt || !endAt) {
-    return "";
+    return '';
   }
 
-  return `${startAt.format("HH:mm")}-${endAt.format("HH:mm")}`;
+  return `${startAt.format('HH:mm')}-${endAt.format('HH:mm')}`;
 }
 
 function formatSlotTime(timeText: string) {
-  const [hourText = "", minuteText = ""] = timeText.split(":");
+  const [hourText = '', minuteText = ''] = timeText.split(':');
   const hour = Number(hourText);
   const minute = Number(minuteText);
 
@@ -84,13 +77,13 @@ function formatSlotTime(timeText: string) {
   }
 
   const displayHour = hour % 12 || 12;
-  const period = hour >= 12 ? "PM" : "AM";
+  const period = hour >= 12 ? 'PM' : 'AM';
 
-  return `${displayHour}:${minuteText.padStart(2, "0")} ${period}`;
+  return `${displayHour}:${minuteText.padStart(2, '0')} ${period}`;
 }
 
 function formatAppointmentSlot(slot: string) {
-  const [startTime = "", endTime = ""] = slot.split("-");
+  const [startTime = '', endTime = ''] = slot.split('-');
 
   if (!startTime || !endTime) {
     return slot;
@@ -115,25 +108,24 @@ export default function MakeAppointmentModal({
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [currentSlotPulseKey, setCurrentSlotPulseKey] = useState(0);
   const [form] = Form.useForm<AppointmentFormValues>();
-  const selectedServiceId = Form.useWatch("serviceId", form);
-  const selectedAppointmentDate = Form.useWatch("appointmentDate", form);
+  const selectedServiceId = Form.useWatch('serviceId', form);
+  const selectedAppointmentDate = Form.useWatch('appointmentDate', form);
   const isEditMode = Boolean(editingAppointment);
   const currentAppointmentDate = editingAppointment
     ? parseAppointmentDateTime(editingAppointment.startAt)
     : null;
-  const currentAppointmentDateKey = currentAppointmentDate?.format(
-    "YYYY-MM-DD",
-  );
+  const currentAppointmentDateKey =
+    currentAppointmentDate?.format('YYYY-MM-DD');
   const selectedAppointmentDateKey =
-    selectedAppointmentDate?.format("YYYY-MM-DD");
+    selectedAppointmentDate?.format('YYYY-MM-DD');
   const isCurrentAppointmentDateSelected =
     isEditMode &&
     Boolean(currentAppointmentDateKey) &&
     currentAppointmentDateKey === selectedAppointmentDateKey;
   const currentAppointmentSlot = editingAppointment
     ? getAppointmentSlot(editingAppointment)
-    : "";
-  const currentAppointmentServiceName = editingAppointment?.serviceName ?? "";
+    : '';
+  const currentAppointmentServiceName = editingAppointment?.serviceName ?? '';
   const shouldShowCurrentAppointmentSlot =
     isCurrentAppointmentDateSelected && Boolean(currentAppointmentSlot);
   const availableSlots = isEditMode
@@ -146,9 +138,9 @@ export default function MakeAppointmentModal({
     !isEditMode ||
     Boolean(
       selectedSlot &&
-        selectedAppointmentDateKey &&
-        (selectedSlot !== currentAppointmentSlot ||
-          selectedAppointmentDateKey !== currentAppointmentDateKey),
+      selectedAppointmentDateKey &&
+      (selectedSlot !== currentAppointmentSlot ||
+        selectedAppointmentDateKey !== currentAppointmentDateKey),
     );
   const showNoAvailabilityMessage =
     Boolean(selectedServiceId && selectedAppointmentDate) &&
@@ -173,7 +165,7 @@ export default function MakeAppointmentModal({
       try {
         const response = await getAvailability(
           serviceId,
-          appointmentDate.format("YYYY-MM-DD"),
+          appointmentDate.format('YYYY-MM-DD'),
           editingAppointment?.id,
         );
         const nextSlots =
@@ -183,9 +175,13 @@ export default function MakeAppointmentModal({
 
         setSlots(nextSlots);
       } catch (error) {
+        if (isSessionIdleExpiredError(error)) {
+          return;
+        }
+
         setSlots([]);
         messageApi.error(
-          getGenericErrorMessage("Load appointment availability", error),
+          getGenericErrorMessage('Load appointment availability', error),
         );
       } finally {
         setSlotsLoading(false);
@@ -219,7 +215,7 @@ export default function MakeAppointmentModal({
         const appointmentSlot = getAppointmentSlot(editingAppointment);
 
         if (!appointmentDate || !appointmentSlot) {
-          messageApi.error("Unable to load appointment details for update");
+          messageApi.error('Unable to load appointment details for update');
           return;
         }
 
@@ -236,8 +232,12 @@ export default function MakeAppointmentModal({
         );
       })
       .catch((error: unknown) => {
+        if (isSessionIdleExpiredError(error)) {
+          return;
+        }
+
         messageApi.error(
-          getGenericErrorMessage("Load appointment services", error),
+          getGenericErrorMessage('Load appointment services', error),
         );
       })
       .finally(() => {
@@ -254,12 +254,12 @@ export default function MakeAppointmentModal({
 
   const loadAvailability = async () => {
     if (!authSession) {
-      messageApi.error("Please log in to book an appointment");
+      messageApi.error('Please log in to book an appointment');
       return;
     }
 
-    const serviceId = form.getFieldValue("serviceId");
-    const appointmentDate = form.getFieldValue("appointmentDate");
+    const serviceId = form.getFieldValue('serviceId');
+    const appointmentDate = form.getFieldValue('appointmentDate');
 
     if (!serviceId || !appointmentDate) {
       setSlots([]);
@@ -280,7 +280,7 @@ export default function MakeAppointmentModal({
       !values.appointmentDate ||
       !values.appointmentTime
     ) {
-      messageApi.error("Please log in and complete the form");
+      messageApi.error('Please log in and complete the form');
       return;
     }
 
@@ -289,17 +289,17 @@ export default function MakeAppointmentModal({
     try {
       if (editingAppointment) {
         await updateAppointment(editingAppointment.id, {
-          date: values.appointmentDate.format("YYYY-MM-DD"),
+          date: values.appointmentDate.format('YYYY-MM-DD'),
           slot: values.appointmentTime,
         });
-        messageApi.success("Appointment updated successfully");
+        messageApi.success('Appointment updated successfully');
       } else {
         await createAppointment({
           serviceId: values.serviceId,
-          date: values.appointmentDate.format("YYYY-MM-DD"),
+          date: values.appointmentDate.format('YYYY-MM-DD'),
           slot: values.appointmentTime,
         });
-        messageApi.success("Appointment created successfully");
+        messageApi.success('Appointment created successfully');
       }
 
       form.resetFields();
@@ -307,9 +307,13 @@ export default function MakeAppointmentModal({
       setSelectedSlot(null);
       onBooked();
     } catch (error) {
+      if (isSessionIdleExpiredError(error)) {
+        return;
+      }
+
       messageApi.error(
         getGenericErrorMessage(
-          editingAppointment ? "Update appointment" : "Create appointment",
+          editingAppointment ? 'Update appointment' : 'Create appointment',
           error,
         ),
       );
@@ -324,7 +328,7 @@ export default function MakeAppointmentModal({
       <Modal
         title={
           <SAModalHeader
-            title={isEditMode ? "Update Appointment" : "New Appointment"}
+            title={isEditMode ? 'Update Appointment' : 'New Appointment'}
           />
         }
         open={open}
@@ -346,10 +350,10 @@ export default function MakeAppointmentModal({
             onFinish={handleSubmit}
             onValuesChange={(changedValues) => {
               if (
-                "serviceId" in changedValues ||
-                "appointmentDate" in changedValues
+                'serviceId' in changedValues ||
+                'appointmentDate' in changedValues
               ) {
-                form.setFieldValue("appointmentTime", undefined);
+                form.setFieldValue('appointmentTime', undefined);
                 loadAvailability();
               }
             }}
@@ -362,7 +366,7 @@ export default function MakeAppointmentModal({
               rules={[
                 {
                   required: true,
-                  message: "Please select a service",
+                  message: 'Please select a service',
                 },
               ]}
             >
@@ -380,14 +384,12 @@ export default function MakeAppointmentModal({
             <Form.Item
               name="appointmentDate"
               label={
-                <span className="appointment-form-label">
-                  Appointment Date
-                </span>
+                <span className="appointment-form-label">Appointment Date</span>
               }
               rules={[
                 {
                   required: true,
-                  message: "Please select an appointment date",
+                  message: 'Please select an appointment date',
                 },
               ]}
             >
@@ -397,10 +399,10 @@ export default function MakeAppointmentModal({
                   const currentDate = dayjs.isDayjs(current) ? current : null;
 
                   if (
-                    info.type !== "date" ||
+                    info.type !== 'date' ||
                     !currentDate ||
                     !currentAppointmentDateKey ||
-                    currentDate.format("YYYY-MM-DD") !==
+                    currentDate.format('YYYY-MM-DD') !==
                       currentAppointmentDateKey
                   ) {
                     return info.originNode;
@@ -416,7 +418,7 @@ export default function MakeAppointmentModal({
                   );
                 }}
                 className="appointment-date-picker"
-                disabled={!form.getFieldValue("serviceId")}
+                disabled={!form.getFieldValue('serviceId')}
                 disabledDate={(current) => {
                   if (!current) {
                     return false;
@@ -425,7 +427,7 @@ export default function MakeAppointmentModal({
                   if (
                     isEditMode &&
                     currentAppointmentDateKey &&
-                    current.format("YYYY-MM-DD") === currentAppointmentDateKey
+                    current.format('YYYY-MM-DD') === currentAppointmentDateKey
                   ) {
                     return false;
                   }
@@ -439,9 +441,7 @@ export default function MakeAppointmentModal({
                   );
 
                   return (
-                    day === 0 ||
-                    day === 6 ||
-                    current.toDate() < startOfToday
+                    day === 0 || day === 6 || current.toDate() < startOfToday
                   );
                 }}
               />
@@ -457,7 +457,7 @@ export default function MakeAppointmentModal({
               rules={[
                 {
                   required: true,
-                  message: "Please select a time slot",
+                  message: 'Please select a time slot',
                 },
               ]}
             >
@@ -473,19 +473,19 @@ export default function MakeAppointmentModal({
                     <button
                       type="button"
                       className={[
-                        "appointment-current-slot-card",
+                        'appointment-current-slot-card',
                         selectedSlot === currentAppointmentSlot
-                          ? "appointment-current-slot-card-selected"
-                          : "",
+                          ? 'appointment-current-slot-card-selected'
+                          : '',
                       ]
                         .filter(Boolean)
-                        .join(" ")}
+                        .join(' ')}
                       aria-pressed={selectedSlot === currentAppointmentSlot}
                       onClick={() => {
                         setSelectedSlot(currentAppointmentSlot);
                         setCurrentSlotPulseKey((currentKey) => currentKey + 1);
                         form.setFieldValue(
-                          "appointmentTime",
+                          'appointmentTime',
                           currentAppointmentSlot,
                         );
                       }}
@@ -501,8 +501,8 @@ export default function MakeAppointmentModal({
                       </span>
                       <span className="appointment-current-slot-badge">
                         {selectedSlot === currentAppointmentSlot
-                          ? "Selected"
-                          : "Current"}
+                          ? 'Selected'
+                          : 'Current'}
                       </span>
                       {currentSlotPulseKey > 0 ? (
                         <span
@@ -522,12 +522,12 @@ export default function MakeAppointmentModal({
                       {availableSlots.map((slot) => (
                         <Button
                           key={slot}
-                          type={selectedSlot === slot ? "primary" : "default"}
+                          type={selectedSlot === slot ? 'primary' : 'default'}
                           size="large"
                           className="appointment-slot-button"
                           onClick={() => {
                             setSelectedSlot(slot);
-                            form.setFieldValue("appointmentTime", slot);
+                            form.setFieldValue('appointmentTime', slot);
                           }}
                         >
                           {formatAppointmentSlot(slot)}
@@ -551,7 +551,7 @@ export default function MakeAppointmentModal({
                   disabled={!selectedSlot || !hasAppointmentChange}
                   size="large"
                 >
-                  {isEditMode ? "Update Appointment" : "Book Appointment"}
+                  {isEditMode ? 'Update Appointment' : 'Book Appointment'}
                 </Button>
               </div>
             </Form.Item>

@@ -7,6 +7,7 @@ import { ProtectedProxyController } from './protected-proxy.controller';
 import { ProtectedProxyService } from './protected-proxy.service';
 import { PublicProxyController } from './public-proxy.controller';
 import { ProxyService } from './proxy.service';
+import { RefreshTokenCoordinatorService } from './refresh-token-coordinator.service';
 
 @Module({
   imports: [GuardConfigModule, GuardAuthenticationModule], // booking guard needs the environment configurations
@@ -16,6 +17,11 @@ import { ProxyService } from './proxy.service';
     ProtectedProxyController,
     FrontendProxyController,
   ],
-  providers: [ProxyService, ProtectedProxyService, FrontendProxyService],
+  providers: [
+    ProxyService,
+    ProtectedProxyService,
+    FrontendProxyService,
+    RefreshTokenCoordinatorService,
+  ],
 })
 export class ProxyModule {}

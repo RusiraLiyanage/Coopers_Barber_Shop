@@ -140,6 +140,10 @@
   overflow-y: hidden;
 }
 
+.appointments-calendar-panel-agenda .appointments-calendar-panel-content {
+  overflow-y: auto;
+}
+
 .appointments-calendar {
   min-height: 680px;
 }
@@ -223,6 +227,63 @@
 
 .appointments-calendar .rbc-time-view .rbc-event-content {
   height: 100%;
+}
+
+.appointments-calendar .rbc-agenda-view {
+  overflow: hidden;
+  border: 0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.appointments-calendar .rbc-agenda-view table.rbc-agenda-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.appointments-calendar .rbc-agenda-view thead th {
+  padding: 12px 14px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f8fafc;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.appointments-calendar .rbc-agenda-view tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #eef2f7;
+  color: #1f2937;
+  vertical-align: middle;
+}
+
+.appointments-calendar .rbc-agenda-date-cell {
+  width: 160px;
+  color: #111827;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.appointments-calendar .rbc-agenda-time-cell {
+  width: 190px;
+  color: #4b5563;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.appointments-calendar .rbc-agenda-event-cell {
+  width: auto;
+}
+
+.appointments-calendar .rbc-agenda-view .appointment-event-booked,
+.appointments-calendar .rbc-agenda-view .appointment-event-scheduled,
+.appointments-calendar .rbc-agenda-view .appointment-event-cancelledClient,
+.appointments-calendar .rbc-agenda-view .appointment-event-cancelledBarber {
+  background: transparent;
+  color: inherit;
 }
 
 .appointments-calendar-legend {
@@ -326,6 +387,21 @@
   color: #fff;
 }
 
+.appointment-calendar-event-agenda {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #bfdbfe;
+  border-left: 4px solid #2563eb;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #111827;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
 .appointment-calendar-event-main {
   display: flex;
   align-items: center;
@@ -369,6 +445,12 @@
   white-space: normal;
 }
 
+.appointment-calendar-event-agenda .appointment-calendar-event-title {
+  color: #111827;
+  font-size: 15px;
+  font-weight: 800;
+}
+
 .appointment-calendar-event-summary {
   display: flex;
   align-items: center;
@@ -394,6 +476,18 @@
   color: #fff;
   font-size: 10px;
   font-weight: 700;
+}
+
+.appointment-calendar-event-agenda .appointment-calendar-event-summary {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  color: #4b5563;
+  font-size: 12px;
+}
+
+.appointment-calendar-event-agenda .appointment-calendar-event-status {
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .appointment-calendar-event-short {
@@ -448,6 +542,32 @@
 
 .appointment-event-cancelledBarber .appointment-calendar-event-status {
   background: rgba(245, 158, 11, 0.26);
+}
+
+.appointment-event-cancelledClient .appointment-calendar-event-agenda {
+  border-color: #fecaca;
+  border-left-color: #ef4444;
+  background: #fef2f2;
+}
+
+.appointment-event-cancelledBarber .appointment-calendar-event-agenda {
+  border-color: #fde68a;
+  border-left-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.appointment-event-cancelledClient
+  .appointment-calendar-event-agenda
+  .appointment-calendar-event-status {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.appointment-event-cancelledBarber
+  .appointment-calendar-event-agenda
+  .appointment-calendar-event-status {
+  background: #fef3c7;
+  color: #92400e;
 }
 
 .appointment-calendar-event-details {

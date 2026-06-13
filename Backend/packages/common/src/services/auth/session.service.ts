@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -16,11 +16,7 @@ const SESSION_IDLE_EXPIRED_MESSAGE = 'Session expired due to inactivity';
 type CreateAuthSessionInput = {
   userId: string;
   refreshToken: string;
-};
-
-type RotateAuthSessionInput = {
-  currentRefreshToken: string;
-  newRefreshToken: string;
+  tokenFamilyId?: string;
 };
 
 export class SessionIdleExpiredException extends UnauthorizedException {
@@ -48,6 +44,7 @@ export class SessionService {
     const session = this.sessionsRepo.create({
       user: { id: input.userId },
       refreshTokenHash: this.hashRefreshToken(input.refreshToken),
+      tokenFamilyId: input.tokenFamilyId ?? randomUUID(), // new login starts a new family; rotation reuses it
       expiresAt: this.createRefreshTokenExpiresAt(), // expires in 14 days
       revokedAt: null,
       lastUsedAt: now,
@@ -70,6 +67,12 @@ export class SessionService {
 
     if (!session) {
       throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    if (await this.detectAndContainReuse(session)) {
+      throw new UnauthorizedException(
+        'Refresh token reuse detected. Please login again.',
+      );
     }
 
     if (this.isSessionExpired(session, now)) {
@@ -103,6 +106,12 @@ export class SessionService {
 
     if (!session) {
       throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    if (await this.detectAndContainReuse(session)) {
+      throw new UnauthorizedException(
+        'Refresh token reuse detected. Please login again.',
+      );
     }
 
     if (this.isSessionExpired(session, now)) {
@@ -229,23 +238,7 @@ export class SessionService {
     return result.affected ?? 0;
   }
 
-  async rotateSession(input: RotateAuthSessionInput): Promise<AuthSession> {
-    const currentSession = await this.findActiveSession(
-      input.currentRefreshToken,
-    );
-
-    return this.replaceSession(currentSession, input.newRefreshToken);
-  }
-
-  async extendSession(input: RotateAuthSessionInput): Promise<AuthSession> {
-    const currentSession = await this.findExtendableSession(
-      input.currentRefreshToken,
-    );
-
-    return this.replaceSession(currentSession, input.newRefreshToken);
-  }
-
-  private async replaceSession(
+  async replaceSessionRefreshToken(
     currentSession: AuthSession,
     newRefreshToken: string,
   ): Promise<AuthSession> {
@@ -257,7 +250,36 @@ export class SessionService {
     return this.createSession({
       userId: currentSession.user.id,
       refreshToken: newRefreshToken,
+      tokenFamilyId: currentSession.tokenFamilyId, // keep the rotated session in the same family
     });
+  }
+
+  async revokeSessionFamily(tokenFamilyId: string): Promise<void> {
+    await this.sessionsRepo
+      .createQueryBuilder()
+      .update(AuthSession)
+      .set({
+        revokedAt: new Date(),
+      })
+      .where('token_family_id = :tokenFamilyId', { tokenFamilyId })
+      .andWhere('revoked_at IS NULL')
+      .execute();
+  }
+
+  // A refresh token whose session is already revoked is being replayed. In normal
+  // flows the guard's coordinator returns the rotated token, so the old one is
+  // never re-presented — treat this as theft and revoke the whole family.
+  private async detectAndContainReuse(session: AuthSession): Promise<boolean> {
+    if (!session.revokedAt) {
+      return false;
+    }
+
+    await this.revokeSessionFamily(session.tokenFamilyId);
+    this.logger.warn(
+      `Refresh token reuse detected for session ${session.id}; revoked family ${session.tokenFamilyId}.`,
+    );
+
+    return true;
   }
 
   private hashRefreshToken(refreshToken: string): string {

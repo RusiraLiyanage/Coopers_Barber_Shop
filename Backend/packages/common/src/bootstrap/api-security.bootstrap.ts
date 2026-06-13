@@ -32,10 +32,11 @@ export function configureApiSecurity(
   app: INestApplication,
   options: ApiSecurityOptions = {},
 ): void {
+  // Only browser-facing services (the guard) need CORS. Internal upstreams are
+  // reached server-to-server, so we leave CORS disabled when no options are given
+  // rather than falling back to a permissive default.
   if (options.cors) {
     app.enableCors(options.cors);
-  } else {
-    app.enableCors();
   }
 
   app.use(helmet(options.helmet)); // adds browser security headers to HTTP responses.

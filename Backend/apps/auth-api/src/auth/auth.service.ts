@@ -2,11 +2,17 @@ import { createHash, randomInt } from 'node:crypto';
 import {
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { PasswordResetToken, User, UserRole } from '@coopers/entities';
+import {
+  AuthSession,
+  PasswordResetToken,
+  User,
+  UserRole,
+} from '@coopers/entities';
 import { UsersService } from '../users/users.service';
 import { RegisterDto } from './dto/register.dto';
 import {
@@ -65,6 +71,8 @@ function toAccountProfile(user: User): AccountProfileResponse {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectRepository(PasswordResetToken)
     private readonly passwordResetTokensRepo: Repository<PasswordResetToken>,
@@ -135,49 +143,15 @@ export class AuthService {
   async refresh(refreshToken: string): Promise<AuthTokensResponse> {
     const currentSession =
       await this.sessionService.findActiveSession(refreshToken);
-    const user = currentSession.user;
 
-    const authenticatedUser: AuthenticatedUser = {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-    };
-
-    const newRefreshToken = this.jwtTokenService.generateRefreshToken();
-
-    const newSession = await this.sessionService.rotateSession({
-      currentRefreshToken: refreshToken,
-      newRefreshToken: newRefreshToken.refresh_token,
-    });
-
-    return {
-      ...this.jwtTokenService.signAccessToken(authenticatedUser, newSession.id), // generates the new access token
-      ...newRefreshToken, // the new refresh token
-    };
+    return this.createRotatedSessionTokens(currentSession, 'refreshed');
   }
 
   async extend(refreshToken: string): Promise<AuthTokensResponse> {
     const currentSession =
       await this.sessionService.findExtendableSession(refreshToken);
-    const user = currentSession.user;
 
-    const authenticatedUser: AuthenticatedUser = {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-    };
-
-    const newRefreshToken = this.jwtTokenService.generateRefreshToken();
-
-    const newSession = await this.sessionService.extendSession({
-      currentRefreshToken: refreshToken,
-      newRefreshToken: newRefreshToken.refresh_token,
-    });
-
-    return {
-      ...this.jwtTokenService.signAccessToken(authenticatedUser, newSession.id),
-      ...newRefreshToken,
-    };
+    return this.createRotatedSessionTokens(currentSession, 'extended');
   }
 
   async logout(refreshToken: string): Promise<LogoutResponse> {
@@ -286,6 +260,37 @@ export class AuthService {
     return {
       ...this.jwtTokenService.signAccessToken(user, session.id),
       ...refreshToken,
+    };
+  }
+
+  private async createRotatedSessionTokens(
+    currentSession: AuthSession,
+    action: 'refreshed' | 'extended',
+  ): Promise<AuthTokensResponse> {
+    const refreshToken = this.jwtTokenService.generateRefreshToken();
+    const newSession = await this.sessionService.replaceSessionRefreshToken(
+      currentSession,
+      refreshToken.refresh_token,
+    );
+
+    this.logger.log(
+      `Auth session ${action}: ${currentSession.id} -> ${newSession.id} for user ${currentSession.user.id}.`,
+    );
+
+    return {
+      ...this.jwtTokenService.signAccessToken(
+        this.toAuthenticatedUser(currentSession.user),
+        newSession.id,
+      ),
+      ...refreshToken,
+    };
+  }
+
+  private toAuthenticatedUser(user: User): AuthenticatedUser {
+    return {
+      id: user.id,
+      email: user.email,
+      role: user.role,
     };
   }
 

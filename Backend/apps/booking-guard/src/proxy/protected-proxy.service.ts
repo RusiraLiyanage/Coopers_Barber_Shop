@@ -13,6 +13,7 @@ import {
 } from '@coopers/common';
 import { ProxyRequestOptions, ProxyResponse } from './proxy.types';
 import { ProxyService } from './proxy.service';
+import { RefreshTokenCoordinatorService } from './refresh-token-coordinator.service';
 
 type ProtectedForwardOptions = Omit<
   ProxyRequestOptions,
@@ -115,6 +116,7 @@ export class ProtectedProxyService {
   constructor(
     private readonly authenticationService: GuardAuthenticationService,
     private readonly proxyService: ProxyService,
+    private readonly refreshTokenCoordinator: RefreshTokenCoordinatorService,
   ) {}
 
   async forward(
@@ -218,7 +220,14 @@ export class ProtectedProxyService {
   private async refreshAndAuthenticate(
     refreshToken: string | undefined,
   ): Promise<AuthenticatedProxyContext> {
-    const refreshedTokens = await this.refreshTokens(refreshToken);
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token is required.');
+    }
+
+    const refreshedTokens = await this.refreshTokenCoordinator.getOrRefresh(
+      refreshToken,
+      () => this.refreshTokens(refreshToken),
+    );
     const refreshedAuthorizationHeader = `Bearer ${refreshedTokens.access_token}`;
     const user = await this.authenticationService.authenticateBearerToken(
       refreshedAuthorizationHeader,
@@ -234,12 +243,8 @@ export class ProtectedProxyService {
   }
 
   private async refreshTokens(
-    refreshToken: string | undefined,
+    refreshToken: string,
   ): Promise<AuthTokensResponse> {
-    if (!refreshToken) {
-      throw new UnauthorizedException('Refresh token is required.');
-    }
-
     const result = await this.proxyService.forward({
       target: 'auth',
       method: 'POST',

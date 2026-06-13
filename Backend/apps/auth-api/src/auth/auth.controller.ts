@@ -2,21 +2,21 @@ import {
   Body,
   Controller,
   Get,
-  Headers,
   HttpCode,
   Patch,
   Post,
   Request,
-  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type {
   AuthenticatedRequest,
   AuthTokensResponse,
+  JwtAuthenticatedRequest,
   LogoutResponse,
   SessionValidationResponse,
 } from '@coopers/common';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { AuthService } from './auth.service';
 import { LogoutDto } from './dto/logout.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -34,14 +34,6 @@ import type {
   PasswordResetRequestResponse,
   PasswordResetVerificationResponse,
 } from './auth.service';
-
-function getRequiredUserId(userId: string | undefined): string {
-  if (!userId) {
-    throw new UnauthorizedException('Missing authenticated user context');
-  }
-
-  return userId;
-}
 
 @ApiTags('auth')
 @Controller('auth')
@@ -120,23 +112,24 @@ export class AuthController {
   }
 
   @ApiOperation({ summary: 'Get the current authenticated account profile' })
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard)
   @Get('me')
   getAccountProfile(
-    @Headers('x-user-id') userId: string | undefined,
+    @Request() req: JwtAuthenticatedRequest,
   ): Promise<AccountProfileResponse> {
-    return this.authService.getAccountProfile(getRequiredUserId(userId));
+    return this.authService.getAccountProfile(req.user.userId);
   }
 
   @ApiOperation({ summary: 'Update the current authenticated account profile' })
+  @ApiBearerAuth('access-token')
   @ApiBody({ type: UpdateAccountDto })
+  @UseGuards(JwtAuthGuard)
   @Patch('me')
   updateAccountProfile(
-    @Headers('x-user-id') userId: string | undefined,
+    @Request() req: JwtAuthenticatedRequest,
     @Body() dto: UpdateAccountDto,
   ): Promise<AccountProfileResponse> {
-    return this.authService.updateAccountProfile(
-      getRequiredUserId(userId),
-      dto,
-    );
+    return this.authService.updateAccountProfile(req.user.userId, dto);
   }
 }

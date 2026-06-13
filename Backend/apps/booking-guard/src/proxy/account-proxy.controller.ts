@@ -63,7 +63,7 @@ export class AccountProxyController {
     writeProxyResponse(
       response,
       result,
-      getRememberMeFromCookie(cookieHeader) ?? true,
+      getRememberMeFromCookie(cookieHeader) ?? false,
     );
 
     return result.body;
@@ -109,7 +109,7 @@ export class AccountProxyController {
     writeProxyResponse(
       response,
       result,
-      getRememberMeFromCookie(cookieHeader) ?? true,
+      getRememberMeFromCookie(cookieHeader) ?? false,
     );
 
     return result.body;

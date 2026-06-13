@@ -173,14 +173,75 @@ function App() {
     setOpenAuthModal(false);
   };
 
+  const runProtectedAction = useCallback(
+    async (action: () => void): Promise<void> => {
+      if (isSessionTimeoutPromptOpen) {
+        return;
+      }
+
+      if (!isAuthenticated) {
+        setOpenAuthModal(true);
+        return;
+      }
+
+      try {
+        const session = await getCurrentSession();
+
+        setAuthSession(toAuthSession(session));
+        action();
+      } catch (error: unknown) {
+        if (isSessionIdleExpiredError(error)) {
+          showSessionExtensionPrompt();
+          return;
+        }
+
+        setAuthSession(null);
+        setEditingAppointment(null);
+        setOpenAppointmentModal(false);
+        navigate('/');
+        setOpenAuthModal(true);
+      }
+    },
+    [
+      isAuthenticated,
+      isSessionTimeoutPromptOpen,
+      navigate,
+      setAuthSession,
+      showSessionExtensionPrompt,
+    ],
+  );
+
   const openBookingFlow = () => {
     setEditingAppointment(null);
     setOpenAppointmentModal(false);
-    navigate('/new-appointment');
 
     if (!isAuthenticated) {
       setOpenAuthModal(true);
+      return;
     }
+
+    void runProtectedAction(() => {
+      navigate('/new-appointment');
+    });
+  };
+
+  const openMyAppointmentsFlow = () => {
+    void runProtectedAction(() => {
+      navigate('/appointments');
+    });
+  };
+
+  const openMyAccountFlow = () => {
+    void runProtectedAction(() => {
+      navigate('/account');
+    });
+  };
+
+  const openUpdateAppointmentFlow = (appointment: AppointmentRecord) => {
+    void runProtectedAction(() => {
+      setEditingAppointment(appointment);
+      setOpenAppointmentModal(true);
+    });
   };
 
   return (
@@ -189,7 +250,8 @@ function App() {
         isAuthenticated={isAuthenticated}
         onLogout={handleLogout}
         onOpenAuthModal={() => setOpenAuthModal(true)}
-        onOpenMyAccount={() => navigate('/account')}
+        onOpenMyAccount={openMyAccountFlow}
+        onOpenMyAppointments={openMyAppointmentsFlow}
         onOpenAppointmentModal={openBookingFlow}
       />
 
@@ -219,10 +281,7 @@ function App() {
           refreshKey={appointmentsRefreshKey}
           onClose={() => navigate('/')}
           onMakeAppointment={openBookingFlow}
-          onUpdateAppointment={(appointment) => {
-            setEditingAppointment(appointment);
-            setOpenAppointmentModal(true);
-          }}
+          onUpdateAppointment={openUpdateAppointmentFlow}
         />
 
         <MyAccount

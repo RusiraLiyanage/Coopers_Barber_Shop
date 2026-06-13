@@ -23,6 +23,12 @@ export class AuthSession {
   @Column({ name: 'refresh_token_hash' })
   refreshTokenHash: string;
 
+  // Links every session created by rotation to the original login. Replaying a
+  // rotated (revoked) token revokes the whole family to contain token theft.
+  @Index()
+  @Column({ name: 'token_family_id', type: 'uuid' })
+  tokenFamilyId: string;
+
   @Column({ name: 'expires_at', type: 'timestamptz' })
   expiresAt: Date;
 

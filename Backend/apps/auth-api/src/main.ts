@@ -2,7 +2,6 @@ import { ConfigService } from '@nestjs/config';
 import {
   configureApiSecurity,
   configureSwagger,
-  createFrontendCorsOptions,
   ensureNodeCryptoGlobal,
 } from '@coopers/common';
 
@@ -17,21 +16,13 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
 
-  const rawFrontendUrl = config.get<string>('FRONTEND_URL');
-  const frontendUrl: string =
-    typeof rawFrontendUrl === 'string'
-      ? rawFrontendUrl
-      : 'http://localhost:5173';
-
   const rawAuthApiPort = config.get<number>('AUTH_API_PORT');
   const authApiPort: number =
     typeof rawAuthApiPort === 'number' ? rawAuthApiPort : 7312;
 
-  const corsOptions = createFrontendCorsOptions(frontendUrl);
-
-  configureApiSecurity(app, {
-    cors: corsOptions,
-  });
+  // No CORS: auth-api is reached only by the booking-guard (server-to-server),
+  // never directly by the browser.
+  configureApiSecurity(app);
   configureSwagger(app, {
     title: "Cooper's Barbershop Auth API",
     description:

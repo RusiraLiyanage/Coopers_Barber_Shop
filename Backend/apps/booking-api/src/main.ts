@@ -2,7 +2,6 @@ import { ConfigService } from '@nestjs/config';
 import {
   configureApiSecurity,
   configureSwagger,
-  createFrontendCorsOptions,
   ensureNodeCryptoGlobal,
 } from '@coopers/common';
 
@@ -16,11 +15,9 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
 
-  configureApiSecurity(app, {
-    cors: createFrontendCorsOptions(
-      config.get<string>('FRONTEND_URL', 'http://localhost:5173'),
-    ),
-  });
+  // No CORS: booking-api is reached only by the booking-guard (server-to-server),
+  // never directly by the browser.
+  configureApiSecurity(app);
   configureSwagger(app, {
     title: "Cooper's Barbershop Booking API",
     description: 'Booking, staff, services, users, and appointment endpoints.',
