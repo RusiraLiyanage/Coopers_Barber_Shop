@@ -29,6 +29,8 @@ const SESSION_ACTIVITY_EVENTS = [
   "touchstart",
 ] as const;
 
+type SessionTimeoutState = "active" | "extend_prompt" | "logged_out";
+
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -38,10 +40,12 @@ function App() {
   const [editingAppointment, setEditingAppointment] =
     useState<AppointmentRecord | null>(null);
   const [appointmentsRefreshKey, setAppointmentsRefreshKey] = useState(0);
-  const [sessionExpired, setSessionExpired] = useState(false);
+  const [sessionTimeoutState, setSessionTimeoutState] =
+    useState<SessionTimeoutState>("active");
   const sessionLastActivityAtRef = useRef(Date.now());
 
   const isAuthenticated = Boolean(authSession?.authenticated);
+  const isSessionTimeoutActive = sessionTimeoutState !== "active";
 
   const setAuthSession = useCallback((session: AuthSession | null) => {
     localStorage.removeItem(LEGACY_AUTH_TOKEN_KEY);
@@ -81,7 +85,7 @@ function App() {
   }, [setAuthSession]);
 
   useEffect(() => {
-    if (!isAuthenticated || sessionExpired) {
+    if (!isAuthenticated || isSessionTimeoutActive) {
       return;
     }
 
@@ -98,7 +102,7 @@ function App() {
         window.clearTimeout(timeoutId);
       }
       setAuthSession(null);
-      setSessionExpired(true);
+      setSessionTimeoutState("extend_prompt");
       setOpenAppointmentModal(false);
       setEditingAppointment(null);
       navigate("/");
@@ -156,10 +160,10 @@ function App() {
       window.removeEventListener("pageshow", checkIdleWhenTabReturns);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [isAuthenticated, navigate, sessionExpired, setAuthSession]);
+  }, [isAuthenticated, isSessionTimeoutActive, navigate, setAuthSession]);
 
   const handleLogout = () => {
-    setSessionExpired(false);
+    setSessionTimeoutState("active");
     setAuthSession(null);
     setEditingAppointment(null);
     navigate("/");
@@ -172,7 +176,7 @@ function App() {
 
     sessionLastActivityAtRef.current = Date.now();
     setAuthSession(toAuthSession(session));
-    setSessionExpired(false);
+    setSessionTimeoutState("active");
     setOpenAuthModal(false);
   };
 
@@ -236,13 +240,13 @@ function App() {
 
       <UserAuthModal
         open={openAuthModal}
-        sessionExpired={sessionExpired}
+        sessionExpired={isSessionTimeoutActive}
         onClose={() => setOpenAuthModal(false)}
         onExtendSession={handleExtendSession}
         onAuthSuccess={(session) => {
           sessionLastActivityAtRef.current = Date.now();
           setAuthSession(session);
-          setSessionExpired(false);
+          setSessionTimeoutState("active");
           setOpenAuthModal(false);
           setEditingAppointment(null);
           setOpenAppointmentModal(true);
