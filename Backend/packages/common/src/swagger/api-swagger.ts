@@ -7,6 +7,7 @@ export type ApiSwaggerOptions = {
   version?: string;
   path?: string;
   tags?: string[];
+  bearerAuth?: boolean;
 };
 
 export function configureSwagger(
@@ -16,8 +17,10 @@ export function configureSwagger(
   const documentBuilder = new DocumentBuilder()
     .setTitle(options.title)
     .setDescription(options.description)
-    .setVersion(options.version ?? '1.0.0')
-    .addBearerAuth(
+    .setVersion(options.version ?? '1.0.0');
+
+  if (options.bearerAuth !== false) {
+    documentBuilder.addBearerAuth(
       {
         type: 'http',
         scheme: 'bearer',
@@ -25,6 +28,7 @@ export function configureSwagger(
       },
       'access-token',
     );
+  }
 
   for (const tag of options.tags ?? []) {
     documentBuilder.addTag(tag);
@@ -34,7 +38,7 @@ export function configureSwagger(
 
   SwaggerModule.setup(options.path ?? 'docs', app, document, {
     swaggerOptions: {
-      persistAuthorization: true,
+      persistAuthorization: true, // keep the authorization bearer token even after refreshing the page
     },
   });
 }

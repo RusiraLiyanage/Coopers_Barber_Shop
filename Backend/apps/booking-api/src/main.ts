@@ -24,7 +24,7 @@ async function bootstrap() {
   configureSwagger(app, {
     title: "Cooper's Barbershop Booking API",
     description: 'Booking, staff, services, users, and appointment endpoints.',
-    tags: ['health', 'auth', 'users', 'services', 'staff', 'appointments'],
+    tags: ['health', 'users', 'services', 'staff', 'appointments'],
   });
 
   await app.listen(config.get<number>('API_PORT', 7310));

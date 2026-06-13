@@ -37,6 +37,7 @@ async function bootstrap() {
     description:
       'Authentication, token refresh, logout, and session endpoints.',
     tags: ['health', 'auth'],
+    bearerAuth: false,
   });
 
   await app.listen(authApiPort);
