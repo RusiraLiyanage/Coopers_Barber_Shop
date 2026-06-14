@@ -4,3 +4,7 @@ export * from './staff.entity';
 export * from './user.entity';
 export * from './auth-session.entity';
 export * from './password-reset-token.entity';
+export * from './safety-rule.entity';
+export * from './hair-history.entity';
+export * from './appointment-brief.entity';
+export * from './invite-token.entity';

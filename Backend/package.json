@@ -15,7 +15,8 @@
     "pre": "turbo run build",
     "booking:api": "turbo dev --filter @coopers/booking.api",
     "booking:guard": "turbo dev --filter @coopers/booking.guard",
-    "auth:api": "turbo dev --filter @coopers/auth.api"
+    "auth:api": "turbo dev --filter @coopers/auth.api",
+    "admin:api": "turbo dev --filter @coopers/admin.api"
   },
   "devDependencies": {
     "prettier": "^3.4.2",

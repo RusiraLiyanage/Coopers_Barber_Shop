@@ -3,7 +3,14 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  UpdateDateColumn,
 } from 'typeorm';
+
+export enum ServiceComplexity {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+}
 
 // The structure of the service data table is defined as follows,
 
@@ -25,6 +32,28 @@ export class Service {
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
+  // skill tags a barber should have to confidently perform this service.
+  @Column({
+    name: 'required_skills',
+    type: 'text',
+    array: true,
+    default: () => "'{}'",
+  })
+  requiredSkills: string[];
+
+  // safety keywords that can trigger a consultation warning before booking.
+  @Column({
+    name: 'safety_triggers',
+    type: 'text',
+    array: true,
+    default: () => "'{}'",
+  })
+  safetyTriggers: string[];
+
+  // simple service complexity level used by future matching logic.
+  @Column({ type: 'text', default: ServiceComplexity.LOW })
+  complexity: ServiceComplexity;
+
   // timestamps for creation.
   @CreateDateColumn({
     name: 'created_at',
@@ -32,4 +61,12 @@ export class Service {
     default: () => 'CURRENT_TIMESTAMP',
   })
   createdAt: Date;
+
+  // timestamp for admin updates.
+  @UpdateDateColumn({
+    name: 'updated_at',
+    type: 'timestamptz',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
+  updatedAt: Date;
 }

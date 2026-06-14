@@ -29,6 +29,10 @@
     "booking:guard": {
       "cache": false,
       "persistent": true
+    },
+    "admin:api": {
+      "cache": false,
+      "persistent": true
     }
   }
 }
