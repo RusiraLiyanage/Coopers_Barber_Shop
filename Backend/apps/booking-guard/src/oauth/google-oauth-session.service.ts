@@ -1,17 +1,32 @@
 import { Injectable } from '@nestjs/common';
 import type { AuthTokensResponse } from '@coopers/common';
-import { GuardConfigService } from '@coopers/common';
+import { GuardConfigService, GoogleOAuthConfig } from '@coopers/common';
 import {
   AuthCookieResponse,
   clearAuthCookies,
   setAuthCookies,
 } from '../proxy/auth-cookie.util';
 import { ProxyService } from '../proxy/proxy.service';
+import {
+  clearGoogleOAuthLinkCookie,
+  getGoogleOAuthLinkTicket,
+  setGoogleOAuthLinkCookie,
+} from './oauth-state-cookie.util';
 import type { NormalizedOAuthProfile } from './oauth.types';
 
 export type OAuthRedirectResponse = AuthCookieResponse & {
   redirect: (url: string) => void;
 };
+
+export type GoogleLinkResponse = AuthCookieResponse;
+
+type AuthStatusResponse = {
+  authenticated: true;
+};
+
+type GoogleOAuthCompletionResult =
+  | { status: 'authenticated'; tokens: AuthTokensResponse }
+  | { status: 'link_required'; linkTicket: string };
 
 function isAuthTokensResponse(value: unknown): value is AuthTokensResponse {
   if (typeof value !== 'object' || value === null) {
@@ -30,6 +45,36 @@ function isSuccessStatus(statusCode: number): boolean {
   return statusCode >= 200 && statusCode < 300;
 }
 
+function parseCompletionResult(
+  body: unknown,
+): GoogleOAuthCompletionResult | null {
+  if (typeof body !== 'object' || body === null || !('status' in body)) {
+    return null;
+  }
+
+  const result = body as {
+    status: unknown;
+    tokens?: unknown;
+    linkTicket?: unknown;
+  };
+
+  if (
+    result.status === 'authenticated' &&
+    isAuthTokensResponse(result.tokens)
+  ) {
+    return { status: 'authenticated', tokens: result.tokens };
+  }
+
+  if (
+    result.status === 'link_required' &&
+    typeof result.linkTicket === 'string'
+  ) {
+    return { status: 'link_required', linkTicket: result.linkTicket };
+  }
+
+  return null;
+}
+
 function createGoogleOAuthCompletionBody(profile: NormalizedOAuthProfile) {
   return {
     providerUserId: profile.providerUserId,
@@ -38,6 +83,22 @@ function createGoogleOAuthCompletionBody(profile: NormalizedOAuthProfile) {
     firstName: profile.firstName,
     lastName: profile.lastName,
   };
+}
+
+// Reuses the configured frontend success URL as the link prompt page, marking it
+// so the SPA opens the "confirm your password to connect Google" step. The email
+// is the user's own and only drives the prompt copy; the authoritative identity
+// lives in the httpOnly link-ticket cookie.
+function buildLinkRedirectUrl(
+  googleConfig: GoogleOAuthConfig,
+  email: string,
+): string {
+  const url = new URL(googleConfig.successRedirectUrl);
+
+  url.searchParams.set('link_google', '1');
+  url.searchParams.set('email', email);
+
+  return url.toString();
 }
 
 @Injectable()
@@ -59,16 +120,66 @@ export class GoogleOAuthSessionService {
       body: createGoogleOAuthCompletionBody(profile),
     });
 
+    const completion = isSuccessStatus(result.statusCode)
+      ? parseCompletionResult(result.body)
+      : null;
+
+    if (completion?.status === 'authenticated') {
+      setAuthCookies(response, completion.tokens, { rememberMe: true });
+      response.redirect(googleConfig.successRedirectUrl);
+      return;
+    }
+
+    if (completion?.status === 'link_required') {
+      setGoogleOAuthLinkCookie(response, completion.linkTicket);
+      response.redirect(buildLinkRedirectUrl(googleConfig, profile.email));
+      return;
+    }
+
+    clearAuthCookies(response);
+    clearGoogleOAuthLinkCookie(response);
+    response.redirect(googleConfig.failureRedirectUrl);
+  }
+
+  async linkGoogleAccount(
+    password: string | undefined,
+    cookieHeader: string | undefined,
+    response: GoogleLinkResponse,
+  ): Promise<unknown> {
+    const linkTicket = getGoogleOAuthLinkTicket(cookieHeader);
+
+    if (!linkTicket || !password) {
+      clearGoogleOAuthLinkCookie(response);
+      response.status(400);
+
+      return { message: 'Google link request is missing or has expired.' };
+    }
+
+    const result = await this.proxyService.forward({
+      target: 'auth',
+      method: 'POST',
+      path: '/auth/oauth/google/link',
+      body: { linkTicket, password },
+    });
+
+    response.status(result.statusCode);
+
     if (
       isSuccessStatus(result.statusCode) &&
       isAuthTokensResponse(result.body)
     ) {
       setAuthCookies(response, result.body, { rememberMe: true });
-      response.redirect(googleConfig.successRedirectUrl);
-      return;
+      clearGoogleOAuthLinkCookie(response);
+
+      return { authenticated: true } satisfies AuthStatusResponse;
     }
 
-    clearAuthCookies(response);
-    response.redirect(googleConfig.failureRedirectUrl);
+    // Keep the ticket cookie on a wrong password (401) so the user can retry;
+    // drop it on any other failure since the ticket is no longer usable.
+    if (result.statusCode !== 401) {
+      clearGoogleOAuthLinkCookie(response);
+    }
+
+    return result.body;
   }
 }

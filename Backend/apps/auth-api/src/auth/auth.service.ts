@@ -32,6 +32,8 @@ import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
 import { VerifyPasswordResetCodeDto } from './dto/verify-password-reset-code.dto';
 import { ConfirmPasswordResetDto } from './dto/confirm-password-reset.dto';
 import { CompleteGoogleOAuthDto } from './dto/complete-google-oauth.dto';
+import { LinkGoogleOAuthDto } from './dto/link-google-oauth.dto';
+import { OAuthLinkTicketService } from './oauth-link-ticket.service';
 import { ConfigService } from '@nestjs/config';
 import { IsNull, type Repository } from 'typeorm';
 
@@ -56,6 +58,13 @@ export type PasswordResetVerificationResponse = {
 export type PasswordResetConfirmResponse = {
   success: true;
 };
+
+// A first-time Google login either authenticates straight away (new user or an
+// already-linked identity) or, when the email already belongs to a local
+// account, asks the caller to confirm ownership with a password before linking.
+export type GoogleOAuthCompletionResult =
+  | { status: 'authenticated'; tokens: AuthTokensResponse }
+  | { status: 'link_required'; linkTicket: string };
 
 const DEFAULT_PASSWORD_RESET_TTL_MINUTES = 10;
 const DEFAULT_PASSWORD_RESET_MAX_ATTEMPTS = 5;
@@ -87,6 +96,7 @@ export class AuthService {
     private readonly sessionService: SessionService,
     private readonly emailService: EmailService,
     private readonly configService: ConfigService,
+    private readonly oauthLinkTicketService: OAuthLinkTicketService,
   ) {}
 
   async validateUser(
@@ -147,7 +157,7 @@ export class AuthService {
 
   async completeGoogleOAuthLogin(
     dto: CompleteGoogleOAuthDto,
-  ): Promise<AuthTokensResponse> {
+  ): Promise<GoogleOAuthCompletionResult> {
     if (dto.emailVerified !== true) {
       throw new UnauthorizedException('Google email address is not verified.');
     }
@@ -170,28 +180,65 @@ export class AuthService {
     });
 
     if (existingIdentity) {
-      existingIdentity.email = email;
-      existingIdentity.emailVerified = true;
-      await this.oauthIdentitiesRepo.save(existingIdentity);
+      await this.syncIdentityEmail(existingIdentity, email);
 
-      return this.createSessionTokens(
-        this.toAuthenticatedUser(existingIdentity.user),
+      return this.authenticated(existingIdentity.user);
+    }
+
+    const existingUser = await this.usersService.findByEmail(email);
+
+    // Pre-account-hijacking guard: registration does not verify email, so a
+    // local account with this address may have been created by someone who
+    // never proved they own it. Require the user to confirm ownership with
+    // their password (handled by linkGoogleOAuthIdentity) before linking,
+    // rather than silently merging the verified Google identity into it.
+    if (existingUser) {
+      return {
+        status: 'link_required',
+        linkTicket: this.oauthLinkTicketService.sign({
+          provider: OAuthProvider.GOOGLE,
+          providerUserId,
+          email,
+          userId: existingUser.id,
+        }),
+      };
+    }
+
+    const user = await this.usersService.create({
+      email,
+      passwordHash: await this.createOAuthOnlyPasswordHash(),
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+      role: UserRole.CUSTOMER,
+    });
+
+    await this.linkGoogleIdentity(user, providerUserId, email);
+
+    return this.authenticated(user);
+  }
+
+  async linkGoogleOAuthIdentity(
+    dto: LinkGoogleOAuthDto,
+  ): Promise<AuthTokensResponse> {
+    const claims = this.oauthLinkTicketService.verify(dto.linkTicket);
+    const user = await this.usersService.findById(claims.userId);
+
+    if (!user || this.normalizeEmail(user.email) !== claims.email) {
+      throw new UnauthorizedException(
+        'Google link request is no longer valid.',
       );
     }
 
-    const user = await this.findOrCreateGoogleOAuthUser(email, dto);
-
-    await this.ensureUserDoesNotHaveGoogleIdentity(user.id);
-    await this.oauthIdentitiesRepo.save(
-      this.oauthIdentitiesRepo.create({
-        provider: OAuthProvider.GOOGLE,
-        providerUserId,
-        email,
-        emailVerified: true,
-        user,
-        userId: user.id,
-      }),
+    const isPasswordValid = await this.passwordService.compare(
+      dto.password,
+      user.passwordHash,
     );
+
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Incorrect password.');
+    }
+
+    await this.linkGoogleIdentity(user, claims.providerUserId, claims.email);
 
     return this.createSessionTokens(this.toAuthenticatedUser(user));
   }
@@ -350,31 +397,44 @@ export class AuthService {
     };
   }
 
-  private async findOrCreateGoogleOAuthUser(
-    email: string,
-    dto: CompleteGoogleOAuthDto,
-  ): Promise<User> {
-    const existingUser = await this.usersService.findByEmail(email);
+  private async authenticated(
+    user: User,
+  ): Promise<GoogleOAuthCompletionResult> {
+    return {
+      status: 'authenticated',
+      tokens: await this.createSessionTokens(this.toAuthenticatedUser(user)),
+    };
+  }
 
-    // Pre-account-hijacking guard: a local (password) account with this email
-    // may have been created by someone who never proved they own the address,
-    // because registration does not verify email. Silently merging the verified
-    // Google identity into it would hand that account — and its bookings — to
-    // whoever set the password. Until local email ownership is verified, refuse
-    // to auto-link and let the user sign in with their password instead.
-    if (existingUser) {
-      throw new ConflictException(
-        'An account with this email already exists. Please sign in with your password.',
-      );
+  private async syncIdentityEmail(
+    identity: OAuthIdentity,
+    email: string,
+  ): Promise<void> {
+    if (identity.email === email && identity.emailVerified) {
+      return;
     }
 
-    return this.usersService.create({
-      email,
-      passwordHash: await this.createOAuthOnlyPasswordHash(),
-      firstName: dto.firstName,
-      lastName: dto.lastName,
-      role: UserRole.CUSTOMER,
-    });
+    identity.email = email;
+    identity.emailVerified = true;
+    await this.oauthIdentitiesRepo.save(identity);
+  }
+
+  private async linkGoogleIdentity(
+    user: User,
+    providerUserId: string,
+    email: string,
+  ): Promise<void> {
+    await this.ensureUserDoesNotHaveGoogleIdentity(user.id);
+    await this.oauthIdentitiesRepo.save(
+      this.oauthIdentitiesRepo.create({
+        provider: OAuthProvider.GOOGLE,
+        providerUserId,
+        email,
+        emailVerified: true,
+        user,
+        userId: user.id,
+      }),
+    );
   }
 
   private async ensureUserDoesNotHaveGoogleIdentity(

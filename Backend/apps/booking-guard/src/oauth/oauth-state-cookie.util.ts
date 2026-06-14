@@ -2,7 +2,11 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { getCookieValue } from '../proxy/auth-cookie.util';
 
 const GOOGLE_OAUTH_STATE_COOKIE = 'gos';
+const GOOGLE_OAUTH_LINK_COOKIE = 'gol';
 const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
+const OAUTH_LINK_TTL_MS = 10 * 60 * 1000;
+const GOOGLE_CALLBACK_PATH = '/auth/google/callback';
+const GOOGLE_LINK_PATH = '/auth/google/link';
 
 type OAuthCookieOptions = {
   httpOnly: boolean;
@@ -20,14 +24,17 @@ export type OAuthStateCookieResponse = {
 
 type OAuthStateRequestQuery = Record<string, unknown> | undefined;
 
-function createCookieOptions(maxAge?: number): OAuthCookieOptions {
+function createCookieOptions(
+  path: string,
+  maxAge?: number,
+): OAuthCookieOptions {
   const domain = process.env.COOKIE_DOMAIN?.trim();
 
   return {
     httpOnly: true,
     secure: process.env.ENV !== 'develop',
     sameSite: 'lax',
-    path: '/auth/google/callback',
+    path,
     ...(maxAge ? { maxAge } : {}),
     ...(domain ? { domain } : {}),
   };
@@ -52,14 +59,43 @@ export function setGoogleOAuthStateCookie(
   response.cookie(
     GOOGLE_OAUTH_STATE_COOKIE,
     state,
-    createCookieOptions(OAUTH_STATE_TTL_MS),
+    createCookieOptions(GOOGLE_CALLBACK_PATH, OAUTH_STATE_TTL_MS),
   );
 }
 
 export function clearGoogleOAuthStateCookie(
   response: OAuthStateCookieResponse,
 ): void {
-  response.clearCookie(GOOGLE_OAUTH_STATE_COOKIE, createCookieOptions());
+  response.clearCookie(
+    GOOGLE_OAUTH_STATE_COOKIE,
+    createCookieOptions(GOOGLE_CALLBACK_PATH),
+  );
+}
+
+export function setGoogleOAuthLinkCookie(
+  response: OAuthStateCookieResponse,
+  linkTicket: string,
+): void {
+  response.cookie(
+    GOOGLE_OAUTH_LINK_COOKIE,
+    linkTicket,
+    createCookieOptions(GOOGLE_LINK_PATH, OAUTH_LINK_TTL_MS),
+  );
+}
+
+export function clearGoogleOAuthLinkCookie(
+  response: OAuthStateCookieResponse,
+): void {
+  response.clearCookie(
+    GOOGLE_OAUTH_LINK_COOKIE,
+    createCookieOptions(GOOGLE_LINK_PATH),
+  );
+}
+
+export function getGoogleOAuthLinkTicket(
+  cookieHeader: string | undefined,
+): string | undefined {
+  return getCookieValue(cookieHeader, GOOGLE_OAUTH_LINK_COOKIE);
 }
 
 export function getOAuthStateFromQuery(

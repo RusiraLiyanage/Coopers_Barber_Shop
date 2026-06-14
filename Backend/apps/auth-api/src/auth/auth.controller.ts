@@ -30,7 +30,9 @@ import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
 import { VerifyPasswordResetCodeDto } from './dto/verify-password-reset-code.dto';
 import { ConfirmPasswordResetDto } from './dto/confirm-password-reset.dto';
 import { CompleteGoogleOAuthDto } from './dto/complete-google-oauth.dto';
+import { LinkGoogleOAuthDto } from './dto/link-google-oauth.dto';
 import type {
+  GoogleOAuthCompletionResult,
   PasswordResetConfirmResponse,
   PasswordResetRequestResponse,
   PasswordResetVerificationResponse,
@@ -63,8 +65,21 @@ export class AuthController {
   @Post('oauth/google/complete')
   completeGoogleOAuthLogin(
     @Body() dto: CompleteGoogleOAuthDto,
-  ): Promise<AuthTokensResponse> {
+  ): Promise<GoogleOAuthCompletionResult> {
     return this.authService.completeGoogleOAuthLogin(dto);
+  }
+
+  @ApiOperation({
+    summary:
+      'Link a Google identity to an existing account after password check',
+  })
+  @ApiBody({ type: LinkGoogleOAuthDto })
+  @HttpCode(200)
+  @Post('oauth/google/link')
+  linkGoogleOAuthIdentity(
+    @Body() dto: LinkGoogleOAuthDto,
+  ): Promise<AuthTokensResponse> {
+    return this.authService.linkGoogleOAuthIdentity(dto);
   }
 
   @ApiOperation({ summary: 'Refresh access and refresh tokens' })

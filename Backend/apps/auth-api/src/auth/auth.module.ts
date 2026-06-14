@@ -18,6 +18,7 @@ import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { AuthSessionCleanupService } from './auth-session-cleanup.service';
+import { OAuthLinkTicketService } from './oauth-link-ticket.service';
 import { LocalStrategy } from './strategies/local.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
@@ -57,6 +58,7 @@ function getAccessTokenTtlSeconds(config: ConfigService): number {
     JwtTokenService,
     SessionService,
     AuthSessionCleanupService,
+    OAuthLinkTicketService,
   ],
   exports: [AuthService],
 })
