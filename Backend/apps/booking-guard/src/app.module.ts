@@ -7,6 +7,7 @@ import {
   XssProtectionMiddleware,
 } from '@coopers/common';
 import { HealthController } from './health.controller';
+import { OAuthModule } from './oauth/oauth.module';
 import { ProxyModule } from './proxy/proxy.module';
 
 @Module({
@@ -14,6 +15,7 @@ import { ProxyModule } from './proxy/proxy.module';
     ConfigModule.forRoot(createAppConfigOptions()), // configuration key and values are injected into the App Module
     ApiRateLimitModule.forRoot(), // adding rate limitor to the application
     GuardConfigModule,
+    OAuthModule,
     ProxyModule,
   ],
   controllers: [HealthController],

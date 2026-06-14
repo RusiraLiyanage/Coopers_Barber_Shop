@@ -19,12 +19,12 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 
 function getAccessTokenTtlSeconds(config: ConfigService): number {
   const configuredTtl = Number(
-    config.get<string>('ACCESS_TOKEN_TTL_SECONDS') ?? '300',
+    config.get<string>('ACCESS_TOKEN_TTL_SECONDS') ?? '120',
   );
 
   return Number.isFinite(configuredTtl) && configuredTtl > 0
     ? configuredTtl
-    : 300;
+    : 120;
 }
 
 @Module({
