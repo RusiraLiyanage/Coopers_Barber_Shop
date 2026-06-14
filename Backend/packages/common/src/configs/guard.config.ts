@@ -7,6 +7,15 @@ export type GuardUpstreamConfig = {
   frontendUrl: string;
 };
 
+export type GoogleOAuthConfig = {
+  clientId: string;
+  clientSecret: string;
+  callbackUrl: string;
+  successRedirectUrl: string;
+  failureRedirectUrl: string;
+  scope: string[];
+};
+
 function normalizeServiceUrl(value: string): string {
   return value.replace(/\/+$/, ''); // get rid of any end slashes of the url
 }
@@ -61,6 +70,23 @@ export class GuardConfigService {
       frontendUrl: normalizeServiceUrl(
         this.config.get<string>('FRONTEND_DEV_URL') ?? this.frontendUrl,
       ),
+    };
+  }
+
+  getGoogleOAuthConfig(): GoogleOAuthConfig {
+    return {
+      clientId: getRequiredString(this.config, 'GOOGLE_CLIENT_ID'),
+      clientSecret: getRequiredString(this.config, 'GOOGLE_CLIENT_SECRET'),
+      callbackUrl: getRequiredString(this.config, 'GOOGLE_CALLBACK_URL'),
+      successRedirectUrl: getRequiredString(
+        this.config,
+        'OAUTH_SUCCESS_REDIRECT_URL',
+      ),
+      failureRedirectUrl: getRequiredString(
+        this.config,
+        'OAUTH_FAILURE_REDIRECT_URL',
+      ),
+      scope: ['email', 'profile'],
     };
   }
 }

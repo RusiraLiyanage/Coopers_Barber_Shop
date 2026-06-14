@@ -8,3 +8,4 @@ export * from './safety-rule.entity';
 export * from './hair-history.entity';
 export * from './appointment-brief.entity';
 export * from './invite-token.entity';
+export * from './oauth-identity.entity';
