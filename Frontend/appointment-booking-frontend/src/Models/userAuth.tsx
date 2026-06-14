@@ -11,6 +11,7 @@ import {
 import { useEffect, useState } from 'react';
 import {
   ApiRequestError,
+  beginGoogleOAuthLogin,
   toAuthSession,
   type AuthSession,
   type RegisterPayload,
@@ -33,7 +34,7 @@ import './userAuth.css';
 
 interface UserAuthModalProps {
   open: boolean;
-  sessionTimeoutState?: 'none' | 'extend_prompt' | 'logged_out';
+  sessionTimeoutState?: 'none' | 'extend_prompt';
   onClose: () => void;
   onExtendSession?: () => Promise<void>;
   onSessionLogout?: () => Promise<void>;
@@ -112,7 +113,6 @@ export default function UserAuthModal({
   const isForgotPasswordMode = authMode === 'forgot-password';
   const isSessionTimeoutMode = sessionTimeoutState !== 'none';
   const isExtendPrompt = sessionTimeoutState === 'extend_prompt';
-  const isLoggedOutAfterTimeout = sessionTimeoutState === 'logged_out';
   const shouldShowSessionExtendFailure =
     isSessionTimeoutMode && sessionExtendFailed && authAlert !== null;
 
@@ -257,6 +257,11 @@ export default function UserAuthModal({
     } finally {
       setConfirmLoading(false);
     }
+  };
+
+  const handleGoogleOAuthLogin = () => {
+    setAuthAlert(null);
+    beginGoogleOAuthLogin();
   };
 
   const handleRegister = async (values: FieldType) => {
@@ -434,10 +439,6 @@ export default function UserAuthModal({
       return 'Do you want to extend your session or logout?';
     }
 
-    if (isLoggedOutAfterTimeout) {
-      return 'Please log in again to continue.';
-    }
-
     if (!isForgotPasswordMode) {
       return isLoginMode
         ? 'Enter your details to continue.'
@@ -466,6 +467,25 @@ export default function UserAuthModal({
 
     return 'Update password';
   };
+
+  const renderGoogleOAuthOption = () => (
+    <div className="auth-oauth-section">
+      <div className="auth-oauth-divider">
+        <span>or</span>
+      </div>
+      <Button
+        block
+        htmlType="button"
+        className="auth-google-button"
+        onClick={handleGoogleOAuthLogin}
+      >
+        <span className="auth-google-mark" aria-hidden="true">
+          G
+        </span>
+        Continue with Google
+      </Button>
+    </div>
+  );
 
   return (
     <>
@@ -524,18 +544,10 @@ export default function UserAuthModal({
             ) : (
               <>
                 <Alert
-                  type={isLoggedOutAfterTimeout ? 'error' : 'warning'}
+                  type="warning"
                   showIcon
-                  message={
-                    isLoggedOutAfterTimeout
-                      ? 'Session expired'
-                      : 'Session inactive'
-                  }
-                  description={
-                    isLoggedOutAfterTimeout
-                      ? 'Your session has ended. Please log in again.'
-                      : 'Your session was paused because there has been no recent activity.'
-                  }
+                  message="Session inactive"
+                  description="Your session was paused because there has been no recent activity."
                   className="auth-modal-alert"
                 />
 
@@ -785,6 +797,8 @@ export default function UserAuthModal({
                   >
                     Log in
                   </Button>
+
+                  {renderGoogleOAuthOption()}
                 </Form>
               ) : (
                 <Form
@@ -910,6 +924,8 @@ export default function UserAuthModal({
                   >
                     Sign up
                   </Button>
+
+                  {renderGoogleOAuthOption()}
                 </Form>
               )}
 

@@ -23,5 +23,6 @@ import { RefreshTokenCoordinatorService } from './refresh-token-coordinator.serv
     FrontendProxyService,
     RefreshTokenCoordinatorService,
   ],
+  exports: [ProxyService],
 })
 export class ProxyModule {}

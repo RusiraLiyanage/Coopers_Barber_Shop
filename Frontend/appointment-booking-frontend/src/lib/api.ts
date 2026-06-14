@@ -98,6 +98,13 @@ function buildHeaders() {
   };
 }
 
+function buildApiUrl(path: string): string {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, "");
+
+  return `${normalizedBaseUrl}${normalizedPath}`;
+}
+
 function getSessionStorageValue(key: string): string | null {
   try {
     return window.sessionStorage.getItem(key);
@@ -191,7 +198,7 @@ async function request<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(buildApiUrl(path), {
     credentials: "include",
     ...options,
   });
@@ -346,6 +353,11 @@ export async function login(email: string, password: string, remember: boolean) 
   }
 
   return response;
+}
+
+export function beginGoogleOAuthLogin(): void {
+  rememberClientAuthSession(true);
+  window.location.assign(buildApiUrl("/auth/google"));
 }
 
 export async function register(payload: RegisterPayload) {

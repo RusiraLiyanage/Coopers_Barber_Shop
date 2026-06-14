@@ -1,15 +1,20 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  GoogleOAuthSessionService,
+  OAuthRedirectResponse,
+} from './google-oauth-session.service';
 import { GoogleOAuthCallbackGuard } from './guards/google-oauth-callback.guard';
 import { GoogleOAuthGuard } from './guards/google-oauth.guard';
-import type {
-  NormalizedOAuthProfile,
-  OAuthAuthenticatedRequest,
-} from './oauth.types';
+import type { OAuthAuthenticatedRequest } from './oauth.types';
 
 @ApiTags('guard-oauth')
 @Controller('auth/google')
 export class GoogleOAuthController {
+  constructor(
+    private readonly googleOAuthSessionService: GoogleOAuthSessionService,
+  ) {}
+
   @ApiOperation({ summary: 'Redirect to Google OAuth login' })
   @UseGuards(GoogleOAuthGuard)
   @Get()
@@ -20,9 +25,13 @@ export class GoogleOAuthController {
   @ApiOperation({ summary: 'Handle Google OAuth callback' })
   @UseGuards(GoogleOAuthCallbackGuard)
   @Get('callback')
-  handleGoogleCallback(
+  async handleGoogleCallback(
     @Req() request: OAuthAuthenticatedRequest,
-  ): NormalizedOAuthProfile {
-    return request.user;
+    @Res() response: OAuthRedirectResponse,
+  ): Promise<void> {
+    await this.googleOAuthSessionService.completeGoogleLogin(
+      request.user,
+      response,
+    );
   }
 }

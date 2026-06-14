@@ -8,6 +8,7 @@ import MyAccount from './pages/MyAccount';
 import UserAuthModal from './Models/userAuth';
 import MakeAppointmentModal from './Models/makeAppointment';
 import {
+  clearClientAuthSession,
   canRestoreClientAuthSession,
   isSessionIdleExpiredError,
   SESSION_IDLE_EXPIRED_EVENT,
@@ -29,8 +30,17 @@ import './App.css';
 
 const { Content, Footer } = Layout;
 const LEGACY_AUTH_TOKEN_KEY = 'booking_auth_token';
+const SESSION_RESTORE_ROUTES = new Set([
+  '/appointments',
+  '/account',
+  '/new-appointment',
+]);
 
-type SessionTimeoutFlowState = 'none' | 'extend_prompt' | 'logged_out';
+type SessionTimeoutFlowState = 'none' | 'extend_prompt';
+
+function shouldRestoreSessionForRoute(pathname: string): boolean {
+  return SESSION_RESTORE_ROUTES.has(pathname);
+}
 
 function App() {
   const dispatch = useAppDispatch();
@@ -71,8 +81,11 @@ function App() {
 
   useEffect(() => {
     let isMounted = true;
+    const shouldRestoreSession =
+      canRestoreClientAuthSession() ||
+      shouldRestoreSessionForRoute(location.pathname);
 
-    if (!canRestoreClientAuthSession()) {
+    if (!shouldRestoreSession) {
       if (shouldClearStaleClientAuthSession()) {
         void dispatch(logoutAction())
           .unwrap()
@@ -105,6 +118,7 @@ function App() {
         }
 
         setAuthSession(null);
+        clearClientAuthSession();
       })
       .finally(() => {
         if (isMounted) {
@@ -115,7 +129,7 @@ function App() {
     return () => {
       isMounted = false;
     };
-  }, [dispatch, setAuthSession, showSessionExtensionPrompt]);
+  }, [dispatch, location.pathname, setAuthSession, showSessionExtensionPrompt]);
 
   useEffect(() => {
     const handleSessionIdleExpired = () => {
@@ -166,7 +180,7 @@ function App() {
   };
 
   const handleSessionTimeoutLogout = async () => {
-    setSessionTimeoutFlowState('logged_out');
+    setSessionTimeoutFlowState('none');
     setAuthSession(null);
     setEditingAppointment(null);
     setOpenAppointmentModal(false);

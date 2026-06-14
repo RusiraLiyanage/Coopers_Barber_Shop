@@ -9,7 +9,11 @@ import {
   PasswordService,
   SessionService,
 } from '@coopers/common';
-import { AuthSession, PasswordResetToken } from '@coopers/entities';
+import {
+  AuthSession,
+  OAuthIdentity,
+  PasswordResetToken,
+} from '@coopers/entities';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -31,7 +35,7 @@ function getAccessTokenTtlSeconds(config: ConfigService): number {
   imports: [
     UsersModule, // imports will make thing easier to import within the Auth Service.
     EmailModule,
-    TypeOrmModule.forFeature([AuthSession, PasswordResetToken]),
+    TypeOrmModule.forFeature([AuthSession, PasswordResetToken, OAuthIdentity]),
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

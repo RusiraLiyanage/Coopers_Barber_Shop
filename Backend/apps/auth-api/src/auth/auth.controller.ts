@@ -29,6 +29,7 @@ import { AccountProfileResponse } from './auth.service';
 import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
 import { VerifyPasswordResetCodeDto } from './dto/verify-password-reset-code.dto';
 import { ConfirmPasswordResetDto } from './dto/confirm-password-reset.dto';
+import { CompleteGoogleOAuthDto } from './dto/complete-google-oauth.dto';
 import type {
   PasswordResetConfirmResponse,
   PasswordResetRequestResponse,
@@ -52,6 +53,18 @@ export class AuthController {
   @Post('register')
   register(@Body() dto: RegisterDto): Promise<AuthTokensResponse> {
     return this.authService.register(dto);
+  }
+
+  @ApiOperation({
+    summary: 'Complete Google OAuth login from the booking guard',
+  })
+  @ApiBody({ type: CompleteGoogleOAuthDto })
+  @HttpCode(200)
+  @Post('oauth/google/complete')
+  completeGoogleOAuthLogin(
+    @Body() dto: CompleteGoogleOAuthDto,
+  ): Promise<AuthTokensResponse> {
+    return this.authService.completeGoogleOAuthLogin(dto);
   }
 
   @ApiOperation({ summary: 'Refresh access and refresh tokens' })

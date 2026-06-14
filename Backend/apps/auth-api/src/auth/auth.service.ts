@@ -1,4 +1,4 @@
-import { createHash, randomInt } from 'node:crypto';
+import { createHash, randomBytes, randomInt } from 'node:crypto';
 import {
   ConflictException,
   Injectable,
@@ -9,6 +9,8 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   AuthSession,
+  OAuthIdentity,
+  OAuthProvider,
   PasswordResetToken,
   User,
   UserRole,
@@ -29,6 +31,7 @@ import { UpdateAccountDto } from './dto/update-account.dto';
 import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
 import { VerifyPasswordResetCodeDto } from './dto/verify-password-reset-code.dto';
 import { ConfirmPasswordResetDto } from './dto/confirm-password-reset.dto';
+import { CompleteGoogleOAuthDto } from './dto/complete-google-oauth.dto';
 import { ConfigService } from '@nestjs/config';
 import { IsNull, type Repository } from 'typeorm';
 
@@ -76,6 +79,8 @@ export class AuthService {
   constructor(
     @InjectRepository(PasswordResetToken)
     private readonly passwordResetTokensRepo: Repository<PasswordResetToken>,
+    @InjectRepository(OAuthIdentity)
+    private readonly oauthIdentitiesRepo: Repository<OAuthIdentity>,
     private readonly usersService: UsersService,
     private readonly passwordService: PasswordService,
     private readonly jwtTokenService: JwtTokenService,
@@ -138,6 +143,57 @@ export class AuthService {
       email: user.email,
       role: user.role,
     });
+  }
+
+  async completeGoogleOAuthLogin(
+    dto: CompleteGoogleOAuthDto,
+  ): Promise<AuthTokensResponse> {
+    if (dto.emailVerified !== true) {
+      throw new UnauthorizedException('Google email address is not verified.');
+    }
+
+    const email = this.normalizeEmail(dto.email);
+    const providerUserId = dto.providerUserId.trim();
+
+    if (!providerUserId) {
+      throw new UnauthorizedException('Invalid Google identity.');
+    }
+
+    const existingIdentity = await this.oauthIdentitiesRepo.findOne({
+      where: {
+        provider: OAuthProvider.GOOGLE,
+        providerUserId,
+      },
+      relations: {
+        user: true,
+      },
+    });
+
+    if (existingIdentity) {
+      existingIdentity.email = email;
+      existingIdentity.emailVerified = true;
+      await this.oauthIdentitiesRepo.save(existingIdentity);
+
+      return this.createSessionTokens(
+        this.toAuthenticatedUser(existingIdentity.user),
+      );
+    }
+
+    const user = await this.findOrCreateGoogleOAuthUser(email, dto);
+
+    await this.ensureUserDoesNotHaveGoogleIdentity(user.id);
+    await this.oauthIdentitiesRepo.save(
+      this.oauthIdentitiesRepo.create({
+        provider: OAuthProvider.GOOGLE,
+        providerUserId,
+        email,
+        emailVerified: true,
+        user,
+        userId: user.id,
+      }),
+    );
+
+    return this.createSessionTokens(this.toAuthenticatedUser(user));
   }
 
   async refresh(refreshToken: string): Promise<AuthTokensResponse> {
@@ -292,6 +348,46 @@ export class AuthService {
       email: user.email,
       role: user.role,
     };
+  }
+
+  private async findOrCreateGoogleOAuthUser(
+    email: string,
+    dto: CompleteGoogleOAuthDto,
+  ): Promise<User> {
+    const existingUser = await this.usersService.findByEmail(email);
+
+    if (existingUser) {
+      return existingUser;
+    }
+
+    return this.usersService.create({
+      email,
+      passwordHash: await this.createOAuthOnlyPasswordHash(),
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+      role: UserRole.CUSTOMER,
+    });
+  }
+
+  private async ensureUserDoesNotHaveGoogleIdentity(
+    userId: string,
+  ): Promise<void> {
+    const existingUserIdentity = await this.oauthIdentitiesRepo.findOne({
+      where: {
+        userId,
+        provider: OAuthProvider.GOOGLE,
+      },
+    });
+
+    if (existingUserIdentity) {
+      throw new ConflictException('User already has a linked Google account.');
+    }
+  }
+
+  private createOAuthOnlyPasswordHash(): Promise<string> {
+    return this.passwordService.hash(
+      `oauth:${randomBytes(32).toString('hex')}`,
+    );
   }
 
   private async findVerifiedPasswordResetToken(
