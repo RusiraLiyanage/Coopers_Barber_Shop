@@ -37,8 +37,6 @@ function createGoogleOAuthCompletionBody(profile: NormalizedOAuthProfile) {
     emailVerified: profile.emailVerified,
     firstName: profile.firstName,
     lastName: profile.lastName,
-    displayName: profile.displayName,
-    picture: profile.picture,
   };
 }
 

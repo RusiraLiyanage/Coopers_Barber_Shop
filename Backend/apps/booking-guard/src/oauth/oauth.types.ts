@@ -7,8 +7,6 @@ export type NormalizedOAuthProfile = {
   emailVerified: boolean;
   firstName?: string;
   lastName?: string;
-  displayName?: string;
-  picture?: string;
 };
 
 export type OAuthAuthenticatedRequest = {

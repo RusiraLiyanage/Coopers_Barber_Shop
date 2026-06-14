@@ -4,9 +4,6 @@ import { GuardConfigService } from '@coopers/common';
 import { Profile, Strategy } from 'passport-google-oauth20';
 import { NormalizedOAuthProfile } from '../oauth.types';
 
-const DEFAULT_GOOGLE_CALLBACK_URL =
-  'http://localhost:7311/auth/google/callback';
-
 type GoogleEmail = {
   value: string;
   verified?: boolean;
@@ -29,38 +26,16 @@ function findPrimaryEmail(profile: Profile): GoogleEmail | undefined {
   return profile.emails?.find((email) => email.value.trim().length > 0);
 }
 
-function getConfiguredValue(
-  guardConfig: GuardConfigService,
-  key: keyof ReturnType<GuardConfigService['getGoogleOAuthConfig']>,
-  fallback: string,
-): string {
-  try {
-    return guardConfig.getGoogleOAuthConfig()[key] as string;
-  } catch {
-    return fallback;
-  }
-}
-
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   constructor(guardConfig: GuardConfigService) {
+    const config = guardConfig.getGoogleOAuthConfig();
+
     super({
-      clientID: getConfiguredValue(
-        guardConfig,
-        'clientId',
-        'google-oauth-client-id-not-configured',
-      ),
-      clientSecret: getConfiguredValue(
-        guardConfig,
-        'clientSecret',
-        'google-oauth-client-secret-not-configured',
-      ),
-      callbackURL: getConfiguredValue(
-        guardConfig,
-        'callbackUrl',
-        DEFAULT_GOOGLE_CALLBACK_URL,
-      ),
-      scope: ['email', 'profile'],
+      clientID: config.clientId,
+      clientSecret: config.clientSecret,
+      callbackURL: config.callbackUrl,
+      scope: config.scope,
     });
   }
 
@@ -88,8 +63,6 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       emailVerified: true,
       firstName: profile._json.given_name ?? profile.name?.givenName,
       lastName: profile._json.family_name ?? profile.name?.familyName,
-      displayName: profile._json.name ?? profile.displayName,
-      picture: profile._json.picture,
     };
   }
 }

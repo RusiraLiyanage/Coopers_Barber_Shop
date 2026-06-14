@@ -32,16 +32,4 @@ export class CompleteGoogleOAuthDto {
   @IsOptional()
   @IsString()
   lastName?: string;
-
-  @ApiPropertyOptional({ example: 'Cooper Smith' })
-  @IsOptional()
-  @IsString()
-  displayName?: string;
-
-  @ApiPropertyOptional({
-    example: 'https://lh3.googleusercontent.com/a/profile-photo',
-  })
-  @IsOptional()
-  @IsString()
-  picture?: string;
 }

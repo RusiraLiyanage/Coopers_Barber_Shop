@@ -356,8 +356,16 @@ export class AuthService {
   ): Promise<User> {
     const existingUser = await this.usersService.findByEmail(email);
 
+    // Pre-account-hijacking guard: a local (password) account with this email
+    // may have been created by someone who never proved they own the address,
+    // because registration does not verify email. Silently merging the verified
+    // Google identity into it would hand that account — and its bookings — to
+    // whoever set the password. Until local email ownership is verified, refuse
+    // to auto-link and let the user sign in with their password instead.
     if (existingUser) {
-      return existingUser;
+      throw new ConflictException(
+        'An account with this email already exists. Please sign in with your password.',
+      );
     }
 
     return this.usersService.create({
