@@ -1,4 +1,4 @@
-export type ProxyTarget = 'auth' | 'booking';
+export type ProxyTarget = 'auth' | 'booking' | 'admin';
 
 export type ProxyMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 

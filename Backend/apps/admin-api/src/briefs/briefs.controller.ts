@@ -1,6 +1,15 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiOperation,
   ApiParam,
   ApiTags,
@@ -9,24 +18,36 @@ import { AppointmentBrief } from '@coopers/entities';
 import { AdminRoleGuard } from '../auth/guards/admin-role.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { BriefsService } from './briefs.service';
+import { BriefsQueryDto } from './dto/briefs-query.dto';
+import { CreateBriefDto } from './dto/create-brief.dto';
 
 @ApiTags('briefs')
 @ApiBearerAuth('access-token')
-@UseGuards(JwtAuthGuard, AdminRoleGuard)
 @Controller('admin/briefs')
 export class BriefsController {
   constructor(private readonly briefsService: BriefsService) {}
 
   @ApiOperation({ summary: 'List generated appointment briefs' })
+  @UseGuards(JwtAuthGuard, AdminRoleGuard)
   @Get()
-  findAll(): Promise<AppointmentBrief[]> {
-    return this.briefsService.findAll();
+  findAll(@Query() query: BriefsQueryDto): Promise<AppointmentBrief[]> {
+    return this.briefsService.findAll(query);
   }
 
   @ApiOperation({ summary: 'Get a generated appointment brief' })
   @ApiParam({ name: 'id' })
+  @UseGuards(JwtAuthGuard, AdminRoleGuard)
   @Get(':id')
   findOne(@Param('id') id: string): Promise<AppointmentBrief> {
     return this.briefsService.findOne(id);
+  }
+
+  @ApiOperation({
+    summary: 'Create an appointment brief from an internal agent',
+  })
+  @ApiBody({ type: CreateBriefDto })
+  @Post('internal')
+  create(@Body() createBriefDto: CreateBriefDto): Promise<AppointmentBrief> {
+    return this.briefsService.create(createBriefDto);
   }
 }

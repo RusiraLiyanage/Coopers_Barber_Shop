@@ -6,16 +6,22 @@ import Home from './pages/HomePage';
 import MyAppointments from './pages/MyAppointments';
 import MyAccount from './pages/MyAccount';
 import UserAuthModal from './Models/userAuth';
+import GoogleLinkModal from './Models/googleLink';
 import MakeAppointmentModal from './Models/makeAppointment';
 import {
   clearClientAuthSession,
+  clearGoogleLinkPromptFromUrl,
   canRestoreClientAuthSession,
+  isSessionExpiredError,
   isSessionIdleExpiredError,
+  readGoogleLinkPrompt,
+  SESSION_EXPIRED_EVENT,
   SESSION_IDLE_EXPIRED_EVENT,
   shouldClearStaleClientAuthSession,
   toAuthSession,
   type AppointmentRecord,
   type AuthSession,
+  type GoogleLinkPrompt,
 } from './lib/api';
 import { resetStore } from './store';
 import { useAppDispatch, useAppSelector } from './store/hooks';
@@ -36,7 +42,7 @@ const SESSION_RESTORE_ROUTES = new Set([
   '/new-appointment',
 ]);
 
-type SessionTimeoutFlowState = 'none' | 'extend_prompt';
+type SessionTimeoutFlowState = 'none' | 'extend_prompt' | 'expired_notice';
 
 function shouldRestoreSessionForRoute(pathname: string): boolean {
   return SESSION_RESTORE_ROUTES.has(pathname);
@@ -55,6 +61,8 @@ function App() {
   const [appointmentsRefreshKey, setAppointmentsRefreshKey] = useState(0);
   const [sessionTimeoutFlowState, setSessionTimeoutFlowState] =
     useState<SessionTimeoutFlowState>('none');
+  const [googleLinkPrompt, setGoogleLinkPrompt] =
+    useState<GoogleLinkPrompt | null>(() => readGoogleLinkPrompt());
 
   const isAuthenticated = Boolean(authSession?.authenticated);
   const isSessionTimeoutPromptOpen = sessionTimeoutFlowState !== 'none';
@@ -77,6 +85,15 @@ function App() {
     navigate('/');
     setOpenAuthModal(true);
     setSessionTimeoutFlowState('extend_prompt');
+  }, [navigate, setAuthSession]);
+
+  const showSessionExpiredNotice = useCallback(() => {
+    setAuthSession(null);
+    setEditingAppointment(null);
+    setOpenAppointmentModal(false);
+    navigate('/');
+    setOpenAuthModal(true);
+    setSessionTimeoutFlowState('expired_notice');
   }, [navigate, setAuthSession]);
 
   useEffect(() => {
@@ -117,6 +134,11 @@ function App() {
           return;
         }
 
+        if (isSessionExpiredError(error)) {
+          showSessionExpiredNotice();
+          return;
+        }
+
         setAuthSession(null);
         clearClientAuthSession();
       })
@@ -129,25 +151,45 @@ function App() {
     return () => {
       isMounted = false;
     };
-  }, [dispatch, location.pathname, setAuthSession, showSessionExtensionPrompt]);
+  }, [
+    dispatch,
+    location.pathname,
+    setAuthSession,
+    showSessionExpiredNotice,
+    showSessionExtensionPrompt,
+  ]);
+
+  useEffect(() => {
+    // Strip the link markers from the URL once captured so a refresh or share
+    // doesn't re-trigger the prompt; the httpOnly link ticket cookie still
+    // drives the actual linking request.
+    if (googleLinkPrompt) {
+      clearGoogleLinkPromptFromUrl();
+    }
+  }, [googleLinkPrompt]);
 
   useEffect(() => {
     const handleSessionIdleExpired = () => {
       showSessionExtensionPrompt();
+    };
+    const handleSessionExpired = () => {
+      showSessionExpiredNotice();
     };
 
     window.addEventListener(
       SESSION_IDLE_EXPIRED_EVENT,
       handleSessionIdleExpired,
     );
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
 
     return () => {
       window.removeEventListener(
         SESSION_IDLE_EXPIRED_EVENT,
         handleSessionIdleExpired,
       );
+      window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
     };
-  }, [showSessionExtensionPrompt]);
+  }, [showSessionExpiredNotice, showSessionExtensionPrompt]);
 
   useEffect(() => {
     if (
@@ -228,6 +270,11 @@ function App() {
           return;
         }
 
+        if (isSessionExpiredError(error)) {
+          showSessionExpiredNotice();
+          return;
+        }
+
         setAuthSession(null);
         setEditingAppointment(null);
         setOpenAppointmentModal(false);
@@ -241,6 +288,7 @@ function App() {
       dispatch,
       navigate,
       setAuthSession,
+      showSessionExpiredNotice,
       showSessionExtensionPrompt,
     ],
   );
@@ -337,6 +385,18 @@ function App() {
           setSessionTimeoutFlowState('none'); // none means no need to show the extend screen
           setOpenAuthModal(false);
           setEditingAppointment(null);
+        }}
+      />
+
+      <GoogleLinkModal
+        open={Boolean(googleLinkPrompt)}
+        email={googleLinkPrompt?.email ?? ''}
+        onClose={() => setGoogleLinkPrompt(null)}
+        onLinked={(session) => {
+          setAuthSession(session);
+          setSessionTimeoutFlowState('none');
+          setOpenAuthModal(false);
+          setGoogleLinkPrompt(null);
         }}
       />
 

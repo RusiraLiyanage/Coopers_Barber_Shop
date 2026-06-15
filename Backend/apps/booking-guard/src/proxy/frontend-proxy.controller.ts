@@ -22,10 +22,25 @@ type FrontendProxyResponse = {
 export class FrontendProxyController {
   constructor(private readonly frontendProxyService: FrontendProxyService) {}
 
-  @All('*')
-  async forwardFrontend(
+  @All()
+  async forwardFrontendRoot(
     @Req() request: FrontendProxyRequest,
     @Res() response: FrontendProxyResponse,
+  ): Promise<void> {
+    return this.forwardFrontendRequest(request, response);
+  }
+
+  @All('*path')
+  async forwardFrontendPath(
+    @Req() request: FrontendProxyRequest,
+    @Res() response: FrontendProxyResponse,
+  ): Promise<void> {
+    return this.forwardFrontendRequest(request, response);
+  }
+
+  private async forwardFrontendRequest(
+    request: FrontendProxyRequest,
+    response: FrontendProxyResponse,
   ): Promise<void> {
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       throw new NotFoundException('Route not found.');

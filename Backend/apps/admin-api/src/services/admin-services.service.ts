@@ -4,6 +4,22 @@ import { Repository } from 'typeorm';
 import { Service } from '@coopers/entities';
 import { UpdateServiceAiConfigDto } from './dto/update-service-ai-config.dto';
 
+function normalizeSkillTags(
+  values: string[] | undefined,
+): string[] | undefined {
+  if (!values) {
+    return undefined;
+  }
+
+  return Array.from(
+    new Set(
+      values
+        .map((value) => value.trim().toLowerCase())
+        .filter((value) => value.length > 0),
+    ),
+  );
+}
+
 @Injectable()
 export class AdminServicesService {
   constructor(
@@ -36,6 +52,12 @@ export class AdminServicesService {
     const service = await this.servicesRepository.preload({
       id,
       ...updateServiceAiConfigDto,
+      requiredSkills: normalizeSkillTags(
+        updateServiceAiConfigDto.requiredSkills,
+      ),
+      safetyTriggers: normalizeSkillTags(
+        updateServiceAiConfigDto.safetyTriggers,
+      ),
     });
 
     if (!service) {

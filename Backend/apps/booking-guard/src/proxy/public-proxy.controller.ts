@@ -6,6 +6,7 @@ import {
   Param,
   Post,
   Res,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { AuthTokensResponse } from '@coopers/common';
@@ -67,6 +68,15 @@ type PasswordResetVerifyBody = {
 
 type PasswordResetConfirmBody = PasswordResetVerifyBody & {
   password: string;
+};
+
+type AcceptAdminInviteRequestBody = {
+  token: string;
+  password: string;
+  firstName?: string;
+  lastName?: string;
+  mobile?: string;
+  suburb?: string;
 };
 
 function writeStatus(response: StatusResponse, statusCode: number): void {
@@ -219,6 +229,24 @@ export class PublicProxyController {
     return writeAuthResponse(response, result, getRememberMe(body));
   }
 
+  @ApiOperation({ summary: 'Proxy admin invite acceptance to admin-api' })
+  @Post('admin/invites/accept')
+  async acceptAdminInvite(
+    @Body() body: AcceptAdminInviteRequestBody,
+    @Res({ passthrough: true }) response: StatusResponse,
+  ): Promise<unknown> {
+    const result = await this.proxyService.forward({
+      target: 'admin',
+      method: 'POST',
+      path: '/admin/invites/accept',
+      body,
+    });
+
+    writeStatus(response, result.statusCode);
+
+    return result.body;
+  }
+
   @ApiOperation({ summary: 'Validate current guard cookie session' })
   @Get('auth/session')
   async session(
@@ -227,14 +255,27 @@ export class PublicProxyController {
     @Headers('cookie') cookieHeader: string | undefined,
     @Res({ passthrough: true }) response: AuthCookieResponse,
   ): Promise<AuthStatusResponse> {
-    const result = await this.protectedProxyService.validateSession({
-      authorizationHeader: getAuthorizationHeaderFromRequest(
-        authorizationHeader,
-        cookieHeader,
-      ),
-      refreshToken: createRefreshTokenBody(refreshTokenHeader, cookieHeader, {})
-        .refresh_token,
-    });
+    let result: ProtectedProxyResponse;
+
+    try {
+      result = await this.protectedProxyService.validateSession({
+        authorizationHeader: getAuthorizationHeaderFromRequest(
+          authorizationHeader,
+          cookieHeader,
+        ),
+        refreshToken: createRefreshTokenBody(
+          refreshTokenHeader,
+          cookieHeader,
+          {},
+        ).refresh_token,
+      });
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        clearAuthCookies(response);
+      }
+
+      throw error;
+    }
 
     return writeSessionResponse(
       response,

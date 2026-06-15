@@ -21,12 +21,12 @@ export class SafetyRule {
   condition: string;
 
   @Column({
-    name: 'services',
-    type: 'text',
+    name: 'service_ids',
+    type: 'uuid',
     array: true,
     default: () => "'{}'",
   })
-  services: string[];
+  serviceIds: string[];
 
   @Column({ type: 'text' })
   message: string;

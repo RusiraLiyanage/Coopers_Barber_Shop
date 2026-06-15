@@ -1,7 +1,33 @@
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
+import {
+  Appointment,
+  AppointmentBrief,
+  AuthSession,
+  HairHistory,
+  InviteToken,
+  OAuthIdentity,
+  PasswordResetToken,
+  SafetyRule,
+  Service,
+  Staff,
+  User,
+} from '@coopers/entities';
 
 const DEFAULT_DB_PORT = '5432';
+const SHARED_ENTITIES = [
+  Appointment,
+  AppointmentBrief,
+  AuthSession,
+  HairHistory,
+  InviteToken,
+  OAuthIdentity,
+  PasswordResetToken,
+  SafetyRule,
+  Service,
+  Staff,
+  User,
+];
 
 export const createDatabaseConfig = (
   config: ConfigService,
@@ -12,6 +38,7 @@ export const createDatabaseConfig = (
   username: config.get<string>('DB_USERNAME', 'booking_user'),
   password: config.get<string>('DB_PASSWORD', 'rusira123'),
   database: config.get<string>('DB_DATABASE', 'booking_db'),
+  entities: SHARED_ENTITIES,
   autoLoadEntities: true,
   synchronize: false,
   logging: ['error', 'warn'],

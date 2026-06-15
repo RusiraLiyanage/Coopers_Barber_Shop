@@ -45,6 +45,7 @@ export interface LogoutResponse {
 }
 
 export const SESSION_IDLE_EXPIRED_CODE = 'SESSION_IDLE_EXPIRED';
+export const SESSION_EXPIRED_CODE = 'SESSION_EXPIRED';
 
 export interface ActiveSessionValidationResponse {
   active: true;
@@ -52,7 +53,7 @@ export interface ActiveSessionValidationResponse {
 
 export interface InactiveSessionValidationResponse {
   active: false;
-  code?: typeof SESSION_IDLE_EXPIRED_CODE;
+  code?: typeof SESSION_IDLE_EXPIRED_CODE | typeof SESSION_EXPIRED_CODE;
   message?: string;
   canExtend?: boolean;
 }

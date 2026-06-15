@@ -5,6 +5,32 @@ import { Staff } from '@coopers/entities';
 import { CreateBarberDto } from './dto/create-barber.dto';
 import { UpdateBarberDto } from './dto/update-barber.dto';
 
+function normalizeText(value: string): string {
+  return value.trim();
+}
+
+function normalizeOptionalText(value: string | undefined): string | undefined {
+  const normalizedValue = value?.trim();
+
+  return normalizedValue ? normalizedValue : undefined;
+}
+
+function normalizeSkillTags(
+  values: string[] | undefined,
+): string[] | undefined {
+  if (!values) {
+    return undefined;
+  }
+
+  return Array.from(
+    new Set(
+      values
+        .map((value) => value.trim().toLowerCase())
+        .filter((value) => value.length > 0),
+    ),
+  );
+}
+
 @Injectable()
 export class BarbersService {
   constructor(
@@ -31,7 +57,13 @@ export class BarbersService {
   }
 
   async create(createBarberDto: CreateBarberDto): Promise<Staff> {
-    const staff = this.staffRepository.create(createBarberDto);
+    const staff = this.staffRepository.create({
+      ...createBarberDto,
+      displayName: normalizeText(createBarberDto.displayName),
+      email: normalizeOptionalText(createBarberDto.email),
+      timezone: normalizeOptionalText(createBarberDto.timezone),
+      skills: normalizeSkillTags(createBarberDto.skills),
+    });
 
     return this.staffRepository.save(staff);
   }
@@ -40,6 +72,13 @@ export class BarbersService {
     const staff = await this.staffRepository.preload({
       id,
       ...updateBarberDto,
+      displayName:
+        updateBarberDto.displayName === undefined
+          ? undefined
+          : normalizeText(updateBarberDto.displayName),
+      email: normalizeOptionalText(updateBarberDto.email),
+      timezone: normalizeOptionalText(updateBarberDto.timezone),
+      skills: normalizeSkillTags(updateBarberDto.skills),
     });
 
     if (!staff) {

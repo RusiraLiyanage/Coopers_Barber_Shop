@@ -34,7 +34,7 @@ import './userAuth.css';
 
 interface UserAuthModalProps {
   open: boolean;
-  sessionTimeoutState?: 'none' | 'extend_prompt';
+  sessionTimeoutState?: 'none' | 'extend_prompt' | 'expired_notice';
   onClose: () => void;
   onExtendSession?: () => Promise<void>;
   onSessionLogout?: () => Promise<void>;
@@ -113,6 +113,7 @@ export default function UserAuthModal({
   const isForgotPasswordMode = authMode === 'forgot-password';
   const isSessionTimeoutMode = sessionTimeoutState !== 'none';
   const isExtendPrompt = sessionTimeoutState === 'extend_prompt';
+  const isExpiredNotice = sessionTimeoutState === 'expired_notice';
   const shouldShowSessionExtendFailure =
     isSessionTimeoutMode && sessionExtendFailed && authAlert !== null;
 
@@ -439,6 +440,10 @@ export default function UserAuthModal({
       return 'Do you want to extend your session or logout?';
     }
 
+    if (isExpiredNotice) {
+      return 'Please log in again to continue.';
+    }
+
     if (!isForgotPasswordMode) {
       return isLoginMode
         ? 'Enter your details to continue.'
@@ -544,10 +549,16 @@ export default function UserAuthModal({
             ) : (
               <>
                 <Alert
-                  type="warning"
+                  type={isExpiredNotice ? 'error' : 'warning'}
                   showIcon
-                  message="Session inactive"
-                  description="Your session was paused because there has been no recent activity."
+                  message={
+                    isExpiredNotice ? 'Session expired' : 'Session inactive'
+                  }
+                  description={
+                    isExpiredNotice
+                      ? 'Your session has ended. Please log in again.'
+                      : 'Your session was paused because there has been no recent activity.'
+                  }
                   className="auth-modal-alert"
                 />
 

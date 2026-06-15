@@ -23,21 +23,42 @@ function buildFrontendUrl(baseUrl: string, originalUrl: string): string {
   return new URL(normalizedPath, baseUrl).toString();
 }
 
+function isAdminFrontendRequest(originalUrl: string): boolean {
+  return (
+    originalUrl === '/admin-console' ||
+    originalUrl.startsWith('/admin-console/')
+  );
+}
+
+function normalizeFrontendPath(originalUrl: string): string {
+  if (originalUrl === '/admin-console') {
+    return '/admin-console/';
+  }
+
+  return originalUrl;
+}
+
 @Injectable()
 export class FrontendProxyService {
   constructor(private readonly guardConfig: GuardConfigService) {}
 
   async forward(originalUrl: string): Promise<FrontendProxyResult> {
-    const { frontendUrl } = this.guardConfig.getUpstreams();
+    const { adminFrontendUrl, frontendUrl } = this.guardConfig.getUpstreams();
+    const targetFrontendUrl = isAdminFrontendRequest(originalUrl)
+      ? adminFrontendUrl
+      : frontendUrl;
 
     try {
-      const response = await fetch(buildFrontendUrl(frontendUrl, originalUrl), {
-        method: 'GET',
-        headers: {
-          accept: '*/*',
-          'x-coopers-guard-proxy': 'true',
+      const response = await fetch(
+        buildFrontendUrl(targetFrontendUrl, normalizeFrontendPath(originalUrl)),
+        {
+          method: 'GET',
+          headers: {
+            accept: '*/*',
+            'x-coopers-guard-proxy': 'true',
+          },
         },
-      });
+      );
       const body = Buffer.from(await response.arrayBuffer());
 
       return {

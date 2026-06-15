@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsEmail,
@@ -10,6 +11,7 @@ import {
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 import { StaffRole } from '@coopers/entities';
@@ -17,6 +19,7 @@ import { StaffRole } from '@coopers/entities';
 export class CreateBarberDto {
   @ApiProperty({ example: 'Main Staff' })
   @IsString()
+  @MaxLength(120)
   displayName: string;
 
   @ApiPropertyOptional({ example: 'barber@coopers.local' })
@@ -32,6 +35,7 @@ export class CreateBarberDto {
   @ApiPropertyOptional({ example: 'Australia/Sydney' })
   @IsOptional()
   @IsString()
+  @MaxLength(80)
   timezone?: string;
 
   @ApiPropertyOptional({ example: 15 })
@@ -47,6 +51,7 @@ export class CreateBarberDto {
   })
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(50)
   @IsString({ each: true })
   skills?: string[];
 

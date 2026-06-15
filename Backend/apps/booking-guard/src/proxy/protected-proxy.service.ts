@@ -6,6 +6,7 @@ import {
 import {
   ExpiredAccessTokenException,
   GuardAuthenticationService,
+  SESSION_EXPIRED_CODE,
   SESSION_IDLE_EXPIRED_CODE,
   type AuthTokensResponse,
   type JwtRequestUser,
@@ -90,11 +91,41 @@ function isIdleExpiredErrorResponse(value: unknown): boolean {
   );
 }
 
+function isExpiredSessionResponse(
+  value: unknown,
+): value is Extract<SessionValidationResponse, { active: false }> {
+  if (!isSessionValidationResponse(value) || value.active) {
+    return false;
+  }
+
+  const response = value as { code?: unknown; canExtend?: unknown };
+
+  return response.code === SESSION_EXPIRED_CODE && response.canExtend === false;
+}
+
+function isExpiredErrorResponse(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const response = value as { code?: unknown; canExtend?: unknown };
+
+  return response.code === SESSION_EXPIRED_CODE && response.canExtend === false;
+}
+
 function createIdleExpiredException(): UnauthorizedException {
   return new UnauthorizedException({
     code: SESSION_IDLE_EXPIRED_CODE,
     message: 'Session expired due to inactivity',
     canExtend: true,
+  });
+}
+
+function createSessionExpiredException(): UnauthorizedException {
+  return new UnauthorizedException({
+    code: SESSION_EXPIRED_CODE,
+    message: 'Session expired. Please login again.',
+    canExtend: false,
   });
 }
 
@@ -259,6 +290,10 @@ export class ProtectedProxyService {
         throw createIdleExpiredException();
       }
 
+      if (isExpiredErrorResponse(result.body)) {
+        throw createSessionExpiredException();
+      }
+
       throw new UnauthorizedException('Session expired. Please login again.');
     }
 
@@ -282,6 +317,10 @@ export class ProtectedProxyService {
     if (result.statusCode === 200 && isSessionValidationResponse(result.body)) {
       if (isIdleExpiredSessionResponse(result.body)) {
         throw createIdleExpiredException();
+      }
+
+      if (isExpiredSessionResponse(result.body)) {
+        throw createSessionExpiredException();
       }
 
       if (!result.body.active) {

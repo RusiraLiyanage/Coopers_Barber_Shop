@@ -3,7 +3,9 @@ const AUTH_BROWSER_SESSION_KEY = "coopers_auth_browser_session";
 const AUTH_REMEMBERED_SESSION_KEY = "coopers_auth_remembered_session";
 const AUTH_HAD_SESSION_KEY = "coopers_auth_had_session";
 export const SESSION_IDLE_EXPIRED_CODE = "SESSION_IDLE_EXPIRED";
+export const SESSION_EXPIRED_CODE = "SESSION_EXPIRED";
 export const SESSION_IDLE_EXPIRED_EVENT = "coopers-session-idle-expired";
+export const SESSION_EXPIRED_EVENT = "coopers-session-expired";
 
 export interface AuthResponse {
   authenticated: boolean;
@@ -221,6 +223,8 @@ async function request<T>(
 
     if (isSessionIdleExpiredError(error)) {
       dispatchSessionIdleExpiredEvent();
+    } else if (isSessionExpiredError(error)) {
+      dispatchSessionExpiredEvent();
     }
 
     throw error;
@@ -283,11 +287,24 @@ function dispatchSessionIdleExpiredEvent(): void {
   window.dispatchEvent(new Event(SESSION_IDLE_EXPIRED_EVENT));
 }
 
+function dispatchSessionExpiredEvent(): void {
+  window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+}
+
 export function isSessionIdleExpiredError(error: unknown): boolean {
   return (
     error instanceof ApiRequestError &&
     error.code === SESSION_IDLE_EXPIRED_CODE &&
     error.canExtend === true
+  );
+}
+
+export function isSessionExpiredError(error: unknown): boolean {
+  return (
+    error instanceof ApiRequestError &&
+    (error.code === SESSION_EXPIRED_CODE ||
+      (error.statusCode === 401 &&
+        error.message === "Session expired. Please login again."))
   );
 }
 
@@ -358,6 +375,54 @@ export async function login(email: string, password: string, remember: boolean) 
 export function beginGoogleOAuthLogin(): void {
   rememberClientAuthSession(true);
   window.location.assign(buildApiUrl("/auth/google"));
+}
+
+export interface GoogleLinkPrompt {
+  email: string;
+}
+
+export function readGoogleLinkPrompt(): GoogleLinkPrompt | null {
+  try {
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.get("link_google") !== "1") {
+      return null;
+    }
+
+    return { email: params.get("email")?.trim() ?? "" };
+  } catch {
+    return null;
+  }
+}
+
+export function clearGoogleLinkPromptFromUrl(): void {
+  try {
+    const url = new URL(window.location.href);
+
+    url.searchParams.delete("link_google");
+    url.searchParams.delete("email");
+    window.history.replaceState(
+      {},
+      "",
+      `${url.pathname}${url.search}${url.hash}`,
+    );
+  } catch {
+    return;
+  }
+}
+
+export async function linkGoogleAccount(password: string) {
+  const response = await request<AuthResponse>("/auth/google/link", {
+    method: "POST",
+    headers: buildHeaders(),
+    body: JSON.stringify({ password }),
+  });
+
+  if (response.authenticated) {
+    rememberClientAuthSession(true);
+  }
+
+  return response;
 }
 
 export async function register(payload: RegisterPayload) {

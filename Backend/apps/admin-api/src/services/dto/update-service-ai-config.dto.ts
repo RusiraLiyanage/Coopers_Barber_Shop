@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsEnum,
@@ -15,6 +16,7 @@ export class UpdateServiceAiConfigDto {
   })
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(50)
   @IsString({ each: true })
   requiredSkills?: string[];
 
@@ -24,6 +26,7 @@ export class UpdateServiceAiConfigDto {
   })
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(50)
   @IsString({ each: true })
   safetyTriggers?: string[];
 

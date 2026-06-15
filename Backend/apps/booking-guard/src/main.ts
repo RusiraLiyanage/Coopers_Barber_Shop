@@ -19,9 +19,13 @@ async function bootstrap() {
 
   // Validate upstream URLs at startup before proxy routes depend on them.
   guardConfig.getUpstreams();
+  const allowedFrontendOrigins = [
+    guardConfig.frontendUrl,
+    guardConfig.adminFrontendUrl,
+  ].join(',');
 
   configureApiSecurity(app, {
-    cors: createFrontendCorsOptions(guardConfig.frontendUrl),
+    cors: createFrontendCorsOptions(allowedFrontendOrigins),
     helmet: {
       contentSecurityPolicy: false,
     },

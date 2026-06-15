@@ -26,6 +26,21 @@ function buildUrl(
   return url.toString();
 }
 
+function getUpstreamBaseUrl(
+  upstreams: ReturnType<GuardConfigService['getUpstreams']>,
+  target: ProxyRequestOptions['target'],
+): string {
+  if (target === 'auth') {
+    return upstreams.authApiUrl;
+  }
+
+  if (target === 'admin') {
+    return upstreams.adminApiUrl;
+  }
+
+  return upstreams.bookingApiUrl;
+}
+
 async function parseResponseBody(response: Response): Promise<unknown> {
   const contentType = response.headers.get('content-type') ?? '';
   const text = await response.text();
@@ -47,10 +62,7 @@ export class ProxyService {
 
   async forward(options: ProxyRequestOptions): Promise<ProxyResponse> {
     const upstreams = this.guardConfig.getUpstreams();
-    const baseUrl =
-      options.target === 'auth'
-        ? upstreams.authApiUrl
-        : upstreams.bookingApiUrl;
+    const baseUrl = getUpstreamBaseUrl(upstreams, options.target);
 
     try {
       const response = await fetch(

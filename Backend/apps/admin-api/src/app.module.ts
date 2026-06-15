@@ -10,7 +10,9 @@ import { DatabaseModule } from '@coopers/database';
 import { AdminAuthModule } from './auth/admin-auth.module';
 import { BarbersModule } from './barbers/barbers.module';
 import { BriefsModule } from './briefs/briefs.module';
+import { HairHistoryModule } from './hair-history/hair-history.module';
 import { HealthController } from './health.controller';
+import { InvitesModule } from './invites/invites.module';
 import { SafetyRulesModule } from './safety-rules/safety-rules.module';
 import { AdminServicesModule } from './services/admin-services.module';
 
@@ -25,6 +27,8 @@ import { AdminServicesModule } from './services/admin-services.module';
     SafetyRulesModule,
     AdminServicesModule,
     BriefsModule,
+    HairHistoryModule,
+    InvitesModule,
   ],
   controllers: [HealthController],
 })

@@ -1,0 +1,8 @@
+.admin-app-shell {
+  min-height: 100vh;
+  background: #eef2f7;
+}
+
+.admin-app-content {
+  padding-top: 64px;
+}

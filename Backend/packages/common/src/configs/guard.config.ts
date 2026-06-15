@@ -4,7 +4,9 @@ import { ConfigService } from '@nestjs/config';
 export type GuardUpstreamConfig = {
   bookingApiUrl: string;
   authApiUrl: string;
+  adminApiUrl: string;
   frontendUrl: string;
+  adminFrontendUrl: string;
 };
 
 export type GoogleOAuthConfig = {
@@ -18,6 +20,10 @@ export type GoogleOAuthConfig = {
 
 function normalizeServiceUrl(value: string): string {
   return value.replace(/\/+$/, ''); // get rid of any end slashes of the url
+}
+
+function getFirstConfiguredUrl(value: string): string {
+  return value.split(',')[0]?.trim() ?? value;
 }
 
 function getRequiredString(config: ConfigService, key: string): string {
@@ -49,6 +55,16 @@ export class GuardConfigService {
     return getRequiredString(this.config, 'FRONTEND_URL');
   }
 
+  get adminFrontendUrl(): string {
+    const adminFrontendUrl =
+      this.config.get<string>('ADMIN_FRONTEND_DEV_URL') ??
+      this.config.get<string>('ADMIN_FRONTEND_URL');
+
+    return normalizeServiceUrl(
+      adminFrontendUrl ? getFirstConfiguredUrl(adminFrontendUrl) : this.frontendUrl,
+    );
+  }
+
   get guardPort(): number {
     return getOptionalPort(this.config, 'GUARD_PORT', 7311);
   }
@@ -67,9 +83,13 @@ export class GuardConfigService {
       authApiUrl: normalizeServiceUrl(
         getRequiredString(this.config, 'AUTH_API_URL'),
       ),
+      adminApiUrl: normalizeServiceUrl(
+        getRequiredString(this.config, 'ADMIN_API_URL'),
+      ),
       frontendUrl: normalizeServiceUrl(
         this.config.get<string>('FRONTEND_DEV_URL') ?? this.frontendUrl,
       ),
+      adminFrontendUrl: this.adminFrontendUrl,
     };
   }
 

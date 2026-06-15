@@ -5,12 +5,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { AuthSession } from '@coopers/entities';
 import type { Repository } from 'typeorm';
 import {
+  SESSION_EXPIRED_CODE,
   SESSION_IDLE_EXPIRED_CODE,
   type SessionValidationResponse,
 } from './auth.types';
 
 const DEFAULT_SESSION_IDLE_TIMEOUT_SECONDS = 10 * 60;
 const DEFAULT_SESSION_EXTENSION_GRACE_SECONDS = 5 * 60;
+const SESSION_EXPIRED_MESSAGE = 'Session expired. Please login again.';
 const SESSION_IDLE_EXPIRED_MESSAGE = 'Session expired due to inactivity';
 
 type CreateAuthSessionInput = {
@@ -82,7 +84,11 @@ export class SessionService {
 
     if (this.isSessionPastExtensionGrace(session, now)) {
       await this.revokeSessionById(session.id, now);
-      throw new UnauthorizedException('Session expired. Please login again.');
+      throw new UnauthorizedException({
+        code: SESSION_EXPIRED_CODE,
+        message: SESSION_EXPIRED_MESSAGE,
+        canExtend: false,
+      });
     }
 
     if (this.isSessionIdleExpired(session, now)) {
@@ -121,7 +127,11 @@ export class SessionService {
 
     if (this.isSessionPastExtensionGrace(session, now)) {
       await this.revokeSessionById(session.id, now);
-      throw new UnauthorizedException('Session expired. Please login again.');
+      throw new UnauthorizedException({
+        code: SESSION_EXPIRED_CODE,
+        message: SESSION_EXPIRED_MESSAGE,
+        canExtend: false,
+      });
     }
 
     return session;
@@ -154,6 +164,9 @@ export class SessionService {
       await this.revokeSessionById(session.id, now);
       return {
         active: false,
+        code: SESSION_EXPIRED_CODE,
+        message: SESSION_EXPIRED_MESSAGE,
+        canExtend: false,
       };
     }
 
@@ -161,6 +174,9 @@ export class SessionService {
       await this.revokeSessionById(session.id, now);
       return {
         active: false,
+        code: SESSION_EXPIRED_CODE,
+        message: SESSION_EXPIRED_MESSAGE,
+        canExtend: false,
       };
     }
 

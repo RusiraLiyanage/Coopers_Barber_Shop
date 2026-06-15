@@ -1,0 +1,33 @@
+.admin-header {
+  position: fixed;
+  top: 0;
+  z-index: 1000;
+  display: flex;
+  width: 100%;
+  height: 64px;
+  align-items: center;
+  gap: 24px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
+.admin-header-brand {
+  color: #172033;
+  font-size: 22px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.admin-header-menu {
+  flex: 1;
+  min-width: 0;
+  border-bottom: 0;
+  background: transparent;
+  font-weight: 700;
+}
+
+.admin-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
