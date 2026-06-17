@@ -11,6 +11,74 @@
   width: 100%;
 }
 
+.appointment-consultation-panel {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 24px;
+  padding: 16px;
+  border: 1px solid #d6e4ff;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.appointment-consultation-header,
+.appointment-consultation-result {
+  display: grid;
+  gap: 6px;
+}
+
+.appointment-consultation-eyebrow {
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.appointment-consultation-questions {
+  display: grid;
+  gap: 14px;
+}
+
+.appointment-consultation-question {
+  display: grid;
+  gap: 6px;
+  color: #262626;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.appointment-consultation-question small {
+  color: #737373;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.appointment-consultation-required {
+  margin-left: 4px;
+  color: #ff4d4f;
+}
+
+.appointment-consultation-result {
+  padding: 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.08);
+}
+
+.appointment-consultation-result > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.appointment-consultation-result ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  color: #4b5563;
+  font-size: 14px;
+}
+
 .appointment-original-date-cell {
   display: inline-flex;
   min-width: 44px;

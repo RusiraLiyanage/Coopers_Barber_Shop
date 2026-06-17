@@ -27,6 +27,10 @@ type AppointmentRequestBody = {
   staffId?: string;
   date: string;
   slot: string;
+  consultationSummary?: string;
+  safetyNotes?: string;
+  hairState?: string[];
+  desiredLook?: string;
 };
 
 type UpdateAppointmentRequestBody = {
@@ -68,6 +72,13 @@ export class ProtectedProxyController {
         staffId: { type: 'string' },
         date: { type: 'string', format: 'date' },
         slot: { type: 'string' },
+        consultationSummary: { type: 'string' },
+        safetyNotes: { type: 'string' },
+        hairState: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+        desiredLook: { type: 'string' },
       },
     },
   })

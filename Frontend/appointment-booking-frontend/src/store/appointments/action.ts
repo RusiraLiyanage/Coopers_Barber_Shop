@@ -24,11 +24,7 @@ export const getAppointmentAvailabilityAction = createAppAsyncThunk<
   string[],
   AppointmentAvailabilityPayload
 >(`${SLICE_NAME}/getAppointmentAvailability`, async (payload) =>
-  getAvailability(
-    payload.serviceId,
-    payload.date,
-    payload.excludeAppointmentId,
-  ),
+  getAvailability(payload),
 );
 
 export const createAppointmentAction = createAppAsyncThunk<

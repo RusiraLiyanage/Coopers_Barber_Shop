@@ -9,6 +9,7 @@ import {
 import accountReducer from './account/slice';
 import appointmentsReducer from './appointments/slice';
 import authReducer from './auth/slice';
+import consultationReducer from './consultation/slice';
 import servicesReducer from './services/slice';
 
 // Single, global "wipe everything back to initial state" action — dispatched on
@@ -19,6 +20,7 @@ const combinedReducer = combineReducers({
   account: accountReducer,
   appointments: appointmentsReducer,
   auth: authReducer,
+  consultation: consultationReducer,
   services: servicesReducer,
 });
 

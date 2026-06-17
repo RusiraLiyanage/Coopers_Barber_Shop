@@ -1,10 +1,22 @@
-import { Button, DatePicker, Form, Modal, Select, Spin, message } from 'antd';
+import {
+  Alert,
+  Button,
+  DatePicker,
+  Form,
+  Input,
+  Modal,
+  Select,
+  Spin,
+  message,
+} from 'antd';
 import { useCallback, useEffect, useState } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 import {
   isSessionIdleExpiredError,
   type AppointmentRecord,
   type AuthSession,
+  type ConsultationStartResponse,
+  type ConsultationSubmitResponse,
 } from '../lib/api';
 import { getGenericErrorMessage } from '../lib/errors';
 import { SAModalHeader } from '../components/common';
@@ -23,6 +35,21 @@ import {
   clearAvailabilitySlots,
   setAvailabilitySlots,
 } from '../store/appointments/slice';
+import {
+  startConsultationAction,
+  submitConsultationAction,
+} from '../store/consultation/action';
+import {
+  selectConsultationError,
+  selectConsultationLoadingStart,
+  selectConsultationResult,
+  selectConsultationStartResult,
+  selectConsultationSubmitting,
+} from '../store/consultation/selector';
+import {
+  clearConsultation,
+  clearConsultationResult,
+} from '../store/consultation/slice';
 import { getServicesAction } from '../store/services/action';
 import {
   selectActiveServices,
@@ -43,6 +70,8 @@ type AppointmentFormValues = {
   appointmentDate?: Dayjs;
   appointmentTime?: string;
 };
+
+type ConsultationAnswers = Record<string, string>;
 
 function parseAppointmentDateTime(value: string) {
   const [datePart = '', timePart = ''] = value.split(', ');
@@ -107,6 +136,25 @@ function formatAppointmentSlot(slot: string) {
   return `${formatSlotTime(startTime)} - ${formatSlotTime(endTime)}`;
 }
 
+function getSafetyNotesText(result: ConsultationSubmitResponse) {
+  return result.safetyNotes
+    .map((note) => `[${note.severity.toUpperCase()}] ${note.message}`)
+    .join('\n');
+}
+
+function getConsultationAnswersComplete(
+  startResult: ConsultationStartResponse | null,
+  answers: ConsultationAnswers,
+) {
+  if (!startResult) {
+    return false;
+  }
+
+  return startResult.questions.every(
+    (question) => !question.required || Boolean(answers[question.id]?.trim()),
+  );
+}
+
 export default function MakeAppointmentModal({
   open,
   authSession,
@@ -121,12 +169,37 @@ export default function MakeAppointmentModal({
   const slots = useAppSelector(selectAppointmentAvailabilitySlots);
   const slotsLoading = useAppSelector(selectAppointmentAvailabilityLoading);
   const confirmLoading = useAppSelector(selectAppointmentMutating);
+  const consultationStartResult = useAppSelector(
+    selectConsultationStartResult,
+  );
+  const consultationResult = useAppSelector(selectConsultationResult);
+  const consultationLoadingStart = useAppSelector(
+    selectConsultationLoadingStart,
+  );
+  const consultationSubmitting = useAppSelector(selectConsultationSubmitting);
+  const consultationError = useAppSelector(selectConsultationError);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [currentSlotPulseKey, setCurrentSlotPulseKey] = useState(0);
+  const [consultationAnswers, setConsultationAnswers] =
+    useState<ConsultationAnswers>({});
   const [form] = Form.useForm<AppointmentFormValues>();
   const selectedServiceId = Form.useWatch('serviceId', form);
   const selectedAppointmentDate = Form.useWatch('appointmentDate', form);
   const isEditMode = Boolean(editingAppointment);
+  const currentConsultationStartResult =
+    consultationStartResult?.service.id === selectedServiceId
+      ? consultationStartResult
+      : null;
+  const currentConsultationResult =
+    consultationResult?.service.id === selectedServiceId
+      ? consultationResult
+      : null;
+  const matchedBarberId = currentConsultationResult?.matchedBarber.id;
+  const isConsultationReady = isEditMode || Boolean(matchedBarberId);
+  const areConsultationAnswersComplete = getConsultationAnswersComplete(
+    currentConsultationStartResult,
+    consultationAnswers,
+  );
   const currentAppointmentDate = editingAppointment
     ? parseAppointmentDateTime(editingAppointment.startAt)
     : null;
@@ -174,6 +247,7 @@ export default function MakeAppointmentModal({
       serviceId: string,
       appointmentDate: Dayjs,
       preferredSlot?: string,
+      staffId?: string,
     ) => {
       setSelectedSlot(preferredSlot ?? null);
 
@@ -182,6 +256,7 @@ export default function MakeAppointmentModal({
           getAppointmentAvailabilityAction({
             serviceId,
             date: appointmentDate.format('YYYY-MM-DD'),
+            staffId,
             excludeAppointmentId: editingAppointment?.id,
           }),
         ).unwrap();
@@ -214,8 +289,10 @@ export default function MakeAppointmentModal({
 
     form.resetFields();
     dispatch(clearAvailabilitySlots());
+    dispatch(clearConsultation());
     setSelectedSlot(null);
     setCurrentSlotPulseKey(0);
+    setConsultationAnswers({});
 
     dispatch(getServicesAction())
       .unwrap()
@@ -280,9 +357,92 @@ export default function MakeAppointmentModal({
       return;
     }
 
+    if (!isEditMode && !matchedBarberId) {
+      dispatch(clearAvailabilitySlots());
+      setSelectedSlot(null);
+      return;
+    }
+
     setSelectedSlot(null);
 
-    await loadAvailabilityFor(serviceId, appointmentDate);
+    await loadAvailabilityFor(
+      serviceId,
+      appointmentDate,
+      undefined,
+      matchedBarberId,
+    );
+  };
+
+  const startConsultationForService = async (serviceId: string) => {
+    if (isEditMode) {
+      return;
+    }
+
+    dispatch(clearConsultation());
+    setConsultationAnswers({});
+
+    try {
+      await dispatch(startConsultationAction({ serviceId })).unwrap();
+    } catch (error) {
+      if (isSessionIdleExpiredError(error)) {
+        return;
+      }
+
+      messageApi.error(getGenericErrorMessage('Start consultation', error));
+    }
+  };
+
+  const handleConsultationAnswerChange = (
+    questionId: string,
+    answer: string,
+  ) => {
+    dispatch(clearConsultationResult());
+    dispatch(clearAvailabilitySlots());
+    form.setFieldValue('appointmentTime', undefined);
+    setSelectedSlot(null);
+    setConsultationAnswers((currentAnswers) => ({
+      ...currentAnswers,
+      [questionId]: answer,
+    }));
+  };
+
+  const handleMatchBarber = async () => {
+    if (!selectedServiceId || !currentConsultationStartResult) {
+      return;
+    }
+
+    const answers = currentConsultationStartResult.questions.map(
+      (question) => ({
+        questionId: question.id,
+        answer: consultationAnswers[question.id]?.trim() ?? '',
+      }),
+    );
+
+    try {
+      const result = await dispatch(
+        submitConsultationAction({
+          serviceId: selectedServiceId,
+          answers,
+        }),
+      ).unwrap();
+
+      const appointmentDate = form.getFieldValue('appointmentDate');
+
+      if (appointmentDate) {
+        await loadAvailabilityFor(
+          selectedServiceId,
+          appointmentDate,
+          undefined,
+          result.matchedBarber.id,
+        );
+      }
+    } catch (error) {
+      if (isSessionIdleExpiredError(error)) {
+        return;
+      }
+
+      messageApi.error(getGenericErrorMessage('Match barber', error));
+    }
   };
 
   const handleSubmit = async (values: AppointmentFormValues) => {
@@ -309,11 +469,21 @@ export default function MakeAppointmentModal({
         ).unwrap();
         messageApi.success('Appointment updated successfully');
       } else {
+        if (!currentConsultationResult) {
+          messageApi.error('Please complete the consultation before booking');
+          return;
+        }
+
         await dispatch(
           createAppointmentAction({
             serviceId: values.serviceId,
             date: values.appointmentDate.format('YYYY-MM-DD'),
             slot: values.appointmentTime,
+            staffId: currentConsultationResult.matchedBarber.id,
+            consultationSummary: currentConsultationResult.consultationSummary,
+            safetyNotes: getSafetyNotesText(currentConsultationResult),
+            hairState: currentConsultationResult.hairState,
+            desiredLook: currentConsultationResult.desiredLook ?? undefined,
           }),
         ).unwrap();
         messageApi.success('Appointment created successfully');
@@ -321,7 +491,9 @@ export default function MakeAppointmentModal({
 
       form.resetFields();
       dispatch(clearAvailabilitySlots());
+      dispatch(clearConsultation());
       setSelectedSlot(null);
+      setConsultationAnswers({});
       onBooked();
     } catch (error) {
       if (isSessionIdleExpiredError(error)) {
@@ -364,12 +536,25 @@ export default function MakeAppointmentModal({
             form={form}
             onFinish={handleSubmit}
             onValuesChange={(changedValues) => {
-              if (
-                'serviceId' in changedValues ||
-                'appointmentDate' in changedValues
-              ) {
+              if ('serviceId' in changedValues) {
+                form.setFieldValue('appointmentDate', undefined);
                 form.setFieldValue('appointmentTime', undefined);
-                loadAvailability();
+                dispatch(clearAvailabilitySlots());
+                setSelectedSlot(null);
+
+                if (changedValues.serviceId) {
+                  void startConsultationForService(changedValues.serviceId);
+                } else {
+                  dispatch(clearConsultation());
+                  setConsultationAnswers({});
+                }
+
+                return;
+              }
+
+              if ('appointmentDate' in changedValues) {
+                form.setFieldValue('appointmentTime', undefined);
+                void loadAvailability();
               }
             }}
             autoComplete="off"
@@ -395,6 +580,113 @@ export default function MakeAppointmentModal({
                 }))}
               />
             </Form.Item>
+
+            {!isEditMode && selectedServiceId ? (
+              <div className="appointment-consultation-panel">
+                <div className="appointment-consultation-header">
+                  <span className="appointment-consultation-eyebrow">
+                    AI barber match
+                  </span>
+                  <strong>Tell us what you need before choosing a time.</strong>
+                </div>
+
+                {consultationLoadingStart ? (
+                  <Spin />
+                ) : consultationError && !currentConsultationStartResult ? (
+                  <Alert
+                    type="error"
+                    showIcon
+                    message="Consultation could not be started."
+                  />
+                ) : currentConsultationStartResult &&
+                  !currentConsultationResult ? (
+                  <div className="appointment-consultation-questions">
+                    {currentConsultationStartResult.previousHairHistory.length >
+                    0 ? (
+                      <Alert
+                        type="info"
+                        showIcon
+                        message={`${currentConsultationStartResult.previousHairHistory.length} previous hair record(s) will be considered for this match.`}
+                      />
+                    ) : null}
+
+                    {currentConsultationStartResult.questions.map(
+                      (question) => (
+                        <label
+                          key={question.id}
+                          className="appointment-consultation-question"
+                        >
+                          <span>
+                            {question.label}
+                            {question.required ? (
+                              <span className="appointment-consultation-required">
+                                *
+                              </span>
+                            ) : null}
+                          </span>
+                          {question.helperText ? (
+                            <small>{question.helperText}</small>
+                          ) : null}
+                          <Input.TextArea
+                            value={consultationAnswers[question.id] ?? ''}
+                            onChange={(event) =>
+                              handleConsultationAnswerChange(
+                                question.id,
+                                event.target.value,
+                              )
+                            }
+                            rows={2}
+                            maxLength={1000}
+                            showCount
+                            placeholder="Add your answer"
+                          />
+                        </label>
+                      ),
+                    )}
+
+                    <Button
+                      type="primary"
+                      loading={consultationSubmitting}
+                      disabled={!areConsultationAnswersComplete}
+                      onClick={handleMatchBarber}
+                    >
+                      Match Barber
+                    </Button>
+                  </div>
+                ) : currentConsultationResult ? (
+                  <div className="appointment-consultation-result">
+                    <div>
+                      <span className="appointment-consultation-eyebrow">
+                        Recommended barber
+                      </span>
+                      <strong>
+                        {currentConsultationResult.matchedBarber.displayName}
+                      </strong>
+                      <span>
+                        Match score: {currentConsultationResult.matchScore}%
+                      </span>
+                    </div>
+
+                    <ul>
+                      {currentConsultationResult.matchReasons.map((reason) => (
+                        <li key={reason}>{reason}</li>
+                      ))}
+                    </ul>
+
+                    {currentConsultationResult.safetyNotes.length > 0 ? (
+                      <Alert
+                        type="warning"
+                        showIcon
+                        message="Safety notes will be shared with the barber."
+                        description={currentConsultationResult.safetyNotes
+                          .map((note) => note.message)
+                          .join(' ')}
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
             <Form.Item
               name="appointmentDate"
@@ -433,7 +725,7 @@ export default function MakeAppointmentModal({
                   );
                 }}
                 className="appointment-date-picker"
-                disabled={!form.getFieldValue('serviceId')}
+                disabled={!selectedServiceId || !isConsultationReady}
                 disabledDate={(current) => {
                   if (!current) {
                     return false;
@@ -563,7 +855,11 @@ export default function MakeAppointmentModal({
                   type="primary"
                   htmlType="submit"
                   loading={confirmLoading}
-                  disabled={!selectedSlot || !hasAppointmentChange}
+                  disabled={
+                    !selectedSlot ||
+                    !hasAppointmentChange ||
+                    (!isEditMode && !currentConsultationResult)
+                  }
                   size="large"
                 >
                   {isEditMode ? 'Update Appointment' : 'Book Appointment'}

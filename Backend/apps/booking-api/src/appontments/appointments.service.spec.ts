@@ -1,9 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppointmentsService } from './appointments.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Appointment } from '@coopers/entities';
-import { Service } from '@coopers/entities';
-import { Staff } from '@coopers/entities';
+import {
+  Appointment,
+  AppointmentBrief,
+  Service,
+  Staff,
+} from '@coopers/entities';
 import { StaffService } from '../staff/staff.service';
 import { ConflictException } from '@nestjs/common';
 
@@ -12,6 +15,11 @@ const mockAppointmentsRepo = {
   find: jest.fn(),
   findOne: jest.fn(),
   createQueryBuilder: jest.fn(),
+  create: jest.fn(),
+  save: jest.fn(),
+};
+
+const mockAppointmentBriefsRepo = {
   create: jest.fn(),
   save: jest.fn(),
 };
@@ -73,6 +81,10 @@ describe('AppointmentsService', () => {
         {
           provide: getRepositoryToken(Appointment),
           useValue: mockAppointmentsRepo,
+        },
+        {
+          provide: getRepositoryToken(AppointmentBrief),
+          useValue: mockAppointmentBriefsRepo,
         },
         { provide: getRepositoryToken(Service), useValue: mockServicesRepo },
         { provide: getRepositoryToken(Staff), useValue: mockStaffRepo },
@@ -344,6 +356,68 @@ describe('AppointmentsService', () => {
     );
     expect(result.staffId).toBe(selectedStaff.id);
     expect(result.staffName).toBe('Sofia Bennett');
+  });
+
+  it('should create an appointment brief when consultation summary is provided', async () => {
+    const selectedStaff = {
+      id: '22222222-2222-2222-2222-222222222222',
+      displayName: 'Sofia Bennett',
+      timezone: 'Australia/Sydney',
+      bufferAfterMinutes: 15,
+      active: true,
+      available: true,
+    };
+    const savedAppointment = {
+      id: 'appointment-1',
+      service: {
+        id: 'svc2',
+        name: 'Hair Coloring',
+        durationMinutes: 90,
+      },
+      staff: selectedStaff,
+      startAt: new Date('2025-09-23T23:00:00.000Z'),
+      endAt: new Date('2025-09-24T00:30:00.000Z'),
+      status: 'booked',
+    };
+    const savedBrief = {
+      id: 'brief-1',
+      booking: savedAppointment,
+      barber: selectedStaff,
+    };
+
+    mockServicesRepo.findOneBy.mockResolvedValue(savedAppointment.service);
+    mockStaffRepo.findOne.mockResolvedValue(selectedStaff);
+    mockAppointmentsQueryBuilder.getRawMany.mockResolvedValue([]);
+    mockAppointmentsRepo.create.mockReturnValue(savedAppointment);
+    mockAppointmentsRepo.save.mockResolvedValue(savedAppointment);
+    mockAppointmentBriefsRepo.create.mockReturnValue(savedBrief);
+    mockAppointmentBriefsRepo.save.mockResolvedValue(savedBrief);
+
+    await service.book(
+      { userId: 'user-1' },
+      {
+        serviceId: 'svc2',
+        staffId: selectedStaff.id,
+        date: '2025-09-24',
+        slot: '09:00-10:30',
+        consultationSummary:
+          'Client wants a natural brown colour and mentioned dry ends.',
+        safetyNotes: 'Confirm recent bleach before applying colour.',
+        hairState: ['dry hair', 'recent bleach', 'dry hair'],
+        desiredLook: 'Natural brown colour.',
+      },
+    );
+
+    expect(mockAppointmentBriefsRepo.create).toHaveBeenCalledWith({
+      booking: savedAppointment,
+      barber: selectedStaff,
+      clientSummary:
+        'Client wants a natural brown colour and mentioned dry ends.',
+      safetyNotes: 'Confirm recent bleach before applying colour.',
+      hairState: ['dry hair', 'recent bleach'],
+      desiredLook: 'Natural brown colour.',
+    });
+    expect(mockAppointmentBriefsRepo.save).toHaveBeenCalledWith(savedBrief);
   });
 
   it('should update an appointment onto the selected date when the slot is available', async () => {

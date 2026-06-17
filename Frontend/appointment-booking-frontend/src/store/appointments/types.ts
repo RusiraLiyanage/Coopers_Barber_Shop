@@ -1,18 +1,18 @@
-import type { AppointmentRecord } from '../../lib/api';
+import type {
+  AppointmentRecord,
+  CreateAppointmentRequest,
+} from '../../lib/api';
 
 export type { AppointmentRecord };
 
 export type AppointmentAvailabilityPayload = {
   serviceId: string;
   date: string;
+  staffId?: string;
   excludeAppointmentId?: string;
 };
 
-export type CreateAppointmentPayload = {
-  serviceId: string;
-  date: string;
-  slot: string;
-};
+export type CreateAppointmentPayload = CreateAppointmentRequest;
 
 export type UpdateAppointmentPayload = {
   appointmentId: string;

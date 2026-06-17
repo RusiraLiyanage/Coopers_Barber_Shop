@@ -22,6 +22,90 @@ export interface ServiceOption {
   isActive: boolean;
 }
 
+export interface ConsultationQuestion {
+  id: string;
+  label: string;
+  helperText?: string;
+  required: boolean;
+}
+
+export interface ConsultationServiceSummary {
+  id: string;
+  name: string;
+  complexity: 'low' | 'medium' | 'high';
+  requiredSkills: string[];
+  safetyTriggers: string[];
+}
+
+export interface ConsultationHairHistorySummary {
+  service: string;
+  hairState: string[];
+  productsUsed: string | null;
+  barberNotes: string | null;
+  visitDate: string;
+}
+
+export interface ConsultationStartResponse {
+  service: ConsultationServiceSummary;
+  questions: ConsultationQuestion[];
+  previousHairHistory: ConsultationHairHistorySummary[];
+}
+
+export interface ConsultationSafetyNote {
+  severity: 'low' | 'medium' | 'high';
+  message: string;
+  source: 'safety-rule' | 'service-trigger';
+}
+
+export interface ConsultationBarberMatch {
+  id: string;
+  displayName: string;
+  role: 'junior' | 'senior' | 'owner';
+  rating: number;
+  matchedSkills: string[];
+  missingSkills: string[];
+}
+
+export interface ConsultationSubmitResponse {
+  service: ConsultationServiceSummary;
+  matchedBarber: ConsultationBarberMatch;
+  matchScore: number;
+  matchReasons: string[];
+  safetyNotes: ConsultationSafetyNote[];
+  hairState: string[];
+  desiredLook: string | null;
+  consultationSummary: string;
+  previousHairHistoryCount: number;
+}
+
+export type ConsultationAnswerPayload = {
+  questionId: string;
+  answer: string;
+};
+
+export type ConsultationSubmitPayload = {
+  serviceId: string;
+  answers: ConsultationAnswerPayload[];
+};
+
+export type AppointmentAvailabilityRequest = {
+  serviceId: string;
+  date: string;
+  staffId?: string;
+  excludeAppointmentId?: string;
+};
+
+export type CreateAppointmentRequest = {
+  serviceId: string;
+  date: string;
+  slot: string;
+  staffId?: string;
+  consultationSummary?: string;
+  safetyNotes?: string;
+  hairState?: string[];
+  desiredLook?: string;
+};
+
 export interface AppointmentRecord {
   id: string;
   status: string;
@@ -495,12 +579,33 @@ export function getServices() {
   });
 }
 
-export function getAvailability(
-  serviceId: string,
-  date: string,
-  excludeAppointmentId?: string,
-) {
+export function startConsultation(payload: { serviceId: string }) {
+  return request<ConsultationStartResponse>("/consultation/start", {
+    method: "POST",
+    headers: buildHeaders(),
+    body: JSON.stringify(payload),
+  });
+}
+
+export function submitConsultation(payload: ConsultationSubmitPayload) {
+  return request<ConsultationSubmitResponse>("/consultation/submit", {
+    method: "POST",
+    headers: buildHeaders(),
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getAvailability({
+  serviceId,
+  date,
+  staffId,
+  excludeAppointmentId,
+}: AppointmentAvailabilityRequest) {
   const query = new URLSearchParams({ serviceId, date });
+
+  if (staffId) {
+    query.set("staffId", staffId);
+  }
 
   if (excludeAppointmentId) {
     query.set("excludeAppointmentId", excludeAppointmentId);
@@ -511,9 +616,7 @@ export function getAvailability(
   });
 }
 
-export function createAppointment(
-  payload: { serviceId: string; date: string; slot: string },
-) {
+export function createAppointment(payload: CreateAppointmentRequest) {
   return request<AppointmentRecord>("/appointments", {
     method: "POST",
     headers: buildHeaders(),

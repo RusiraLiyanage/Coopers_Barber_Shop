@@ -7,7 +7,12 @@ import {
 } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DeepPartial, Repository } from 'typeorm';
-import { Appointment, Service, Staff } from '@coopers/entities';
+import {
+  Appointment,
+  AppointmentBrief,
+  Service,
+  Staff,
+} from '@coopers/entities';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { StaffService } from '../staff/staff.service';
@@ -83,6 +88,8 @@ export class AppointmentsService {
   constructor(
     @Inject(getRepositoryToken(Appointment as EntityClassOrSchema))
     private appointmentsRepo: Repository<Appointment>,
+    @Inject(getRepositoryToken(AppointmentBrief as EntityClassOrSchema))
+    private appointmentBriefsRepo: Repository<AppointmentBrief>,
     @Inject(getRepositoryToken(Service as EntityClassOrSchema))
     private servicesRepo: Repository<Service>,
     private staffService: StaffService,
@@ -92,6 +99,28 @@ export class AppointmentsService {
 
   private addMinutes(date: Date, minutes: number): Date {
     return new Date(date.getTime() + minutes * 60000);
+  }
+
+  private normalizeOptionalText(value: string | undefined): string | null {
+    const normalizedValue = value?.trim();
+
+    return normalizedValue ? normalizedValue : null;
+  }
+
+  private normalizeStringArray(values: string[] | undefined): string[] {
+    if (!values) {
+      return [];
+    }
+
+    return Array.from(
+      new Set(
+        values.map((value) => value.trim()).filter((value) => value.length > 0),
+      ),
+    );
+  }
+
+  private hasConsultationSummary(dto: CreateAppointmentDto): boolean {
+    return Boolean(dto.consultationSummary?.trim());
   }
 
   private rangesOverlap(
@@ -266,6 +295,27 @@ export class AppointmentsService {
         available: true,
       },
     });
+  }
+
+  private async createAppointmentBrief(
+    appointment: Appointment,
+    staff: Staff,
+    dto: CreateAppointmentDto,
+  ): Promise<void> {
+    if (!this.hasConsultationSummary(dto)) {
+      return;
+    }
+
+    const appointmentBrief = this.appointmentBriefsRepo.create({
+      booking: appointment,
+      barber: staff,
+      clientSummary: dto.consultationSummary?.trim(),
+      safetyNotes: this.normalizeOptionalText(dto.safetyNotes),
+      hairState: this.normalizeStringArray(dto.hairState),
+      desiredLook: this.normalizeOptionalText(dto.desiredLook),
+    });
+
+    await this.appointmentBriefsRepo.save(appointmentBrief);
   }
 
   private toAppointmentResponse(
@@ -472,6 +522,8 @@ export class AppointmentsService {
     const appointment: Appointment =
       this.appointmentsRepo.create(appointmentInput);
     const saved: Appointment = await this.appointmentsRepo.save(appointment);
+
+    await this.createAppointmentBrief(saved, staff, dto);
 
     return this.toAppointmentResponse(saved, staff.timezone);
   }
