@@ -38,7 +38,7 @@
 }
 
 .home-services-card {
-  width: min(100%, 400px);
+  width: min(100%, 640px);
   border-radius: 16px;
   background: linear-gradient(135deg, #f9f9f9, #fff);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
@@ -52,6 +52,9 @@
 }
 
 .home-services-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 24px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -59,9 +62,9 @@
 }
 
 .home-services-list-item {
-  margin-bottom: 10px;
   color: #555;
-  font-size: 1.2rem;
+  font-size: 1.05rem;
+  line-height: 1.35;
 }
 
 .home-appointment-action {
@@ -75,5 +78,9 @@
 
   .home-page-copy {
     font-size: 1.6rem;
+  }
+
+  .home-services-list {
+    grid-template-columns: 1fr;
   }
 }

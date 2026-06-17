@@ -1,9 +1,20 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Staff } from '@coopers/entities';
+import { Appointment, Staff, StaffRole } from '@coopers/entities';
 import { CreateBarberDto } from './dto/create-barber.dto';
 import { UpdateBarberDto } from './dto/update-barber.dto';
+
+const BOOTSTRAP_STAFF_ID = '11111111-1111-1111-1111-111111111111';
+const DEFAULT_BARBER_TIMEZONE = 'Australia/Sydney';
+
+export type DeleteBarberResponse = {
+  success: true;
+};
 
 function normalizeText(value: string): string {
   return value.trim();
@@ -31,19 +42,39 @@ function normalizeSkillTags(
   );
 }
 
+function normalizeRating(value: unknown): number {
+  const rating = Number(value);
+
+  return Number.isFinite(rating) ? rating : 0;
+}
+
+function normalizeStaffResponse(staff: Staff): Staff {
+  return {
+    ...staff,
+    skills: staff.skills ?? [],
+    rating: normalizeRating(staff.rating),
+    available: staff.available !== false,
+    active: staff.active !== false,
+  };
+}
+
 @Injectable()
 export class BarbersService {
   constructor(
     @InjectRepository(Staff)
     private readonly staffRepository: Repository<Staff>,
+    @InjectRepository(Appointment)
+    private readonly appointmentRepository: Repository<Appointment>,
   ) {}
 
-  findAll(): Promise<Staff[]> {
-    return this.staffRepository.find({
+  async findAll(): Promise<Staff[]> {
+    const staff = await this.staffRepository.find({
       order: {
         displayName: 'ASC',
       },
     });
+
+    return staff.map(normalizeStaffResponse);
   }
 
   async findOne(id: string): Promise<Staff> {
@@ -53,19 +84,25 @@ export class BarbersService {
       throw new NotFoundException('Barber not found.');
     }
 
-    return staff;
+    return normalizeStaffResponse(staff);
   }
 
   async create(createBarberDto: CreateBarberDto): Promise<Staff> {
+    const timezone = normalizeOptionalText(createBarberDto.timezone);
     const staff = this.staffRepository.create({
-      ...createBarberDto,
       displayName: normalizeText(createBarberDto.displayName),
       email: normalizeOptionalText(createBarberDto.email),
-      timezone: normalizeOptionalText(createBarberDto.timezone),
-      skills: normalizeSkillTags(createBarberDto.skills),
+      role: createBarberDto.role ?? StaffRole.JUNIOR,
+      timezone: timezone ?? DEFAULT_BARBER_TIMEZONE,
+      skills: normalizeSkillTags(createBarberDto.skills) ?? [],
+      rating: createBarberDto.rating ?? 0,
+      available: createBarberDto.available ?? true,
+      active: createBarberDto.active ?? true,
     });
 
-    return this.staffRepository.save(staff);
+    const savedStaff = await this.staffRepository.save(staff);
+
+    return normalizeStaffResponse(savedStaff);
   }
 
   async update(id: string, updateBarberDto: UpdateBarberDto): Promise<Staff> {
@@ -85,6 +122,36 @@ export class BarbersService {
       throw new NotFoundException('Barber not found.');
     }
 
-    return this.staffRepository.save(staff);
+    const savedStaff = await this.staffRepository.save(staff);
+
+    return normalizeStaffResponse(savedStaff);
+  }
+
+  async delete(id: string): Promise<DeleteBarberResponse> {
+    const staff = await this.staffRepository.findOne({ where: { id } });
+
+    if (!staff) {
+      throw new NotFoundException('Barber not found.');
+    }
+
+    if (staff.id === BOOTSTRAP_STAFF_ID) {
+      throw new ConflictException('Default booking staff cannot be deleted.');
+    }
+
+    const appointmentCount = await this.appointmentRepository.count({
+      where: {
+        staff: { id },
+      },
+    });
+
+    if (appointmentCount > 0) {
+      throw new ConflictException(
+        'This barber has appointments and cannot be deleted.',
+      );
+    }
+
+    await this.staffRepository.remove(staff);
+
+    return { success: true };
   }
 }

@@ -1,6 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 import {
   createBarberAction,
+  deleteBarberAction,
   getBarbersAction,
   updateBarberAction,
 } from './action';
@@ -60,6 +61,16 @@ const barbersSlice = createSlice({
         state.saving = false;
       })
       .addCase(updateBarberAction.rejected, (state) => {
+        state.saving = false;
+      })
+      .addCase(deleteBarberAction.pending, (state) => {
+        state.saving = true;
+      })
+      .addCase(deleteBarberAction.fulfilled, (state, action) => {
+        state.items = state.items.filter((item) => item.id !== action.payload.id);
+        state.saving = false;
+      })
+      .addCase(deleteBarberAction.rejected, (state) => {
         state.saving = false;
       });
   },

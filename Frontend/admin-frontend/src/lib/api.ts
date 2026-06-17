@@ -1,4 +1,8 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
+export const SESSION_EXPIRED_CODE = 'SESSION_EXPIRED';
+export const SESSION_IDLE_EXPIRED_CODE = 'SESSION_IDLE_EXPIRED';
+export const SESSION_IDLE_EXPIRED_EVENT = 'coopers-admin-session-idle-expired';
+export const SESSION_EXPIRED_EVENT = 'coopers-admin-session-expired';
 
 export type StaffRole = 'junior' | 'senior' | 'owner';
 export type ServiceComplexity = 'low' | 'medium' | 'high';
@@ -8,6 +12,7 @@ export type UserRole = 'customer' | 'admin';
 type ApiErrorPayload = {
   message?: string | string[];
   code?: string;
+  canExtend?: boolean;
 };
 
 type ParsedResponse<T> = T | ApiErrorPayload | string | null;
@@ -17,6 +22,7 @@ export class ApiRequestError extends Error {
     message: string,
     public readonly statusCode: number,
     public readonly code?: string,
+    public readonly canExtend?: boolean,
   ) {
     super(message);
     this.name = 'ApiRequestError';
@@ -137,7 +143,6 @@ export type CreateBarberPayload = {
   email?: string;
   role?: StaffRole;
   timezone?: string;
-  bufferAfterMinutes?: number;
   skills?: string[];
   rating?: number;
   available?: boolean;
@@ -145,6 +150,10 @@ export type CreateBarberPayload = {
 };
 
 export type UpdateBarberPayload = Partial<CreateBarberPayload>;
+
+export type DeleteBarberResponse = {
+  success: true;
+};
 
 export type UpdateServiceAiConfigPayload = {
   requiredSkills?: string[];
@@ -188,6 +197,29 @@ export type AcceptAdminInviteResponse = {
   success: true;
   email: string;
 };
+
+export function isSessionExpiryCode(code: string | undefined): boolean {
+  return (
+    code === SESSION_EXPIRED_CODE || code === SESSION_IDLE_EXPIRED_CODE
+  );
+}
+
+export function isSessionIdleExpiredError(error: unknown): boolean {
+  return (
+    error instanceof ApiRequestError &&
+    error.code === SESSION_IDLE_EXPIRED_CODE &&
+    error.canExtend === true
+  );
+}
+
+export function isSessionExpiredError(error: unknown): boolean {
+  return (
+    error instanceof ApiRequestError &&
+    (error.code === SESSION_EXPIRED_CODE ||
+      (error.statusCode === 401 &&
+        error.message === 'Session expired. Please login again.'))
+  );
+}
 
 function buildHeaders(): HeadersInit {
   return {
@@ -244,6 +276,24 @@ function getApiErrorCode<T>(data: ParsedResponse<T>): string | undefined {
   return typeof data.code === 'string' ? data.code : undefined;
 }
 
+function getApiErrorCanExtend<T>(
+  data: ParsedResponse<T>,
+): boolean | undefined {
+  if (typeof data !== 'object' || data === null || !('canExtend' in data)) {
+    return undefined;
+  }
+
+  return typeof data.canExtend === 'boolean' ? data.canExtend : undefined;
+}
+
+function dispatchSessionIdleExpiredEvent(): void {
+  window.dispatchEvent(new Event(SESSION_IDLE_EXPIRED_EVENT));
+}
+
+function dispatchSessionExpiredEvent(): void {
+  window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
@@ -259,39 +309,76 @@ async function request<T>(
     const message = Array.isArray(errorMessage)
       ? errorMessage.join(', ')
       : errorMessage || response.statusText;
+    const code = getApiErrorCode(data);
+    const canExtend = getApiErrorCanExtend(data);
 
-    throw new ApiRequestError(
+    const error = new ApiRequestError(
       message || 'Request failed',
       response.status,
-      getApiErrorCode(data),
+      code,
+      canExtend,
     );
+
+    if (isSessionIdleExpiredError(error)) {
+      dispatchSessionIdleExpiredEvent();
+    } else if (isSessionExpiredError(error)) {
+      dispatchSessionExpiredEvent();
+    }
+
+    throw error;
   }
 
   return data as T;
 }
 
+function toFiniteNumber(value: unknown, fallback = 0): number {
+  const numericValue = Number(value);
+
+  return Number.isFinite(numericValue) ? numericValue : fallback;
+}
+
+function normalizeBarberRecord(barber: BarberRecord): BarberRecord {
+  return {
+    ...barber,
+    role: barber.role ?? 'junior',
+    timezone: barber.timezone ?? 'Australia/Sydney',
+    skills: Array.isArray(barber.skills) ? barber.skills : [],
+    rating: toFiniteNumber(barber.rating),
+    available: barber.available !== false,
+    active: barber.active !== false,
+  };
+}
+
 export function getCurrentSession() {
-  return request<AuthResponse>('/auth/session', {
+  return request<AuthResponse>('/admin-auth/session', {
     headers: buildHeaders(),
   });
 }
 
 export function loginAdmin(payload: AdminLoginPayload) {
-  return request<AuthResponse>('/auth/login', {
+  return request<AuthResponse>('/admin-auth/login', {
     method: 'POST',
     headers: buildHeaders(),
     body: JSON.stringify(payload),
   });
 }
 
+export function extendAdminSession() {
+  return request<AuthResponse>('/admin-auth/extend', {
+    method: 'POST',
+    headers: buildHeaders(),
+    body: JSON.stringify({}),
+  });
+}
+
 export function getAccountProfile() {
-  return request<AccountProfileResponse>('/auth/me', {
+  return request<AccountProfileResponse>('/admin-auth/me', {
     headers: buildHeaders(),
   });
 }
 
 export function logout() {
-  return request<{ success: boolean }>('/auth/logout', {
+  return request<{ success: boolean }>('/admin-auth/logout', {
     method: 'POST',
     headers: buildHeaders(),
     body: JSON.stringify({}),
@@ -301,7 +388,7 @@ export function logout() {
 export function getBarbers() {
   return request<BarberRecord[]>('/admin/barbers', {
     headers: buildHeaders(),
-  });
+  }).then((barbers) => barbers.map(normalizeBarberRecord));
 }
 
 export function createBarber(payload: CreateBarberPayload) {
@@ -309,7 +396,7 @@ export function createBarber(payload: CreateBarberPayload) {
     method: 'POST',
     headers: buildHeaders(),
     body: JSON.stringify(payload),
-  });
+  }).then(normalizeBarberRecord);
 }
 
 export function updateBarber(id: string, payload: UpdateBarberPayload) {
@@ -317,6 +404,13 @@ export function updateBarber(id: string, payload: UpdateBarberPayload) {
     method: 'PATCH',
     headers: buildHeaders(),
     body: JSON.stringify(payload),
+  }).then(normalizeBarberRecord);
+}
+
+export function deleteBarber(id: string) {
+  return request<DeleteBarberResponse>(`/admin/barbers/${id}`, {
+    method: 'DELETE',
+    headers: buildHeaders(),
   });
 }
 

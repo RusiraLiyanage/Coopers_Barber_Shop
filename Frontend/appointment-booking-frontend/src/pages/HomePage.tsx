@@ -7,6 +7,21 @@ interface HomePageProps {
   onMakeAppointment: () => void; // ✅ renamed to match new App.tsx
 }
 
+const HOME_SERVICES = [
+  "💈 Haircut",
+  "💇 Hair Styling",
+  "🎨 Hair Coloring",
+  "🧑‍💼 Consultation",
+  "💆 Deep Conditioning Treatment",
+  "✂️ Skin Fade",
+  "🧔 Beard Trim & Sculpting",
+  "🪒 Hot Towel Shave",
+  "🧑‍🦲 Head Shave",
+  "🎨 Beard Colour",
+  "🧴 Colour Correction Consultation",
+  "🌿 Scalp Treatment",
+];
+
 const HomePage: React.FC<HomePageProps> = ({ onMakeAppointment }) => {
   return (
     <div className="home-page">
@@ -26,14 +41,8 @@ const HomePage: React.FC<HomePageProps> = ({ onMakeAppointment }) => {
             className="home-services-card"
           >
             <ul className="home-services-list">
-              {[
-                "💈 Hair Cut",
-                "💇 Hair Styling",
-                "🎨 Hair Coloring",
-                "🧑‍💼 Consultation",
-                "💆 Deep Conditioning Treatment",
-              ].map((service, index) => (
-                <li key={index} className="home-services-list-item">
+              {HOME_SERVICES.map((service) => (
+                <li key={service} className="home-services-list-item">
                   {service}
                 </li>
               ))}

@@ -40,12 +40,20 @@
   padding: 20px 0;
 }
 
+.admin-section-guide {
+  margin-bottom: 18px;
+}
+
 .admin-section-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 16px;
+}
+
+.admin-toolbar-select {
+  min-width: 260px;
 }
 
 .admin-primary-cell {
@@ -79,6 +87,25 @@
   margin-top: 20px;
 }
 
+.admin-service-starter-alert {
+  margin-bottom: 20px;
+}
+
+.admin-service-starter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.admin-service-starter-notes {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.admin-service-starter-notes li + li {
+  margin-top: 6px;
+}
+
 @media (max-width: 960px) {
   .admin-dashboard {
     padding: 32px 18px;
@@ -97,7 +124,8 @@
   }
 
   .admin-overview-grid,
-  .admin-form-grid {
+  .admin-form-grid,
+  .admin-service-starter-grid {
     grid-template-columns: 1fr;
   }
 }

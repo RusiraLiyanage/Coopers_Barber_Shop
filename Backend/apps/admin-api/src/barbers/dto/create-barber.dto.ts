@@ -6,7 +6,6 @@ import {
   IsBoolean,
   IsEmail,
   IsEnum,
-  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -38,15 +37,10 @@ export class CreateBarberDto {
   @MaxLength(80)
   timezone?: string;
 
-  @ApiPropertyOptional({ example: 15 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  bufferAfterMinutes?: number;
-
   @ApiPropertyOptional({
-    example: ['cuts', 'styling', 'colour'],
+    description:
+      'Services, treatments, and client situations this barber can confidently handle.',
+    example: ['skin fades', 'beard shaping', 'sensitive scalp support'],
     type: [String],
   })
   @IsOptional()

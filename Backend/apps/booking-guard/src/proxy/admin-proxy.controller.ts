@@ -6,11 +6,11 @@ import {
 } from './protected-proxy.service';
 import {
   AuthCookieResponse,
-  getAuthorizationHeaderFromRequest,
-  getRememberMeFromCookie,
-  setAuthCookies,
+  getAdminAuthorizationHeaderFromRequest,
+  getAdminRememberMeFromCookie,
+  setAdminAuthCookies,
 } from './auth-cookie.util';
-import { getRefreshTokenFromRequest } from './refresh-token.util';
+import { getAdminRefreshTokenFromRequest } from './refresh-token.util';
 
 type AdminProxyRequest = {
   method: string;
@@ -27,7 +27,7 @@ function writeProxyResponse(
   response.status(result.statusCode);
 
   if (result.refreshedTokens) {
-    setAuthCookies(response, result.refreshedTokens, { rememberMe });
+    setAdminAuthCookies(response, result.refreshedTokens, { rememberMe });
   }
 }
 
@@ -83,11 +83,11 @@ export class AdminProxyController {
     const proxyUrl = createAdminProxyUrl(request);
     const result = await this.protectedProxyService.forward({
       target: 'admin',
-      authorizationHeader: getAuthorizationHeaderFromRequest(
+      authorizationHeader: getAdminAuthorizationHeaderFromRequest(
         authorizationHeader,
         cookieHeader,
       ),
-      refreshToken: getRefreshTokenFromRequest(
+      refreshToken: getAdminRefreshTokenFromRequest(
         refreshTokenHeader,
         cookieHeader,
       ),
@@ -100,7 +100,7 @@ export class AdminProxyController {
     writeProxyResponse(
       response,
       result,
-      getRememberMeFromCookie(cookieHeader) ?? false,
+      getAdminRememberMeFromCookie(cookieHeader) ?? false,
     );
 
     return result.body;

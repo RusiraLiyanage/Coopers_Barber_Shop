@@ -1,5 +1,6 @@
 import { createAppAsyncThunk } from '../createAppAsyncThunk';
 import {
+  extendAdminSession,
   getAccountProfile,
   getCurrentSession,
   loginAdmin,
@@ -49,6 +50,19 @@ export const loginAdminAction = createAppAsyncThunk<
 
   return createAdminSession();
 });
+
+export const extendAdminSessionAction = createAppAsyncThunk<AuthSession>(
+  `${SLICE_NAME}/extendAdminSession`,
+  async () => {
+    const response = await extendAdminSession();
+
+    if (!response.authenticated) {
+      throw new Error('Authentication failed');
+    }
+
+    return createAdminSession();
+  },
+);
 
 export const logoutAction = createAppAsyncThunk<{ success: boolean }>(
   `${SLICE_NAME}/logout`,

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { GuardAuthenticationModule, GuardConfigModule } from '@coopers/common';
+import { AdminAuthProxyController } from './admin-auth-proxy.controller';
 import { AccountProxyController } from './account-proxy.controller';
 import { AdminProxyController } from './admin-proxy.controller';
 import { FrontendProxyController } from './frontend-proxy.controller';
@@ -14,6 +15,7 @@ import { RefreshTokenCoordinatorService } from './refresh-token-coordinator.serv
   imports: [GuardConfigModule, GuardAuthenticationModule], // booking guard needs the environment configurations
   controllers: [
     AccountProxyController,
+    AdminAuthProxyController,
     PublicProxyController,
     AdminProxyController,
     ProtectedProxyController,

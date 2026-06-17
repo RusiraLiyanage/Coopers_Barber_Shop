@@ -1,9 +1,11 @@
 import {
   createBarber,
+  deleteBarber,
   getBarbers,
   updateBarber,
   type BarberRecord,
   type CreateBarberPayload,
+  type DeleteBarberResponse,
   type UpdateBarberPayload,
 } from '../../lib/api';
 import { createAppAsyncThunk } from '../createAppAsyncThunk';
@@ -26,3 +28,11 @@ export const updateBarberAction = createAppAsyncThunk<
 >(`${SLICE_NAME}/updateBarber`, async ({ id, payload }) =>
   updateBarber(id, payload),
 );
+
+export const deleteBarberAction = createAppAsyncThunk<
+  DeleteBarberResponse & { id: string },
+  string
+>(`${SLICE_NAME}/deleteBarber`, async (id) => ({
+  ...(await deleteBarber(id)),
+  id,
+}));

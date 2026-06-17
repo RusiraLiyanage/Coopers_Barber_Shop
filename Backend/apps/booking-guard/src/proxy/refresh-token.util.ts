@@ -1,4 +1,7 @@
-import { getRefreshTokenFromCookie } from './auth-cookie.util';
+import {
+  getAdminRefreshTokenFromCookie,
+  getRefreshTokenFromCookie,
+} from './auth-cookie.util';
 
 type RefreshTokenRequestBody = {
   refresh_token?: string;
@@ -15,10 +18,39 @@ export function getRefreshTokenFromRequest(
   cookieHeader: string | undefined,
   body?: RefreshTokenRequestBody,
 ): string | undefined {
+  return getRefreshTokenFromRequestCookie(
+    refreshTokenHeader,
+    cookieHeader,
+    getRefreshTokenFromCookie,
+    body,
+  );
+}
+
+export function getAdminRefreshTokenFromRequest(
+  refreshTokenHeader: string | undefined,
+  cookieHeader: string | undefined,
+  body?: RefreshTokenRequestBody,
+): string | undefined {
+  return getRefreshTokenFromRequestCookie(
+    refreshTokenHeader,
+    cookieHeader,
+    getAdminRefreshTokenFromCookie,
+    body,
+  );
+}
+
+function getRefreshTokenFromRequestCookie(
+  refreshTokenHeader: string | undefined,
+  cookieHeader: string | undefined,
+  getCookieRefreshToken: (
+    cookieHeader: string | undefined,
+  ) => string | undefined,
+  body?: RefreshTokenRequestBody,
+): string | undefined {
   return (
     getUsableToken(refreshTokenHeader) ??
     getUsableToken(body?.refresh_token) ??
-    getRefreshTokenFromCookie(cookieHeader)
+    getCookieRefreshToken(cookieHeader)
   );
 }
 
@@ -28,6 +60,20 @@ export function createRefreshTokenBody(
   body: RefreshTokenRequestBody,
 ): RefreshTokenRequestBody {
   const refreshToken = getRefreshTokenFromRequest(
+    refreshTokenHeader,
+    cookieHeader,
+    body,
+  );
+
+  return refreshToken ? { refresh_token: refreshToken } : body;
+}
+
+export function createAdminRefreshTokenBody(
+  refreshTokenHeader: string | undefined,
+  cookieHeader: string | undefined,
+  body: RefreshTokenRequestBody,
+): RefreshTokenRequestBody {
+  const refreshToken = getAdminRefreshTokenFromRequest(
     refreshTokenHeader,
     cookieHeader,
     body,

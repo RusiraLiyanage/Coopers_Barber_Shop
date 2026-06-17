@@ -9,6 +9,7 @@ import {
   Input,
   InputNumber,
   Modal,
+  Popconfirm,
   Select,
   Space,
   Switch,
@@ -21,16 +22,26 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import {
   CopyOutlined,
+  DeleteOutlined,
   EditOutlined,
   PlusOutlined,
   ReloadOutlined,
 } from '@ant-design/icons';
 import { format } from 'date-fns';
 import { SACard, SAModalHeader, SAStatusTag } from '../components/common';
+import {
+  BARBER_CAPABILITY_OPTIONS,
+  getServiceAiStarterConfig,
+  SERVICE_SAFETY_TRIGGER_OPTIONS,
+} from '../lib/adminOptions';
 import { createAdminInvite } from '../lib/api';
-import { getUserFriendlyErrorMessage } from '../lib/errors';
+import {
+  getUserFriendlyErrorMessage,
+  isSessionExpiredError,
+} from '../lib/errors';
 import {
   createBarberAction,
+  deleteBarberAction,
   getBarbersAction,
   updateBarberAction,
 } from '../store/barbers/action';
@@ -97,7 +108,6 @@ type BarberFormValues = {
   email?: string;
   role: StaffRole;
   timezone: string;
-  bufferAfterMinutes: number;
   skills: string[];
   rating: number;
   available: boolean;
@@ -142,7 +152,17 @@ const SEVERITY_OPTIONS = [
   { label: 'High', value: 'high' },
 ];
 
-function toTitleCase(value: string): string {
+const BOOTSTRAP_STAFF_ID = '11111111-1111-1111-1111-111111111111';
+const BOOTSTRAP_STAFF_NAME = 'Main Staff';
+const KNOWN_BARBER_CAPABILITIES = new Set(
+  BARBER_CAPABILITY_OPTIONS.map((option) => option.value),
+);
+
+function toTitleCase(value: string | null | undefined): string {
+  if (!value) {
+    return 'Unknown';
+  }
+
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
@@ -168,6 +188,22 @@ function compactOptionalString(value: string | undefined): string | undefined {
   const trimmedValue = value?.trim();
 
   return trimmedValue ? trimmedValue : undefined;
+}
+
+function filterSelectOption(
+  inputValue: string,
+  option?: { label?: unknown; value?: unknown },
+): boolean {
+  const normalizedInput = inputValue.trim().toLowerCase();
+
+  if (!normalizedInput) {
+    return true;
+  }
+
+  const label = String(option?.label ?? '').toLowerCase();
+  const value = String(option?.value ?? '').toLowerCase();
+
+  return label.includes(normalizedInput) || value.includes(normalizedInput);
 }
 
 function renderTags(values: string[] | undefined, emptyText = 'None') {
@@ -205,6 +241,33 @@ function getCustomerName(brief: AppointmentBriefRecord): string {
   return fullName || email;
 }
 
+function isAdminVisibleBarber(barber: BarberRecord): boolean {
+  const isBootstrapId = barber.id === BOOTSTRAP_STAFF_ID;
+  const isDefaultBookingStaff =
+    barber.displayName === BOOTSTRAP_STAFF_NAME &&
+    barber.email === null &&
+    compactStringArray(barber.skills).length === 0;
+
+  return !isBootstrapId && !isDefaultBookingStaff;
+}
+
+function isConfiguredService(service: ServiceAiConfigRecord): boolean {
+  const requiredSkills = compactStringArray(service.requiredSkills);
+
+  return (
+    requiredSkills.length > 0 &&
+    requiredSkills.every((skill) => KNOWN_BARBER_CAPABILITIES.has(skill))
+  );
+}
+
+function getServiceSetupTag(service: ServiceAiConfigRecord) {
+  if (isConfiguredService(service)) {
+    return <SAStatusTag color="green">Ready</SAStatusTag>;
+  }
+
+  return <SAStatusTag color="gold">Needs setup</SAStatusTag>;
+}
+
 function createBarberPayload(
   values: BarberFormValues,
 ): CreateBarberPayload {
@@ -213,7 +276,6 @@ function createBarberPayload(
     email: compactOptionalString(values.email),
     role: values.role,
     timezone: values.timezone.trim(),
-    bufferAfterMinutes: values.bufferAfterMinutes,
     skills: compactStringArray(values.skills),
     rating: values.rating,
     available: values.available,
@@ -256,6 +318,11 @@ export default function AdminDashboard() {
     useState<SafetyRuleRecord | null>(null);
   const [selectedBrief, setSelectedBrief] =
     useState<AppointmentBriefRecord | null>(null);
+  const [barberSkillsSearchValue, setBarberSkillsSearchValue] = useState('');
+  const [serviceRequiredSkillsSearchValue, setServiceRequiredSkillsSearchValue] =
+    useState('');
+  const [serviceSafetyTriggersSearchValue, setServiceSafetyTriggersSearchValue] =
+    useState('');
 
   const barbers = useAppSelector(selectBarbers);
   const serviceConfigs = useAppSelector(selectServiceConfigs);
@@ -271,21 +338,76 @@ export default function AdminDashboard() {
   const serviceConfigsSaving = useAppSelector(selectServiceConfigsSaving);
   const safetyRulesSaving = useAppSelector(selectSafetyRulesSaving);
 
-  const serviceOptions = useMemo(
-    () =>
-      serviceConfigs.map((service) => ({
-        label: service.name,
-        value: service.id,
-      })),
-    [serviceConfigs],
-  );
-
   const serviceNameById = useMemo(
     () =>
       new Map(
         serviceConfigs.map((service) => [service.id, service.name] as const),
       ),
     [serviceConfigs],
+  );
+
+  const visibleBarbers = useMemo(
+    () => barbers.filter(isAdminVisibleBarber),
+    [barbers],
+  );
+
+  const showRequestError = useCallback(
+    (error: unknown) => {
+      if (isSessionExpiredError(error)) {
+        return;
+      }
+
+      messageApi.error(getUserFriendlyErrorMessage(error));
+    },
+    [messageApi],
+  );
+
+  const configuredServiceConfigs = useMemo(
+    () => serviceConfigs.filter(isConfiguredService),
+    [serviceConfigs],
+  );
+
+  const servicesNeedingSetup = useMemo(
+    () => serviceConfigs.filter((service) => !isConfiguredService(service)),
+    [serviceConfigs],
+  );
+
+  const sortedServiceConfigs = useMemo(
+    () =>
+      [...serviceConfigs].sort((left, right) => {
+        const leftConfigured = isConfiguredService(left);
+        const rightConfigured = isConfiguredService(right);
+
+        if (leftConfigured !== rightConfigured) {
+          return leftConfigured ? 1 : -1;
+        }
+
+        return left.name.localeCompare(right.name);
+      }),
+    [serviceConfigs],
+  );
+
+  const serviceOptions = useMemo(
+    () =>
+      configuredServiceConfigs.map((service) => ({
+        label: service.name,
+        value: service.id,
+      })),
+    [configuredServiceConfigs],
+  );
+
+  const unconfiguredServiceOptions = useMemo(
+    () =>
+      servicesNeedingSetup.map((service) => ({
+        label: service.name,
+        value: service.id,
+      })),
+    [servicesNeedingSetup],
+  );
+
+  const selectedServiceStarterConfig = useMemo(
+    () => getServiceAiStarterConfig(editingService?.name),
+    [editingService],
   );
 
   const loadAdminData = useCallback(async () => {
@@ -298,9 +420,9 @@ export default function AdminDashboard() {
         dispatch(getHairHistoryAction()).unwrap(),
       ]);
     } catch (error) {
-      messageApi.error(getUserFriendlyErrorMessage(error));
+      showRequestError(error);
     }
-  }, [dispatch, messageApi]);
+  }, [dispatch, showRequestError]);
 
   useEffect(() => {
     void loadAdminData();
@@ -310,11 +432,15 @@ export default function AdminDashboard() {
     () => [
       {
         label: 'Active barbers',
-        value: barbers.filter((barber) => barber.active).length,
+        value: visibleBarbers.filter((barber) => barber.active).length,
       },
       {
-        label: 'Service configs',
-        value: serviceConfigs.length,
+        label: 'Services ready for AI',
+        value: configuredServiceConfigs.length,
+      },
+      {
+        label: 'Services needing setup',
+        value: servicesNeedingSetup.length,
       },
       {
         label: 'Active safety rules',
@@ -331,37 +457,35 @@ export default function AdminDashboard() {
     ],
     [
       appointmentBriefs.length,
-      barbers,
+      visibleBarbers,
+      configuredServiceConfigs.length,
+      servicesNeedingSetup.length,
       hairHistory.length,
       safetyRules,
-      serviceConfigs.length,
     ],
   );
 
   const servicesMissingSkills = useMemo(
-    () =>
-      serviceConfigs.filter(
-        (service) => compactStringArray(service.requiredSkills).length === 0,
-      ),
+    () => serviceConfigs.filter((service) => !isConfiguredService(service)),
     [serviceConfigs],
   );
 
   const barbersMissingSkills = useMemo(
     () =>
-      barbers.filter(
+      visibleBarbers.filter(
         (barber) => compactStringArray(barber.skills).length === 0,
       ),
-    [barbers],
+    [visibleBarbers],
   );
 
   const showCreateBarberModal = () => {
     setEditingBarber(null);
+    setBarberSkillsSearchValue('');
     barberForm.setFieldsValue({
       displayName: '',
       email: '',
       role: 'junior',
       timezone: 'Australia/Sydney',
-      bufferAfterMinutes: 15,
       skills: [],
       rating: 0,
       available: true,
@@ -372,12 +496,12 @@ export default function AdminDashboard() {
 
   const showEditBarberModal = (barber: BarberRecord) => {
     setEditingBarber(barber);
+    setBarberSkillsSearchValue('');
     barberForm.setFieldsValue({
       displayName: barber.displayName,
       email: barber.email ?? '',
       role: barber.role,
       timezone: barber.timezone,
-      bufferAfterMinutes: barber.bufferAfterMinutes,
       skills: barber.skills,
       rating: barber.rating,
       available: barber.available,
@@ -388,6 +512,8 @@ export default function AdminDashboard() {
 
   const showServiceModal = (service: ServiceAiConfigRecord) => {
     setEditingService(service);
+    setServiceRequiredSkillsSearchValue('');
+    setServiceSafetyTriggersSearchValue('');
     serviceConfigForm.setFieldsValue({
       requiredSkills: service.requiredSkills,
       safetyTriggers: service.safetyTriggers,
@@ -395,6 +521,14 @@ export default function AdminDashboard() {
       isActive: service.isActive,
     });
     setServiceModalOpen(true);
+  };
+
+  const handleSelectServiceToConfigure = (serviceId: string) => {
+    const service = serviceConfigs.find((item) => item.id === serviceId);
+
+    if (service) {
+      showServiceModal(service);
+    }
   };
 
   const showCreateSafetyRuleModal = () => {
@@ -437,7 +571,16 @@ export default function AdminDashboard() {
       messageApi.success('Barber profile saved.');
       setBarberModalOpen(false);
     } catch (error) {
-      messageApi.error(getUserFriendlyErrorMessage(error));
+      showRequestError(error);
+    }
+  };
+
+  const handleDeleteBarber = async (barber: BarberRecord) => {
+    try {
+      await dispatch(deleteBarberAction(barber.id)).unwrap();
+      messageApi.success(`${barber.displayName} deleted.`);
+    } catch (error) {
+      showRequestError(error);
     }
   };
 
@@ -464,9 +607,76 @@ export default function AdminDashboard() {
       messageApi.success('Service AI config saved.');
       setServiceModalOpen(false);
     } catch (error) {
-      messageApi.error(getUserFriendlyErrorMessage(error));
+      showRequestError(error);
     }
   };
+
+  const handleApplyServiceStarterConfig = () => {
+    if (!selectedServiceStarterConfig) {
+      return;
+    }
+
+    serviceConfigForm.setFieldsValue({
+      requiredSkills: selectedServiceStarterConfig.requiredSkills,
+      safetyTriggers: selectedServiceStarterConfig.safetyTriggers,
+      complexity: selectedServiceStarterConfig.complexity,
+      isActive: editingService?.isActive ?? true,
+    });
+  };
+
+  const commitBarberSkillsSearchValue = useCallback(() => {
+    const normalizedValue = barberSkillsSearchValue.trim();
+
+    if (!normalizedValue) {
+      return;
+    }
+
+    const currentValues = barberForm.getFieldValue('skills') as
+      | string[]
+      | undefined;
+
+    barberForm.setFieldValue(
+      'skills',
+      compactStringArray([...(currentValues ?? []), normalizedValue]),
+    );
+    setBarberSkillsSearchValue('');
+  }, [barberForm, barberSkillsSearchValue]);
+
+  const commitServiceRequiredSkillsSearchValue = useCallback(() => {
+    const normalizedValue = serviceRequiredSkillsSearchValue.trim();
+
+    if (!normalizedValue) {
+      return;
+    }
+
+    const currentValues = serviceConfigForm.getFieldValue('requiredSkills') as
+      | string[]
+      | undefined;
+
+    serviceConfigForm.setFieldValue(
+      'requiredSkills',
+      compactStringArray([...(currentValues ?? []), normalizedValue]),
+    );
+    setServiceRequiredSkillsSearchValue('');
+  }, [serviceConfigForm, serviceRequiredSkillsSearchValue]);
+
+  const commitServiceSafetyTriggersSearchValue = useCallback(() => {
+    const normalizedValue = serviceSafetyTriggersSearchValue.trim();
+
+    if (!normalizedValue) {
+      return;
+    }
+
+    const currentValues = serviceConfigForm.getFieldValue('safetyTriggers') as
+      | string[]
+      | undefined;
+
+    serviceConfigForm.setFieldValue(
+      'safetyTriggers',
+      compactStringArray([...(currentValues ?? []), normalizedValue]),
+    );
+    setServiceSafetyTriggersSearchValue('');
+  }, [serviceConfigForm, serviceSafetyTriggersSearchValue]);
 
   const handleSaveSafetyRule = async () => {
     const values = await safetyRuleForm.validateFields();
@@ -484,7 +694,7 @@ export default function AdminDashboard() {
       messageApi.success('Safety rule saved.');
       setSafetyModalOpen(false);
     } catch (error) {
-      messageApi.error(getUserFriendlyErrorMessage(error));
+      showRequestError(error);
     }
   };
 
@@ -503,7 +713,7 @@ export default function AdminDashboard() {
       setCreatedInvite(invite);
       messageApi.success('Admin invite created.');
     } catch (error) {
-      messageApi.error(getUserFriendlyErrorMessage(error));
+      showRequestError(error);
     } finally {
       setInviteSubmitting(false);
     }
@@ -553,7 +763,7 @@ export default function AdminDashboard() {
       render: (role: StaffRole) => <Tag>{toTitleCase(role)}</Tag>,
     },
     {
-      title: 'Skills',
+      title: 'Capabilities',
       dataIndex: 'skills',
       key: 'skills',
       render: (skills: string[]) => renderTags(skills),
@@ -563,14 +773,10 @@ export default function AdminDashboard() {
       dataIndex: 'rating',
       key: 'rating',
       width: 100,
-      render: (rating: number) => rating.toFixed(1),
-    },
-    {
-      title: 'Buffer',
-      dataIndex: 'bufferAfterMinutes',
-      key: 'bufferAfterMinutes',
-      width: 110,
-      render: (minutes: number) => `${minutes} min`,
+      render: (rating: number | null | undefined) =>
+        typeof rating === 'number' && Number.isFinite(rating)
+          ? rating.toFixed(1)
+          : '0.0',
     },
     {
       title: 'Status',
@@ -581,14 +787,28 @@ export default function AdminDashboard() {
     {
       title: '',
       key: 'action',
-      width: 120,
+      width: 180,
       render: (_, barber) => (
-        <Button
-          icon={<EditOutlined />}
-          onClick={() => showEditBarberModal(barber)}
-        >
-          Edit
-        </Button>
+        <Space>
+          <Button
+            icon={<EditOutlined />}
+            onClick={() => showEditBarberModal(barber)}
+          >
+            Edit
+          </Button>
+          <Popconfirm
+            title="Delete barber profile?"
+            description={`Remove ${barber.displayName} from admin matching?`}
+            okText="Delete"
+            okButtonProps={{ danger: true }}
+            cancelText="Cancel"
+            onConfirm={() => void handleDeleteBarber(barber)}
+          >
+            <Button danger icon={<DeleteOutlined />} loading={barbersSaving}>
+              Delete
+            </Button>
+          </Popconfirm>
+        </Space>
       ),
     },
   ];
@@ -610,6 +830,12 @@ export default function AdminDashboard() {
       ),
     },
     {
+      title: 'AI setup',
+      key: 'setup',
+      width: 140,
+      render: (_, service) => getServiceSetupTag(service),
+    },
+    {
       title: 'Complexity',
       dataIndex: 'complexity',
       key: 'complexity',
@@ -624,13 +850,14 @@ export default function AdminDashboard() {
       title: 'Required skills',
       dataIndex: 'requiredSkills',
       key: 'requiredSkills',
-      render: (skills: string[]) => renderTags(skills),
+      render: (skills: string[]) => renderTags(skills, 'Add required skills'),
     },
     {
       title: 'Safety triggers',
       dataIndex: 'safetyTriggers',
       key: 'safetyTriggers',
-      render: (triggers: string[]) => renderTags(triggers),
+      render: (triggers: string[]) =>
+        renderTags(triggers, 'Optional safety triggers'),
     },
     {
       title: 'Status',
@@ -645,7 +872,7 @@ export default function AdminDashboard() {
       width: 120,
       render: (_, service) => (
         <Button icon={<EditOutlined />} onClick={() => showServiceModal(service)}>
-          Edit
+          {isConfiguredService(service) ? 'Edit' : 'Configure'}
         </Button>
       ),
     },
@@ -851,6 +1078,12 @@ export default function AdminDashboard() {
             label: 'Overview',
             children: (
               <Space direction="vertical" size={20} className="admin-full-width">
+                <Alert
+                  type="info"
+                  showIcon
+                  message="Admin setup order"
+                  description="Add AI-ready barber profiles, configure service matching rules, then add safety rules. Appointment briefs and hair history will start filling once the client AI consultation feature begins creating real records."
+                />
                 <div className="admin-overview-grid">
                   {overviewStats.map((stat) => (
                     <SACard key={stat.label} bodyPadding={20}>
@@ -870,7 +1103,7 @@ export default function AdminDashboard() {
                     <Alert
                       type="warning"
                       showIcon
-                      message="Services missing required skills"
+                      message="Services needing AI setup"
                       description={servicesMissingSkills
                         .map((service) => service.name)
                         .join(', ')}
@@ -880,7 +1113,7 @@ export default function AdminDashboard() {
                     <Alert
                       type="warning"
                       showIcon
-                      message="Barbers missing skills"
+                      message="Barbers missing capabilities"
                       description={barbersMissingSkills
                         .map((barber) => barber.displayName)
                         .join(', ')}
@@ -903,6 +1136,13 @@ export default function AdminDashboard() {
             label: 'Barbers',
             children: (
               <div className="admin-table-section">
+                <Alert
+                  type="info"
+                  showIcon
+                  className="admin-section-guide"
+                  message="Why barber profiles matter"
+                  description="The AI consultation will use each barber's capabilities, role, availability, and rating to recommend the right person for a client request. Add only barbers that should participate in AI matching."
+                />
                 <div className="admin-section-toolbar">
                   <Typography.Title level={4}>Barber profiles</Typography.Title>
                   <Button
@@ -916,10 +1156,15 @@ export default function AdminDashboard() {
                 <Table
                   rowKey="id"
                   columns={barberColumns}
-                  dataSource={barbers}
+                  dataSource={visibleBarbers}
                   loading={barbersLoading}
                   scroll={{ x: 980 }}
                   pagination={{ pageSize: 8 }}
+                  locale={{
+                    emptyText: (
+                      <Empty description="No AI-ready barbers yet. Add barber profiles manually to start matching clients." />
+                    ),
+                  }}
                 />
               </div>
             ),
@@ -929,18 +1174,49 @@ export default function AdminDashboard() {
             label: 'Service AI Config',
             children: (
               <div className="admin-table-section">
+                <Alert
+                  type="info"
+                  showIcon
+                  className="admin-section-guide"
+                  message="Why service AI config matters"
+                  description="Required skills tell the AI who can perform a service. Safety triggers are keywords or situations that should make the AI check safety rules before recommending a path."
+                />
                 <div className="admin-section-toolbar">
-                  <Typography.Title level={4}>
-                    Service matching rules
-                  </Typography.Title>
+                  <div>
+                    <Typography.Title level={4}>
+                      Service matching rules
+                    </Typography.Title>
+                    <Typography.Text type="secondary">
+                      Every booking service should have capabilities, complexity, and optional safety triggers before the consultation agent uses it.
+                    </Typography.Text>
+                  </div>
+                  <Select
+                    className="admin-toolbar-select"
+                    placeholder="Jump to a service that needs setup"
+                    options={unconfiguredServiceOptions}
+                    onSelect={handleSelectServiceToConfigure}
+                    showSearch
+                    filterOption={filterSelectOption}
+                    optionFilterProp="label"
+                    disabled={
+                      serviceConfigsLoading ||
+                      unconfiguredServiceOptions.length === 0
+                    }
+                    allowClear
+                  />
                 </div>
                 <Table
                   rowKey="id"
                   columns={serviceColumns}
-                  dataSource={serviceConfigs}
+                  dataSource={sortedServiceConfigs}
                   loading={serviceConfigsLoading}
                   scroll={{ x: 1040 }}
                   pagination={{ pageSize: 8 }}
+                  locale={{
+                    emptyText: (
+                      <Empty description="No booking services available yet." />
+                    ),
+                  }}
                 />
               </div>
             ),
@@ -950,6 +1226,13 @@ export default function AdminDashboard() {
             label: 'Safety Rules',
             children: (
               <div className="admin-table-section">
+                <Alert
+                  type="info"
+                  showIcon
+                  className="admin-section-guide"
+                  message="Why safety rules matter"
+                  description="Safety rules are the policy layer for risky requests such as scalp sensitivity, allergies, bleach damage, box dye, or formal styling requirements. The AI should use them before creating a recommendation."
+                />
                 <div className="admin-section-toolbar">
                   <Typography.Title level={4}>Safety rules</Typography.Title>
                   <Button
@@ -967,6 +1250,11 @@ export default function AdminDashboard() {
                   loading={safetyRulesLoading}
                   scroll={{ x: 900 }}
                   pagination={{ pageSize: 8 }}
+                  locale={{
+                    emptyText: (
+                      <Empty description="No safety rules yet. Add rules after configuring the services they apply to." />
+                    ),
+                  }}
                 />
               </div>
             ),
@@ -976,6 +1264,13 @@ export default function AdminDashboard() {
             label: 'Appointment Briefs',
             children: (
               <div className="admin-table-section">
+                <Alert
+                  type="info"
+                  showIcon
+                  className="admin-section-guide"
+                  message="Why appointment briefs matter"
+                  description="Briefs are generated by the future AI consultation flow so the barber can see the customer's request, safety notes, hair state, and intended look before the appointment."
+                />
                 <div className="admin-section-toolbar">
                   <Typography.Title level={4}>
                     Generated appointment briefs
@@ -1001,6 +1296,13 @@ export default function AdminDashboard() {
             label: 'Hair History',
             children: (
               <div className="admin-table-section">
+                <Alert
+                  type="info"
+                  showIcon
+                  className="admin-section-guide"
+                  message="Why hair history matters"
+                  description="Hair history is cross-visit memory. It helps the AI avoid repeating unsafe recommendations when a client has previous colour, bleach, product, sensitivity, or damage history."
+                />
                 <div className="admin-section-toolbar">
                   <Typography.Title level={4}>Client hair history</Typography.Title>
                 </div>
@@ -1024,6 +1326,13 @@ export default function AdminDashboard() {
             label: 'Admin Invites',
             children: (
               <div className="admin-table-section">
+                <Alert
+                  type="info"
+                  showIcon
+                  className="admin-section-guide"
+                  message="Why admin invites matter"
+                  description="Use invites to onboard trusted admins without sharing the main admin password. Invite acceptance creates an admin account that can manage AI setup data."
+                />
                 <div className="admin-section-toolbar">
                   <Typography.Title level={4}>Invite administrators</Typography.Title>
                 </div>
@@ -1110,15 +1419,30 @@ export default function AdminDashboard() {
             name="displayName"
             label="Display name"
             rules={[{ required: true, message: 'Display name is required.' }]}
+            extra="Customer-facing barber name used in recommendations and appointment briefs."
           >
-            <Input />
+            <Input placeholder="Sophia Reed" />
           </Form.Item>
           <div className="admin-form-grid">
-            <Form.Item name="email" label="Email">
-              <Input />
+            <Form.Item
+              name="email"
+              label="Email"
+              extra="Optional internal contact email for the barber."
+            >
+              <Input placeholder="sophia@coopers.local" />
             </Form.Item>
-            <Form.Item name="role" label="Role" rules={[{ required: true }]}>
-              <Select options={STAFF_ROLE_OPTIONS} />
+            <Form.Item
+              name="role"
+              label="Role"
+              rules={[{ required: true }]}
+              extra="High-complexity services can be directed to senior or owner-level barbers."
+            >
+              <Select
+                options={STAFF_ROLE_OPTIONS}
+                showSearch
+                filterOption={filterSelectOption}
+                optionFilterProp="label"
+              />
             </Form.Item>
           </div>
           <div className="admin-form-grid">
@@ -1126,26 +1450,49 @@ export default function AdminDashboard() {
               name="timezone"
               label="Timezone"
               rules={[{ required: true, message: 'Timezone is required.' }]}
+              extra="Used when interpreting appointment times for this barber."
             >
-              <Input />
-            </Form.Item>
-            <Form.Item
-              name="bufferAfterMinutes"
-              label="Buffer after minutes"
-              rules={[{ required: true }]}
-            >
-              <InputNumber min={0} max={120} className="admin-full-width" />
+              <Input placeholder="Australia/Sydney" />
             </Form.Item>
           </div>
-          <Form.Item name="skills" label="Skills">
-            <Select mode="tags" tokenSeparators={[',']} />
+          <Form.Item
+            name="skills"
+            label="Barber capabilities"
+            extra="Choose the services, treatments, and client situations this barber can confidently handle. These choices help the AI match clients to the right barber."
+          >
+            <Select
+              mode="tags"
+              options={BARBER_CAPABILITY_OPTIONS}
+              tokenSeparators={[',']}
+              placeholder="Select capabilities or add a new one"
+              showSearch
+              filterOption={filterSelectOption}
+              optionFilterProp="label"
+              searchValue={barberSkillsSearchValue}
+              onSearch={setBarberSkillsSearchValue}
+              onBlur={commitBarberSkillsSearchValue}
+            />
           </Form.Item>
           <div className="admin-form-grid">
-            <Form.Item name="rating" label="Rating" rules={[{ required: true }]}>
-              <InputNumber min={0} max={5} step={0.1} className="admin-full-width" />
+            <Form.Item
+              name="rating"
+              label="Rating"
+              rules={[{ required: true }]}
+              extra="A simple confidence signal for matching when multiple barbers qualify."
+            >
+              <InputNumber
+                min={0}
+                max={5}
+                step={0.1}
+                className="admin-full-width"
+              />
             </Form.Item>
             <div className="admin-switch-row">
-              <Form.Item name="available" label="Available" valuePropName="checked">
+              <Form.Item
+                name="available"
+                label="Available"
+                valuePropName="checked"
+              >
                 <Switch />
               </Form.Item>
               <Form.Item name="active" label="Active" valuePropName="checked">
@@ -1170,19 +1517,111 @@ export default function AdminDashboard() {
           className="admin-modal-header"
         />
         <Form form={serviceConfigForm} layout="vertical" requiredMark>
-          <Form.Item name="requiredSkills" label="Required skills">
-            <Select mode="tags" tokenSeparators={[',']} />
+          {selectedServiceStarterConfig ? (
+            <Alert
+              type="info"
+              showIcon
+              className="admin-service-starter-alert"
+              message="Suggested starter setup"
+              description={
+                <Space direction="vertical" size={12} className="admin-full-width">
+                  <Typography.Text>
+                    These starter values fit the current service type and can be
+                    adjusted before saving.
+                  </Typography.Text>
+                  <div className="admin-service-starter-grid">
+                    <div>
+                      <Typography.Text strong>
+                        Recommended capabilities
+                      </Typography.Text>
+                      <div>{renderTags(selectedServiceStarterConfig.requiredSkills)}</div>
+                    </div>
+                    <div>
+                      <Typography.Text strong>
+                        Recommended safety triggers
+                      </Typography.Text>
+                      <div>
+                        {renderTags(
+                          selectedServiceStarterConfig.safetyTriggers,
+                          'No default triggers',
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <Typography.Text strong>
+                    Suggested complexity: {toTitleCase(selectedServiceStarterConfig.complexity)}
+                  </Typography.Text>
+                  <ul className="admin-service-starter-notes">
+                    {selectedServiceStarterConfig.notes.map((note) => (
+                      <li key={note}>{note}</li>
+                    ))}
+                  </ul>
+                  <div>
+                    <Button onClick={handleApplyServiceStarterConfig}>
+                      Use suggested values
+                    </Button>
+                  </div>
+                </Space>
+              }
+            />
+          ) : null}
+          <Form.Item
+            name="requiredSkills"
+            label="Required skills"
+            rules={[
+              {
+                required: true,
+                type: 'array',
+                min: 1,
+                message: 'Add at least one required skill.',
+              },
+            ]}
+            extra="These capabilities are the main matching rule. The AI should not recommend a barber without at least one of them."
+          >
+            <Select
+              mode="tags"
+              options={BARBER_CAPABILITY_OPTIONS}
+              tokenSeparators={[',']}
+              placeholder="Select required skills for this service"
+              showSearch
+              filterOption={filterSelectOption}
+              optionFilterProp="label"
+              searchValue={serviceRequiredSkillsSearchValue}
+              onSearch={setServiceRequiredSkillsSearchValue}
+              onBlur={commitServiceRequiredSkillsSearchValue}
+            />
           </Form.Item>
-          <Form.Item name="safetyTriggers" label="Safety triggers">
-            <Select mode="tags" tokenSeparators={[',']} />
+          <Form.Item
+            name="safetyTriggers"
+            label="Safety triggers"
+            extra="Optional keywords or situations that should make the AI check the safety rules before recommending this service."
+          >
+            <Select
+              mode="tags"
+              options={SERVICE_SAFETY_TRIGGER_OPTIONS}
+              tokenSeparators={[',']}
+              placeholder="allergy, scalp sensitivity, box dye"
+              showSearch
+              filterOption={filterSelectOption}
+              optionFilterProp="label"
+              searchValue={serviceSafetyTriggersSearchValue}
+              onSearch={setServiceSafetyTriggersSearchValue}
+              onBlur={commitServiceSafetyTriggersSearchValue}
+            />
           </Form.Item>
           <div className="admin-form-grid">
             <Form.Item
               name="complexity"
               label="Complexity"
               rules={[{ required: true }]}
+              extra="High complexity helps the AI prefer senior or owner-level barbers."
             >
-              <Select options={COMPLEXITY_OPTIONS} />
+              <Select
+                options={COMPLEXITY_OPTIONS}
+                showSearch
+                filterOption={filterSelectOption}
+                optionFilterProp="label"
+              />
             </Form.Item>
             <Form.Item name="isActive" label="Active" valuePropName="checked">
               <Switch />
@@ -1209,22 +1648,35 @@ export default function AdminDashboard() {
             name="condition"
             label="Condition"
             rules={[{ required: true, message: 'Condition is required.' }]}
+            extra="Describe the risk or customer situation that should trigger this rule."
           >
-            <Input />
+            <Input placeholder="Client reports allergy, rash, or scalp sensitivity" />
           </Form.Item>
           <Form.Item
             name="serviceIds"
             label="Services"
             rules={[{ required: true, message: 'At least one service is required.' }]}
+            extra="Only configured service AI records are available here."
           >
-            <Select mode="multiple" options={serviceOptions} />
+            <Select
+              mode="multiple"
+              options={serviceOptions}
+              placeholder="Select configured services"
+              showSearch
+              filterOption={filterSelectOption}
+              optionFilterProp="label"
+            />
           </Form.Item>
           <Form.Item
             name="message"
             label="Message"
             rules={[{ required: true, message: 'Message is required.' }]}
+            extra="This is the operational guidance the AI should preserve in the appointment brief."
           >
-            <Input.TextArea rows={4} />
+            <Input.TextArea
+              rows={4}
+              placeholder="Recommend patch test before chemical products. Assign a senior barber for review."
+            />
           </Form.Item>
           <div className="admin-form-grid">
             <Form.Item
@@ -1232,7 +1684,12 @@ export default function AdminDashboard() {
               label="Severity"
               rules={[{ required: true }]}
             >
-              <Select options={SEVERITY_OPTIONS} />
+              <Select
+                options={SEVERITY_OPTIONS}
+                showSearch
+                filterOption={filterSelectOption}
+                optionFilterProp="label"
+              />
             </Form.Item>
             <Form.Item name="active" label="Active" valuePropName="checked">
               <Switch />

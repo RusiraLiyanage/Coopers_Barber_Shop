@@ -187,7 +187,17 @@ VALUES ('Haircut', 30),
     (
         'Deep Conditioning Treatment',
         60
-    )
+    ),
+    ('Skin Fade', 45),
+    ('Beard Trim & Sculpting', 30),
+    ('Hot Towel Shave', 30),
+    ('Head Shave', 30),
+    ('Beard Colour', 45),
+    (
+        'Colour Correction Consultation',
+        30
+    ),
+    ('Scalp Treatment', 45)
 ON CONFLICT (name) DO NOTHING;
 
 -- Users (bcrypt hashes via pgcrypto)

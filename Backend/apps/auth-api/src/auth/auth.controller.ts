@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import type {
   AuthenticatedRequest,
   AuthTokensResponse,
@@ -131,6 +132,7 @@ export class AuthController {
   }
 
   @ApiOperation({ summary: 'Validate whether an auth session is still active' })
+  @SkipThrottle()
   @HttpCode(200)
   @Post('sessions/validate')
   validateSession(

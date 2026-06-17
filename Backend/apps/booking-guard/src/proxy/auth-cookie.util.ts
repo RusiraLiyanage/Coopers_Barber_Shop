@@ -3,11 +3,36 @@ import type { AuthTokensResponse } from '@coopers/common';
 export const ACCESS_TOKEN_COOKIE = 'tsa';
 export const REFRESH_TOKEN_COOKIE = 'tsr';
 export const REMEMBER_ME_COOKIE = 'tsm';
+export const ADMIN_ACCESS_TOKEN_COOKIE = 'admin_tsa';
+export const ADMIN_REFRESH_TOKEN_COOKIE = 'admin_tsr';
+export const ADMIN_REMEMBER_ME_COOKIE = 'admin_tsm';
 
 const LEGACY_ACCESS_TOKEN_COOKIE = 'access_token';
 const LEGACY_REFRESH_TOKEN_COOKIE = 'refresh_token';
 const DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 300;
 const DEFAULT_REFRESH_TOKEN_TTL_DAYS = 14;
+
+type AuthCookieNames = {
+  accessToken: string;
+  refreshToken: string;
+  rememberMe: string;
+  legacyAccessToken?: string;
+  legacyRefreshToken?: string;
+};
+
+const CUSTOMER_AUTH_COOKIES: AuthCookieNames = {
+  accessToken: ACCESS_TOKEN_COOKIE,
+  refreshToken: REFRESH_TOKEN_COOKIE,
+  rememberMe: REMEMBER_ME_COOKIE,
+  legacyAccessToken: LEGACY_ACCESS_TOKEN_COOKIE,
+  legacyRefreshToken: LEGACY_REFRESH_TOKEN_COOKIE,
+};
+
+const ADMIN_AUTH_COOKIES: AuthCookieNames = {
+  accessToken: ADMIN_ACCESS_TOKEN_COOKIE,
+  refreshToken: ADMIN_REFRESH_TOKEN_COOKIE,
+  rememberMe: ADMIN_REMEMBER_ME_COOKIE,
+};
 
 type AuthCookieOptions = {
   httpOnly: boolean;
@@ -100,25 +125,68 @@ export function getCookieValue(
 export function getAccessTokenFromCookie(
   cookieHeader: string | undefined,
 ): string | undefined {
-  return (
-    getCookieValue(cookieHeader, ACCESS_TOKEN_COOKIE) ??
-    getCookieValue(cookieHeader, LEGACY_ACCESS_TOKEN_COOKIE)
-  );
+  return getAccessTokenFromCookieNames(cookieHeader, CUSTOMER_AUTH_COOKIES);
 }
 
 export function getRefreshTokenFromCookie(
   cookieHeader: string | undefined,
 ): string | undefined {
-  return (
-    getCookieValue(cookieHeader, REFRESH_TOKEN_COOKIE) ??
-    getCookieValue(cookieHeader, LEGACY_REFRESH_TOKEN_COOKIE)
-  );
+  return getRefreshTokenFromCookieNames(cookieHeader, CUSTOMER_AUTH_COOKIES);
 }
 
 export function getRememberMeFromCookie(
   cookieHeader: string | undefined,
 ): boolean | undefined {
-  const rememberMe = getCookieValue(cookieHeader, REMEMBER_ME_COOKIE);
+  return getRememberMeFromCookieNames(cookieHeader, CUSTOMER_AUTH_COOKIES);
+}
+
+export function getAdminAccessTokenFromCookie(
+  cookieHeader: string | undefined,
+): string | undefined {
+  return getAccessTokenFromCookieNames(cookieHeader, ADMIN_AUTH_COOKIES);
+}
+
+export function getAdminRefreshTokenFromCookie(
+  cookieHeader: string | undefined,
+): string | undefined {
+  return getRefreshTokenFromCookieNames(cookieHeader, ADMIN_AUTH_COOKIES);
+}
+
+export function getAdminRememberMeFromCookie(
+  cookieHeader: string | undefined,
+): boolean | undefined {
+  return getRememberMeFromCookieNames(cookieHeader, ADMIN_AUTH_COOKIES);
+}
+
+function getAccessTokenFromCookieNames(
+  cookieHeader: string | undefined,
+  cookieNames: AuthCookieNames,
+): string | undefined {
+  return (
+    getCookieValue(cookieHeader, cookieNames.accessToken) ??
+    (cookieNames.legacyAccessToken
+      ? getCookieValue(cookieHeader, cookieNames.legacyAccessToken)
+      : undefined)
+  );
+}
+
+function getRefreshTokenFromCookieNames(
+  cookieHeader: string | undefined,
+  cookieNames: AuthCookieNames,
+): string | undefined {
+  return (
+    getCookieValue(cookieHeader, cookieNames.refreshToken) ??
+    (cookieNames.legacyRefreshToken
+      ? getCookieValue(cookieHeader, cookieNames.legacyRefreshToken)
+      : undefined)
+  );
+}
+
+function getRememberMeFromCookieNames(
+  cookieHeader: string | undefined,
+  cookieNames: AuthCookieNames,
+): boolean | undefined {
+  const rememberMe = getCookieValue(cookieHeader, cookieNames.rememberMe);
 
   if (rememberMe === undefined) {
     return undefined;
@@ -131,11 +199,29 @@ export function getAuthorizationHeaderFromRequest(
   authorizationHeader: string | undefined,
   cookieHeader: string | undefined,
 ): string | undefined {
+  return getAuthorizationHeaderFromRequestCookies(
+    authorizationHeader,
+    getAccessTokenFromCookie(cookieHeader),
+  );
+}
+
+export function getAdminAuthorizationHeaderFromRequest(
+  authorizationHeader: string | undefined,
+  cookieHeader: string | undefined,
+): string | undefined {
+  return getAuthorizationHeaderFromRequestCookies(
+    authorizationHeader,
+    getAdminAccessTokenFromCookie(cookieHeader),
+  );
+}
+
+function getAuthorizationHeaderFromRequestCookies(
+  authorizationHeader: string | undefined,
+  accessToken: string | undefined,
+): string | undefined {
   if (authorizationHeader?.trim()) {
     return authorizationHeader;
   }
-
-  const accessToken = getAccessTokenFromCookie(cookieHeader);
 
   return accessToken ? `Bearer ${accessToken}` : undefined;
 }
@@ -145,35 +231,67 @@ export function setAuthCookies(
   tokens: AuthTokensResponse,
   options: SetAuthCookieOptions = {},
 ): void {
+  setScopedAuthCookies(response, tokens, CUSTOMER_AUTH_COOKIES, options);
+}
+
+export function setAdminAuthCookies(
+  response: AuthCookieResponse,
+  tokens: AuthTokensResponse,
+  options: SetAuthCookieOptions = {},
+): void {
+  setScopedAuthCookies(response, tokens, ADMIN_AUTH_COOKIES, options);
+}
+
+function setScopedAuthCookies(
+  response: AuthCookieResponse,
+  tokens: AuthTokensResponse,
+  cookieNames: AuthCookieNames,
+  options: SetAuthCookieOptions = {},
+): void {
   const rememberMe = options.rememberMe === true;
   const accessTokenMaxAge = rememberMe ? getAccessTokenMaxAgeMs() : undefined;
   const refreshTokenMaxAge = rememberMe ? getRefreshTokenMaxAgeMs() : undefined;
 
   response.cookie(
-    ACCESS_TOKEN_COOKIE,
+    cookieNames.accessToken,
     tokens.access_token,
     createCookieOptions(accessTokenMaxAge),
   );
   response.cookie(
-    REFRESH_TOKEN_COOKIE,
+    cookieNames.refreshToken,
     tokens.refresh_token,
     createCookieOptions(refreshTokenMaxAge),
   );
   response.cookie(
-    REMEMBER_ME_COOKIE,
+    cookieNames.rememberMe,
     rememberMe ? 'true' : 'false',
     createCookieOptions(refreshTokenMaxAge),
   );
 }
 
 export function clearAuthCookies(response: AuthCookieResponse): void {
+  clearScopedAuthCookies(response, CUSTOMER_AUTH_COOKIES);
+}
+
+export function clearAdminAuthCookies(response: AuthCookieResponse): void {
+  clearScopedAuthCookies(response, ADMIN_AUTH_COOKIES);
+}
+
+function clearScopedAuthCookies(
+  response: AuthCookieResponse,
+  cookieNames: AuthCookieNames,
+): void {
   [
-    ACCESS_TOKEN_COOKIE,
-    REFRESH_TOKEN_COOKIE,
-    REMEMBER_ME_COOKIE,
-    LEGACY_ACCESS_TOKEN_COOKIE,
-    LEGACY_REFRESH_TOKEN_COOKIE,
+    cookieNames.accessToken,
+    cookieNames.refreshToken,
+    cookieNames.rememberMe,
+    cookieNames.legacyAccessToken,
+    cookieNames.legacyRefreshToken,
   ].forEach((cookieName) => {
+    if (!cookieName) {
+      return;
+    }
+
     response.clearCookie(cookieName, createCookieOptions());
   });
 }

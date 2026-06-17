@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   Param,
   Patch,
   Post,
@@ -16,7 +18,7 @@ import {
 import { Staff } from '@coopers/entities';
 import { AdminRoleGuard } from '../auth/guards/admin-role.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { BarbersService } from './barbers.service';
+import { BarbersService, DeleteBarberResponse } from './barbers.service';
 import { CreateBarberDto } from './dto/create-barber.dto';
 import { UpdateBarberDto } from './dto/update-barber.dto';
 
@@ -54,5 +56,13 @@ export class BarbersController {
     @Body() updateBarberDto: UpdateBarberDto,
   ): Promise<Staff> {
     return this.barbersService.update(id, updateBarberDto);
+  }
+
+  @ApiOperation({ summary: 'Delete a barber profile' })
+  @ApiParam({ name: 'id' })
+  @Delete(':id')
+  @HttpCode(200)
+  delete(@Param('id') id: string): Promise<DeleteBarberResponse> {
+    return this.barbersService.delete(id);
   }
 }

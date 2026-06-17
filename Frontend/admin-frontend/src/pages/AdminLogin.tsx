@@ -13,10 +13,14 @@ type AdminLoginFormValues = {
   remember?: boolean;
 };
 
-export default function AdminLogin() {
+type AdminLoginProps = {
+  initialError?: string | null;
+};
+
+export default function AdminLogin({ initialError = null }: AdminLoginProps) {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (values: AdminLoginFormValues) => {
