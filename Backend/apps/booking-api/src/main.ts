@@ -20,8 +20,16 @@ async function bootstrap() {
   configureApiSecurity(app);
   configureSwagger(app, {
     title: "Cooper's Barbershop Booking API",
-    description: 'Booking, staff, services, users, and appointment endpoints.',
-    tags: ['health', 'users', 'services', 'staff', 'appointments'],
+    description:
+      'Booking, staff, services, users, appointments, and consultation endpoints.',
+    tags: [
+      'health',
+      'users',
+      'services',
+      'staff',
+      'appointments',
+      'consultation',
+    ],
   });
 
   await app.listen(config.get<number>('API_PORT', 7310));

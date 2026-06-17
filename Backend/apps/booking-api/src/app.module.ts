@@ -11,6 +11,7 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { ServicesModule } from './services/services.module';
 import { AppointmentsModule } from './appontments/appointments.module';
+import { ConsultationModule } from './consultation/consultation.module';
 import { HealthController } from './health.controller';
 
 // All the modules related to this application are imported here.
@@ -25,6 +26,7 @@ import { HealthController } from './health.controller';
     AuthModule,
     ServicesModule,
     AppointmentsModule,
+    ConsultationModule,
   ],
   controllers: [HealthController],
 })
