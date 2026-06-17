@@ -106,12 +106,19 @@
   margin-top: 6px;
 }
 
+.admin-reference-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
 @media (max-width: 960px) {
   .admin-dashboard {
     padding: 32px 18px;
   }
 
-  .admin-overview-grid {
+  .admin-overview-grid,
+  .admin-reference-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -125,7 +132,8 @@
 
   .admin-overview-grid,
   .admin-form-grid,
-  .admin-service-starter-grid {
+  .admin-service-starter-grid,
+  .admin-reference-grid {
     grid-template-columns: 1fr;
   }
 }

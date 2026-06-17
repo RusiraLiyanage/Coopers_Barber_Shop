@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Alert, Button, Checkbox, Form, Input, Typography } from 'antd';
+import { Alert, Button, Checkbox, Form, Input, Typography, message } from 'antd';
 import { LockOutlined, MailOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { ApiRequestError } from '../lib/api';
 import { getUserFriendlyErrorMessage } from '../lib/errors';
 import { loginAdminAction } from '../store/auth/action';
 import { useAppDispatch } from '../store/hooks';
@@ -17,9 +18,18 @@ type AdminLoginProps = {
   initialError?: string | null;
 };
 
+function getAdminLoginErrorMessage(error: unknown): string {
+  if (error instanceof ApiRequestError && error.statusCode === 401) {
+    return 'Invalid email or password.';
+  }
+
+  return getUserFriendlyErrorMessage(error);
+}
+
 export default function AdminLogin({ initialError = null }: AdminLoginProps) {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const [messageApi, contextHolder] = message.useMessage();
   const [error, setError] = useState<string | null>(initialError);
   const [submitting, setSubmitting] = useState(false);
 
@@ -37,7 +47,10 @@ export default function AdminLogin({ initialError = null }: AdminLoginProps) {
       ).unwrap();
       navigate('/');
     } catch (loginError) {
-      setError(getUserFriendlyErrorMessage(loginError));
+      const nextError = getAdminLoginErrorMessage(loginError);
+
+      setError(nextError);
+      messageApi.error(nextError);
     } finally {
       setSubmitting(false);
     }
@@ -45,6 +58,7 @@ export default function AdminLogin({ initialError = null }: AdminLoginProps) {
 
   return (
     <main className="admin-auth-page">
+      {contextHolder}
       <section className="admin-auth-card">
         <Typography.Title level={2}>Admin Console</Typography.Title>
         <Typography.Text type="secondary">

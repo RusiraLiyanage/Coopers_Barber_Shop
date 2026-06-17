@@ -1,5 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 import {
+  createServiceConfigAction,
   getServiceConfigsAction,
   updateServiceConfigAction,
 } from './action';
@@ -43,6 +44,16 @@ const serviceConfigsSlice = createSlice({
       .addCase(getServiceConfigsAction.rejected, (state, action) => {
         state.loading = false;
         state.error = action.error.message ?? 'Unable to load service config.';
+      })
+      .addCase(createServiceConfigAction.pending, (state) => {
+        state.saving = true;
+      })
+      .addCase(createServiceConfigAction.fulfilled, (state, action) => {
+        upsertServiceConfig(state.items, action.payload);
+        state.saving = false;
+      })
+      .addCase(createServiceConfigAction.rejected, (state) => {
+        state.saving = false;
       })
       .addCase(updateServiceConfigAction.pending, (state) => {
         state.saving = true;

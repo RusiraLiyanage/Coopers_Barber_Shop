@@ -1,4 +1,11 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
+const ADMIN_BROWSER_SESSION_KEY = 'coopers_admin_auth_browser_session';
+const ADMIN_REMEMBERED_SESSION_KEY = 'coopers_admin_auth_remembered_session';
+const ADMIN_HAD_SESSION_KEY = 'coopers_admin_auth_had_session';
+const ADMIN_IDLE_PROMPT_AT_KEY = 'coopers_admin_idle_prompt_at';
+const ADMIN_GRACE_EXPIRES_AT_KEY = 'coopers_admin_grace_expires_at';
+const DEFAULT_SESSION_IDLE_TIMEOUT_SECONDS = 300;
+const DEFAULT_SESSION_EXTENSION_GRACE_SECONDS = 300;
 export const SESSION_EXPIRED_CODE = 'SESSION_EXPIRED';
 export const SESSION_IDLE_EXPIRED_CODE = 'SESSION_IDLE_EXPIRED';
 export const SESSION_IDLE_EXPIRED_EVENT = 'coopers-admin-session-idle-expired';
@@ -8,6 +15,7 @@ export type StaffRole = 'junior' | 'senior' | 'owner';
 export type ServiceComplexity = 'low' | 'medium' | 'high';
 export type SafetyRuleSeverity = 'low' | 'medium' | 'high';
 export type UserRole = 'customer' | 'admin';
+export type ReferenceDataType = 'barber_capability' | 'safety_trigger';
 
 type ApiErrorPayload = {
   message?: string | string[];
@@ -16,6 +24,11 @@ type ApiErrorPayload = {
 };
 
 type ParsedResponse<T> = T | ApiErrorPayload | string | null;
+
+type AdminSessionTimeoutDeadlines = {
+  promptAt: number;
+  graceExpiresAt: number;
+};
 
 export class ApiRequestError extends Error {
   constructor(
@@ -72,6 +85,15 @@ export interface ServiceAiConfigRecord {
   requiredSkills: string[];
   safetyTriggers: string[];
   complexity: ServiceComplexity;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReferenceDataItemRecord {
+  id: string;
+  type: ReferenceDataType;
+  label: string;
+  value: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -162,6 +184,17 @@ export type UpdateServiceAiConfigPayload = {
   isActive?: boolean;
 };
 
+export type CreateServicePayload = {
+  name: string;
+  durationMinutes: number;
+  requiredSkills?: string[];
+  safetyTriggers?: string[];
+  complexity?: ServiceComplexity;
+  isActive?: boolean;
+};
+
+export type UpdateServicePayload = Partial<CreateServicePayload>;
+
 export type CreateSafetyRulePayload = {
   condition: string;
   serviceIds: string[];
@@ -171,6 +204,19 @@ export type CreateSafetyRulePayload = {
 };
 
 export type UpdateSafetyRulePayload = Partial<CreateSafetyRulePayload>;
+
+export type CreateReferenceDataItemPayload = {
+  type: ReferenceDataType;
+  label: string;
+};
+
+export type UpdateReferenceDataItemPayload = {
+  label: string;
+};
+
+export type DeleteReferenceDataItemResponse = {
+  success: true;
+};
 
 export type CreateAdminInvitePayload = {
   email: string;
@@ -232,6 +278,210 @@ function buildApiUrl(path: string): string {
   const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');
 
   return `${normalizedBaseUrl}${normalizedPath}`;
+}
+
+function toPositiveNumber(value: unknown, fallback: number): number {
+  const numericValue = Number(value);
+
+  return Number.isFinite(numericValue) && numericValue > 0
+    ? Math.floor(numericValue)
+    : fallback;
+}
+
+function getSessionStorageValue(key: string): string | null {
+  try {
+    return window.sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function getLocalStorageValue(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function setSessionStorageValue(key: string, value: string): void {
+  try {
+    window.sessionStorage.setItem(key, value);
+  } catch {
+    return;
+  }
+}
+
+function setLocalStorageValue(key: string, value: string): void {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    return;
+  }
+}
+
+function removeSessionStorageValue(key: string): void {
+  try {
+    window.sessionStorage.removeItem(key);
+  } catch {
+    return;
+  }
+}
+
+function removeLocalStorageValue(key: string): void {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    return;
+  }
+}
+
+function getAdminSessionIdleTimeoutMs(): number {
+  const configuredSeconds = import.meta.env.VITE_SESSION_IDLE_TIMEOUT_SECONDS;
+
+  return (
+    toPositiveNumber(
+      configuredSeconds,
+      DEFAULT_SESSION_IDLE_TIMEOUT_SECONDS,
+    ) * 1000
+  );
+}
+
+function getAdminSessionExtensionGraceMs(): number {
+  const configuredSeconds =
+    import.meta.env.VITE_SESSION_EXTENSION_GRACE_SECONDS;
+
+  return (
+    toPositiveNumber(
+      configuredSeconds,
+      DEFAULT_SESSION_EXTENSION_GRACE_SECONDS,
+    ) * 1000
+  );
+}
+
+function shouldPersistAdminSessionAcrossBrowserRestarts(): boolean {
+  return getLocalStorageValue(ADMIN_REMEMBERED_SESSION_KEY) === 'true';
+}
+
+function writeAdminSessionDeadlineValue(key: string, value: string): void {
+  setSessionStorageValue(key, value);
+
+  if (shouldPersistAdminSessionAcrossBrowserRestarts()) {
+    setLocalStorageValue(key, value);
+    return;
+  }
+
+  removeLocalStorageValue(key);
+}
+
+function readAdminSessionDeadlineValue(key: string): string | null {
+  return getSessionStorageValue(key) ?? getLocalStorageValue(key);
+}
+
+function rememberAdminAuthSession(remember: boolean): void {
+  setSessionStorageValue(ADMIN_BROWSER_SESSION_KEY, 'true');
+  setLocalStorageValue(ADMIN_HAD_SESSION_KEY, 'true');
+
+  if (remember) {
+    setLocalStorageValue(ADMIN_REMEMBERED_SESSION_KEY, 'true');
+    return;
+  }
+
+  removeLocalStorageValue(ADMIN_REMEMBERED_SESSION_KEY);
+}
+
+function markRestoredAdminAuthSession(): void {
+  if (
+    getSessionStorageValue(ADMIN_BROWSER_SESSION_KEY) === 'true' ||
+    getLocalStorageValue(ADMIN_REMEMBERED_SESSION_KEY) === 'true'
+  ) {
+    setSessionStorageValue(ADMIN_BROWSER_SESSION_KEY, 'true');
+  }
+}
+
+export function canRestoreAdminAuthSession(): boolean {
+  return (
+    getSessionStorageValue(ADMIN_BROWSER_SESSION_KEY) === 'true' ||
+    getLocalStorageValue(ADMIN_REMEMBERED_SESSION_KEY) === 'true'
+  );
+}
+
+function hasTrackedAdminSession(): boolean {
+  return getLocalStorageValue(ADMIN_HAD_SESSION_KEY) === 'true';
+}
+
+export function clearAdminAuthSession(): void {
+  removeSessionStorageValue(ADMIN_BROWSER_SESSION_KEY);
+  removeLocalStorageValue(ADMIN_REMEMBERED_SESSION_KEY);
+  removeLocalStorageValue(ADMIN_HAD_SESSION_KEY);
+  removeSessionStorageValue(ADMIN_IDLE_PROMPT_AT_KEY);
+  removeSessionStorageValue(ADMIN_GRACE_EXPIRES_AT_KEY);
+  removeLocalStorageValue(ADMIN_IDLE_PROMPT_AT_KEY);
+  removeLocalStorageValue(ADMIN_GRACE_EXPIRES_AT_KEY);
+}
+
+export function hasAdminSessionTimeoutState(): boolean {
+  return (
+    canRestoreAdminAuthSession() &&
+    Boolean(
+      readAdminSessionDeadlineValue(ADMIN_IDLE_PROMPT_AT_KEY) &&
+        readAdminSessionDeadlineValue(ADMIN_GRACE_EXPIRES_AT_KEY),
+    )
+  );
+}
+
+export function shouldShowAdminLoginAfterExpiry(): boolean {
+  if (!hasTrackedAdminSession()) {
+    return false;
+  }
+
+  const deadlines = getAdminSessionTimeoutDeadlines();
+
+  return deadlines !== null && Date.now() >= deadlines.graceExpiresAt;
+}
+
+export function clearAdminSessionTimeoutTracking(): void {
+  removeSessionStorageValue(ADMIN_IDLE_PROMPT_AT_KEY);
+  removeSessionStorageValue(ADMIN_GRACE_EXPIRES_AT_KEY);
+  removeLocalStorageValue(ADMIN_IDLE_PROMPT_AT_KEY);
+  removeLocalStorageValue(ADMIN_GRACE_EXPIRES_AT_KEY);
+}
+
+export function getAdminSessionTimeoutDeadlines(): AdminSessionTimeoutDeadlines | null {
+  const promptAtValue = readAdminSessionDeadlineValue(ADMIN_IDLE_PROMPT_AT_KEY);
+  const graceExpiresAtValue = readAdminSessionDeadlineValue(
+    ADMIN_GRACE_EXPIRES_AT_KEY,
+  );
+
+  if (!promptAtValue || !graceExpiresAtValue) {
+    return null;
+  }
+
+  const promptAt = Number(promptAtValue);
+  const graceExpiresAt = Number(graceExpiresAtValue);
+
+  if (!Number.isFinite(promptAt) || !Number.isFinite(graceExpiresAt)) {
+    return null;
+  }
+
+  return {
+    promptAt,
+    graceExpiresAt,
+  };
+}
+
+export function recordAdminSessionActivity(): void {
+  markRestoredAdminAuthSession();
+
+  const now = Date.now();
+  const promptAt = now + getAdminSessionIdleTimeoutMs();
+  const graceExpiresAt = promptAt + getAdminSessionExtensionGraceMs();
+
+  writeAdminSessionDeadlineValue(ADMIN_IDLE_PROMPT_AT_KEY, String(promptAt));
+  writeAdminSessionDeadlineValue(
+    ADMIN_GRACE_EXPIRES_AT_KEY,
+    String(graceExpiresAt),
+  );
 }
 
 async function parseResponse<T>(response: Response): Promise<ParsedResponse<T>> {
@@ -352,6 +602,12 @@ function normalizeBarberRecord(barber: BarberRecord): BarberRecord {
 export function getCurrentSession() {
   return request<AuthResponse>('/admin-auth/session', {
     headers: buildHeaders(),
+  }).then((response) => {
+    if (response.authenticated) {
+      recordAdminSessionActivity();
+    }
+
+    return response;
   });
 }
 
@@ -360,6 +616,13 @@ export function loginAdmin(payload: AdminLoginPayload) {
     method: 'POST',
     headers: buildHeaders(),
     body: JSON.stringify(payload),
+  }).then((response) => {
+    if (response.authenticated) {
+      rememberAdminAuthSession(payload.remember === true);
+      recordAdminSessionActivity();
+    }
+
+    return response;
   });
 }
 
@@ -368,16 +631,28 @@ export function extendAdminSession() {
     method: 'POST',
     headers: buildHeaders(),
     body: JSON.stringify({}),
+  }).then((response) => {
+    if (response.authenticated) {
+      recordAdminSessionActivity();
+    }
+
+    return response;
   });
 }
 
 export function getAccountProfile() {
   return request<AccountProfileResponse>('/admin-auth/me', {
     headers: buildHeaders(),
+  }).then((response) => {
+    recordAdminSessionActivity();
+
+    return response;
   });
 }
 
 export function logout() {
+  clearAdminAuthSession();
+
   return request<{ success: boolean }>('/admin-auth/logout', {
     method: 'POST',
     headers: buildHeaders(),
@@ -388,7 +663,11 @@ export function logout() {
 export function getBarbers() {
   return request<BarberRecord[]>('/admin/barbers', {
     headers: buildHeaders(),
-  }).then((barbers) => barbers.map(normalizeBarberRecord));
+  }).then((barbers) => {
+    recordAdminSessionActivity();
+
+    return barbers.map(normalizeBarberRecord);
+  });
 }
 
 export function createBarber(payload: CreateBarberPayload) {
@@ -396,7 +675,11 @@ export function createBarber(payload: CreateBarberPayload) {
     method: 'POST',
     headers: buildHeaders(),
     body: JSON.stringify(payload),
-  }).then(normalizeBarberRecord);
+  }).then((barber) => {
+    recordAdminSessionActivity();
+
+    return normalizeBarberRecord(barber);
+  });
 }
 
 export function updateBarber(id: string, payload: UpdateBarberPayload) {
@@ -404,19 +687,55 @@ export function updateBarber(id: string, payload: UpdateBarberPayload) {
     method: 'PATCH',
     headers: buildHeaders(),
     body: JSON.stringify(payload),
-  }).then(normalizeBarberRecord);
+  }).then((barber) => {
+    recordAdminSessionActivity();
+
+    return normalizeBarberRecord(barber);
+  });
 }
 
 export function deleteBarber(id: string) {
   return request<DeleteBarberResponse>(`/admin/barbers/${id}`, {
     method: 'DELETE',
     headers: buildHeaders(),
+  }).then((response) => {
+    recordAdminSessionActivity();
+
+    return response;
   });
 }
 
 export function getServiceAiConfigs() {
   return request<ServiceAiConfigRecord[]>('/admin/services', {
     headers: buildHeaders(),
+  }).then((response) => {
+    recordAdminSessionActivity();
+
+    return response;
+  });
+}
+
+export function createService(payload: CreateServicePayload) {
+  return request<ServiceAiConfigRecord>('/admin/services', {
+    method: 'POST',
+    headers: buildHeaders(),
+    body: JSON.stringify(payload),
+  }).then((response) => {
+    recordAdminSessionActivity();
+
+    return response;
+  });
+}
+
+export function updateService(id: string, payload: UpdateServicePayload) {
+  return request<ServiceAiConfigRecord>(`/admin/services/${id}`, {
+    method: 'PATCH',
+    headers: buildHeaders(),
+    body: JSON.stringify(payload),
+  }).then((response) => {
+    recordAdminSessionActivity();
+
+    return response;
   });
 }
 
@@ -428,12 +747,20 @@ export function updateServiceAiConfig(
     method: 'PATCH',
     headers: buildHeaders(),
     body: JSON.stringify(payload),
+  }).then((response) => {
+    recordAdminSessionActivity();
+
+    return response;
   });
 }
 
 export function getSafetyRules() {
   return request<SafetyRuleRecord[]>('/admin/safety-rules', {
     headers: buildHeaders(),
+  }).then((response) => {
+    recordAdminSessionActivity();
+
+    return response;
   });
 }
 
@@ -442,6 +769,10 @@ export function createSafetyRule(payload: CreateSafetyRulePayload) {
     method: 'POST',
     headers: buildHeaders(),
     body: JSON.stringify(payload),
+  }).then((response) => {
+    recordAdminSessionActivity();
+
+    return response;
   });
 }
 
@@ -450,18 +781,83 @@ export function updateSafetyRule(id: string, payload: UpdateSafetyRulePayload) {
     method: 'PATCH',
     headers: buildHeaders(),
     body: JSON.stringify(payload),
+  }).then((response) => {
+    recordAdminSessionActivity();
+
+    return response;
+  });
+}
+
+export function getReferenceData(type?: ReferenceDataType) {
+  const query = type ? `?type=${encodeURIComponent(type)}` : '';
+
+  return request<ReferenceDataItemRecord[]>(`/admin/reference-data${query}`, {
+    headers: buildHeaders(),
+  }).then((response) => {
+    recordAdminSessionActivity();
+
+    return response;
+  });
+}
+
+export function createReferenceDataItem(payload: CreateReferenceDataItemPayload) {
+  return request<ReferenceDataItemRecord>('/admin/reference-data', {
+    method: 'POST',
+    headers: buildHeaders(),
+    body: JSON.stringify(payload),
+  }).then((response) => {
+    recordAdminSessionActivity();
+
+    return response;
+  });
+}
+
+export function updateReferenceDataItem(
+  id: string,
+  payload: UpdateReferenceDataItemPayload,
+) {
+  return request<ReferenceDataItemRecord>(`/admin/reference-data/${id}`, {
+    method: 'PATCH',
+    headers: buildHeaders(),
+    body: JSON.stringify(payload),
+  }).then((response) => {
+    recordAdminSessionActivity();
+
+    return response;
+  });
+}
+
+export function deleteReferenceDataItem(id: string) {
+  return request<DeleteReferenceDataItemResponse>(
+    `/admin/reference-data/${id}`,
+    {
+      method: 'DELETE',
+      headers: buildHeaders(),
+    },
+  ).then((response) => {
+    recordAdminSessionActivity();
+
+    return response;
   });
 }
 
 export function getAppointmentBriefs() {
   return request<AppointmentBriefRecord[]>('/admin/briefs', {
     headers: buildHeaders(),
+  }).then((response) => {
+    recordAdminSessionActivity();
+
+    return response;
   });
 }
 
 export function getHairHistory() {
   return request<HairHistoryRecord[]>('/admin/hair-history', {
     headers: buildHeaders(),
+  }).then((response) => {
+    recordAdminSessionActivity();
+
+    return response;
   });
 }
 
@@ -470,6 +866,10 @@ export function createAdminInvite(payload: CreateAdminInvitePayload) {
     method: 'POST',
     headers: buildHeaders(),
     body: JSON.stringify(payload),
+  }).then((response) => {
+    recordAdminSessionActivity();
+
+    return response;
   });
 }
 

@@ -9,8 +9,9 @@ import {
 
 export const DEFAULT_RATE_LIMIT_TTL_SECONDS = 300;
 export const DEFAULT_RATE_LIMIT_MAX_REQUESTS = 10;
+const MILLISECONDS_PER_SECOND = 1000;
 
-// only 10 requests per 300 seconds are allowed. --> this rate limiting approach is to disallow brute force attacks
+// by default, only 10 requests per 300 seconds are allowed.
 
 type RateLimitConfigValue = string | number | undefined;
 
@@ -34,9 +35,11 @@ function toPositiveNumber(
 export function createApiRateLimitOptions(
   options: ApiRateLimitOptions = {},
 ): ThrottlerModuleOptions {
+  const ttlSeconds = options.ttlSeconds ?? DEFAULT_RATE_LIMIT_TTL_SECONDS;
+
   return [
     {
-      ttl: options.ttlSeconds ?? DEFAULT_RATE_LIMIT_TTL_SECONDS,
+      ttl: ttlSeconds * MILLISECONDS_PER_SECOND,
       limit: options.maxRequests ?? DEFAULT_RATE_LIMIT_MAX_REQUESTS,
     },
   ];

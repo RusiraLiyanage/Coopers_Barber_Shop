@@ -13,6 +13,7 @@ import { BriefsModule } from './briefs/briefs.module';
 import { HairHistoryModule } from './hair-history/hair-history.module';
 import { HealthController } from './health.controller';
 import { InvitesModule } from './invites/invites.module';
+import { ReferenceDataModule } from './reference-data/reference-data.module';
 import { SafetyRulesModule } from './safety-rules/safety-rules.module';
 import { AdminServicesModule } from './services/admin-services.module';
 
@@ -24,6 +25,7 @@ import { AdminServicesModule } from './services/admin-services.module';
     DatabaseModule.forRoot(),
     AdminAuthModule,
     BarbersModule,
+    ReferenceDataModule,
     SafetyRulesModule,
     AdminServicesModule,
     BriefsModule,

@@ -1,9 +1,14 @@
 import type {
+  CreateServicePayload,
   ServiceAiConfigRecord,
-  UpdateServiceAiConfigPayload,
+  UpdateServicePayload,
 } from '../../lib/api';
 
-export type { ServiceAiConfigRecord, UpdateServiceAiConfigPayload };
+export type {
+  CreateServicePayload,
+  ServiceAiConfigRecord,
+  UpdateServicePayload,
+};
 
 export type ServiceConfigsState = {
   items: ServiceAiConfigRecord[];

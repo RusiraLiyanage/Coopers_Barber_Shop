@@ -10,6 +10,7 @@ import authReducer from './auth/slice';
 import barbersReducer from './barbers/slice';
 import briefsReducer from './briefs/slice';
 import hairHistoryReducer from './hairHistory/slice';
+import referenceDataReducer from './referenceData/slice';
 import safetyRulesReducer from './safetyRules/slice';
 import serviceConfigsReducer from './serviceConfigs/slice';
 
@@ -20,6 +21,7 @@ const combinedReducer = combineReducers({
   barbers: barbersReducer,
   briefs: briefsReducer,
   hairHistory: hairHistoryReducer,
+  referenceData: referenceDataReducer,
   safetyRules: safetyRulesReducer,
   serviceConfigs: serviceConfigsReducer,
 });

@@ -1,30 +1,36 @@
-// src/pages/HomePage.tsx
-import { Button } from "antd";
-import { SACard } from "../components/common";
-import "./HomePage.css";
+import { Button, Spin, Typography, message } from 'antd';
+import { useEffect } from 'react';
+import { SACard } from '../components/common';
+import { getGenericErrorMessage } from '../lib/errors';
+import { getServicesAction } from '../store/services/action';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import {
+  selectActiveServices,
+  selectServicesLoading,
+} from '../store/services/selector';
+import './HomePage.css';
 
 interface HomePageProps {
-  onMakeAppointment: () => void; // ✅ renamed to match new App.tsx
+  onMakeAppointment: () => void;
 }
 
-const HOME_SERVICES = [
-  "💈 Haircut",
-  "💇 Hair Styling",
-  "🎨 Hair Coloring",
-  "🧑‍💼 Consultation",
-  "💆 Deep Conditioning Treatment",
-  "✂️ Skin Fade",
-  "🧔 Beard Trim & Sculpting",
-  "🪒 Hot Towel Shave",
-  "🧑‍🦲 Head Shave",
-  "🎨 Beard Colour",
-  "🧴 Colour Correction Consultation",
-  "🌿 Scalp Treatment",
-];
-
 const HomePage: React.FC<HomePageProps> = ({ onMakeAppointment }) => {
+  const dispatch = useAppDispatch();
+  const [messageApi, contextHolder] = message.useMessage();
+  const services = useAppSelector(selectActiveServices);
+  const servicesLoading = useAppSelector(selectServicesLoading);
+
+  useEffect(() => {
+    dispatch(getServicesAction())
+      .unwrap()
+      .catch((error: unknown) => {
+        messageApi.error(getGenericErrorMessage('Load services', error));
+      });
+  }, [dispatch, messageApi]);
+
   return (
     <div className="home-page">
+      {contextHolder}
       <div className="home-page-content">
         <h1 className="home-page-title">Cooper's Barber Shop</h1>
         <p className="home-page-copy">
@@ -40,13 +46,21 @@ const HomePage: React.FC<HomePageProps> = ({ onMakeAppointment }) => {
             bodyPadding={24}
             className="home-services-card"
           >
-            <ul className="home-services-list">
-              {HOME_SERVICES.map((service) => (
-                <li key={service} className="home-services-list-item">
-                  {service}
-                </li>
-              ))}
-            </ul>
+            <Spin spinning={servicesLoading}>
+              {services.length > 0 ? (
+                <ul className="home-services-list">
+                  {services.map((service) => (
+                    <li key={service.id} className="home-services-list-item">
+                      {service.name}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <Typography.Text type="secondary">
+                  Services will appear here once they are active.
+                </Typography.Text>
+              )}
+            </Spin>
           </SACard>
         </div>
 
@@ -54,7 +68,7 @@ const HomePage: React.FC<HomePageProps> = ({ onMakeAppointment }) => {
           type="primary"
           size="large"
           className="home-appointment-action"
-          onClick={onMakeAppointment} // ✅ uses new prop name
+          onClick={onMakeAppointment}
         >
           Make your Appointment
         </Button>

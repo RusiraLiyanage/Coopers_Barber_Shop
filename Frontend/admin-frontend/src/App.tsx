@@ -6,8 +6,13 @@ import AdminSessionTimeoutModal from './components/AdminSessionTimeoutModal';
 import { SALoadingPanel } from './components/common';
 import {
   ApiRequestError,
+  canRestoreAdminAuthSession,
+  clearAdminAuthSession,
+  clearAdminSessionTimeoutTracking,
+  getAdminSessionTimeoutDeadlines,
   SESSION_EXPIRED_EVENT,
   SESSION_IDLE_EXPIRED_EVENT,
+  shouldShowAdminLoginAfterExpiry,
   isSessionExpiredError,
   isSessionIdleExpiredError,
 } from './lib/api';
@@ -24,7 +29,7 @@ import {
   getCurrentSessionAction,
   logoutAction,
 } from './store/auth/action';
-import { selectAuthLoading, selectAuthSession } from './store/auth/selector';
+import { selectAuthSession } from './store/auth/selector';
 import { useAppDispatch, useAppSelector } from './store/hooks';
 import './App.css';
 
@@ -33,6 +38,10 @@ type SessionTimeoutFlowState = 'none' | 'extend_prompt';
 
 function isExpectedSignedOutError(error: unknown): boolean {
   if (error instanceof Error && error.message === 'Authentication failed') {
+    return true;
+  }
+
+  if (error instanceof Error && error.message === 'Admin access required.') {
     return true;
   }
 
@@ -46,7 +55,6 @@ function App() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const authSession = useAppSelector(selectAuthSession);
-  const authLoading = useAppSelector(selectAuthLoading);
   const [authResolved, setAuthResolved] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [sessionTimeoutFlowState, setSessionTimeoutFlowState] =
@@ -58,14 +66,13 @@ function App() {
   const isSessionTimeoutPromptOpen = sessionTimeoutFlowState === 'extend_prompt';
 
   const showSessionExtensionPrompt = useCallback(() => {
-    dispatch(resetStore());
     setAuthError(null);
     setSessionTimeoutFlowState('extend_prompt');
     setAuthResolved(true);
-    navigate('/login', { replace: true });
-  }, [dispatch, navigate]);
+  }, []);
 
   const showSessionExpiredNotice = useCallback(() => {
+    clearAdminAuthSession();
     dispatch(resetStore());
     setAuthError(ADMIN_SESSION_EXPIRED_MESSAGE);
     setSessionTimeoutFlowState('none');
@@ -74,7 +81,72 @@ function App() {
   }, [dispatch, navigate]);
 
   useEffect(() => {
+    if (!authResolved) {
+      return;
+    }
+
+    if (
+      !isAuthenticated &&
+      !isSessionTimeoutPromptOpen &&
+      !canRestoreAdminAuthSession()
+    ) {
+      return;
+    }
+
+    const deadlines = getAdminSessionTimeoutDeadlines();
+
+    if (!deadlines) {
+      return;
+    }
+
+    const now = Date.now();
+
+    if (now >= deadlines.graceExpiresAt) {
+      showSessionExpiredNotice();
+      return;
+    }
+
+    if (now >= deadlines.promptAt) {
+      showSessionExtensionPrompt();
+
+      const graceTimerId = window.setTimeout(() => {
+        showSessionExpiredNotice();
+      }, Math.max(deadlines.graceExpiresAt - now, 0));
+
+      return () => {
+        window.clearTimeout(graceTimerId);
+      };
+    }
+
+    const promptTimerId = window.setTimeout(() => {
+      showSessionExtensionPrompt();
+    }, deadlines.promptAt - now);
+    const graceTimerId = window.setTimeout(() => {
+      showSessionExpiredNotice();
+    }, deadlines.graceExpiresAt - now);
+
+    return () => {
+      window.clearTimeout(promptTimerId);
+      window.clearTimeout(graceTimerId);
+    };
+  }, [
+    authResolved,
+    isAuthenticated,
+    isSessionTimeoutPromptOpen,
+    showSessionExpiredNotice,
+    showSessionExtensionPrompt,
+  ]);
+
+  useEffect(() => {
     let isMounted = true;
+
+    if (shouldShowAdminLoginAfterExpiry()) {
+      showSessionExpiredNotice();
+
+      return () => {
+        isMounted = false;
+      };
+    }
 
     dispatch(getCurrentSessionAction())
       .unwrap()
@@ -138,6 +210,7 @@ function App() {
 
   const handleLogout = useCallback(() => {
     setSessionTimeoutFlowState('none');
+    clearAdminAuthSession();
     dispatch(resetStore());
     navigate('/');
 
@@ -153,17 +226,17 @@ function App() {
       await dispatch(extendAdminSessionAction()).unwrap();
       setAuthError(null);
       setSessionTimeoutFlowState('none');
-      navigate('/', { replace: true });
     } catch {
       showSessionExpiredNotice();
     } finally {
       setExtendLoading(false);
     }
-  }, [dispatch, navigate, showSessionExpiredNotice]);
+  }, [dispatch, showSessionExpiredNotice]);
 
   const handleSessionTimeoutLogout = useCallback(async () => {
     setLogoutLoading(true);
     setSessionTimeoutFlowState('none');
+    clearAdminSessionTimeoutTracking();
     dispatch(resetStore());
     setAuthError(ADMIN_SESSION_EXPIRED_MESSAGE);
     navigate('/login', { replace: true });
@@ -177,13 +250,24 @@ function App() {
     }
   }, [dispatch, navigate]);
 
-  if (!authResolved || (authLoading && !isSessionTimeoutPromptOpen)) {
+  const sessionTimeoutModal = (
+    <AdminSessionTimeoutModal
+      open={isSessionTimeoutPromptOpen}
+      extendLoading={extendLoading}
+      logoutLoading={logoutLoading}
+      onExtend={handleExtendSession}
+      onLogout={handleSessionTimeoutLogout}
+    />
+  );
+
+  if (!authResolved) {
     return (
       <Layout className="admin-app-shell">
         <AdminHeader isAuthenticated={false} onLogout={handleLogout} />
         <Content className="admin-app-content">
           <SALoadingPanel />
         </Content>
+        {sessionTimeoutModal}
       </Layout>
     );
   }
@@ -214,14 +298,8 @@ function App() {
               }
             />
           </Routes>
-          <AdminSessionTimeoutModal
-            open={isSessionTimeoutPromptOpen}
-            extendLoading={extendLoading}
-            logoutLoading={logoutLoading}
-            onExtend={handleExtendSession}
-            onLogout={handleSessionTimeoutLogout}
-          />
         </Content>
+        {sessionTimeoutModal}
       </Layout>
     );
   }
@@ -237,6 +315,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Content>
+      {sessionTimeoutModal}
     </Layout>
   );
 }
