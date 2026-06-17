@@ -24,6 +24,7 @@ import { getRefreshTokenFromRequest } from './refresh-token.util';
 
 type AppointmentRequestBody = {
   serviceId: string;
+  staffId?: string;
   date: string;
   slot: string;
 };
@@ -35,6 +36,7 @@ type UpdateAppointmentRequestBody = {
 type AvailabilityQuery = {
   serviceId?: string;
   date?: string;
+  staffId?: string;
   excludeAppointmentId?: string;
 };
 
@@ -63,6 +65,7 @@ export class ProtectedProxyController {
       required: ['serviceId', 'date', 'slot'],
       properties: {
         serviceId: { type: 'string' },
+        staffId: { type: 'string' },
         date: { type: 'string', format: 'date' },
         slot: { type: 'string' },
       },

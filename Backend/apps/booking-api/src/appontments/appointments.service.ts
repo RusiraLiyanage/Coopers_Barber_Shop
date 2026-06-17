@@ -258,6 +258,16 @@ export class AppointmentsService {
     };
   }
 
+  private findActiveAvailableStaffById(staffId: string): Promise<Staff | null> {
+    return this.staffRepo.findOne({
+      where: {
+        id: staffId,
+        active: true,
+        available: true,
+      },
+    });
+  }
+
   private toAppointmentResponse(
     appointment: AppointmentResponseInput,
     timeZone: string,
@@ -424,7 +434,14 @@ export class AppointmentsService {
       throw new NotFoundException(`Service with ID ${dto.serviceId} not found`);
     }
 
-    const staff: Staff = await this.staffService.getDefaultStaff();
+    const staff = dto.staffId
+      ? await this.findActiveAvailableStaffById(dto.staffId)
+      : await this.staffService.getDefaultStaff();
+
+    if (!staff) {
+      throw new BadRequestException('Selected barber is not available');
+    }
+
     const availableSlots: string[] = await this.calculateAvailability(
       service,
       staff,
@@ -479,15 +496,22 @@ export class AppointmentsService {
   async getAvailability(
     serviceId: string,
     date: string,
+    staffId?: string,
     excludeAppointmentId?: string,
   ): Promise<string[]> {
     // retrieve service details based on the service id.
     const service = await this.servicesRepo.findOneBy({ id: serviceId });
     if (!service) throw new BadRequestException('Service not found');
 
-    // For simplicity, assign all bookings to the first staff member found. (the only staff member)
-    const staff = await this.staffRepo.findOne({ where: {} });
-    if (!staff) throw new BadRequestException('No staff available');
+    const staff = staffId
+      ? await this.findActiveAvailableStaffById(staffId)
+      : await this.staffRepo.findOne({ where: {} });
+
+    if (!staff) {
+      throw new BadRequestException(
+        staffId ? 'Selected barber is not available' : 'No staff available',
+      );
+    }
 
     return this.calculateAvailability(
       service,

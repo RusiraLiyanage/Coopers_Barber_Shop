@@ -77,6 +77,7 @@ export class AppointmentsController {
     return this.appointmentsService.getAvailability(
       query.serviceId,
       query.date,
+      query.staffId,
       query.excludeAppointmentId,
     );
   }

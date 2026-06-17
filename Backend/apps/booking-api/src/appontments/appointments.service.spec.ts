@@ -286,6 +286,66 @@ describe('AppointmentsService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
+  it('should book an appointment with the selected barber when staffId is provided', async () => {
+    const selectedStaff = {
+      id: '22222222-2222-2222-2222-222222222222',
+      displayName: 'Sofia Bennett',
+      timezone: 'Australia/Sydney',
+      bufferAfterMinutes: 15,
+      active: true,
+      available: true,
+    };
+
+    mockServicesRepo.findOneBy.mockResolvedValue({
+      id: 'svc1',
+      name: 'Haircut',
+      durationMinutes: 30,
+    });
+    const savedAppointment = {
+      id: 'appointment-1',
+      service: {
+        id: 'svc1',
+        name: 'Haircut',
+        durationMinutes: 30,
+      },
+      staff: selectedStaff,
+      startAt: new Date('2025-09-23T23:00:00.000Z'),
+      endAt: new Date('2025-09-23T23:30:00.000Z'),
+      status: 'booked',
+    };
+
+    mockStaffRepo.findOne.mockResolvedValue(selectedStaff);
+    mockAppointmentsQueryBuilder.getRawMany.mockResolvedValue([]);
+    mockAppointmentsRepo.create.mockReturnValue(savedAppointment);
+    mockAppointmentsRepo.save.mockResolvedValue(savedAppointment);
+
+    const result = await service.book(
+      { userId: 'user-1' },
+      {
+        serviceId: 'svc1',
+        staffId: selectedStaff.id,
+        date: '2025-09-24',
+        slot: '09:00-09:30',
+      },
+    );
+
+    expect(mockStaffRepo.findOne).toHaveBeenCalledWith({
+      where: {
+        id: selectedStaff.id,
+        active: true,
+        available: true,
+      },
+    });
+    expect(mockStaffService.getDefaultStaff).not.toHaveBeenCalled();
+    expect(mockAppointmentsRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        staff: selectedStaff,
+      }),
+    );
+    expect(result.staffId).toBe(selectedStaff.id);
+    expect(result.staffName).toBe('Sofia Bennett');
+  });
+
   it('should update an appointment onto the selected date when the slot is available', async () => {
     const appointment = {
       id: 'appointment-1',

@@ -13,6 +13,15 @@ export class AvailabilityQueryDto {
   date!: string; // "YYYY-MM-DD"
 
   @ApiProperty({
+    example: '11111111-1111-1111-1111-111111111111',
+    required: false,
+    description: 'The selected barber/staff member to check availability for.',
+  })
+  @IsOptional()
+  @IsUUID()
+  staffId?: string;
+
+  @ApiProperty({
     example: '9cc07820-5f57-4f0d-a3bc-0d8217f1fb42',
     required: false,
   })
