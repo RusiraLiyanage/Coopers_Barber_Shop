@@ -1,4 +1,11 @@
-import { All, Controller, Headers, Req, Res } from '@nestjs/common';
+import {
+  All,
+  Controller,
+  ForbiddenException,
+  Headers,
+  Req,
+  Res,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ProtectedProxyResponse,
@@ -65,6 +72,13 @@ function shouldForwardBody(method: string): boolean {
   return !['GET', 'HEAD'].includes(method.toUpperCase());
 }
 
+function isInternalAgentPath(pathname: string): boolean {
+  return (
+    pathname === '/admin/briefs/internal' ||
+    pathname === '/admin/hair-history/internal'
+  );
+}
+
 @ApiTags('guard-admin-proxy')
 @ApiBearerAuth('access-token')
 @Controller('admin')
@@ -81,6 +95,13 @@ export class AdminProxyController {
     @Res({ passthrough: true }) response: AuthCookieResponse,
   ): Promise<unknown> {
     const proxyUrl = createAdminProxyUrl(request);
+
+    if (isInternalAgentPath(proxyUrl.pathname)) {
+      throw new ForbiddenException(
+        'This endpoint is reserved for internal AI agent traffic.',
+      );
+    }
+
     const result = await this.protectedProxyService.forward({
       target: 'admin',
       authorizationHeader: getAdminAuthorizationHeaderFromRequest(
