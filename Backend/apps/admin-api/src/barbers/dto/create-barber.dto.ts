@@ -13,7 +13,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { StaffRole } from '@coopers/entities';
+import { StaffGender, StaffRole } from '@coopers/entities';
 
 export class CreateBarberDto {
   @ApiProperty({ example: 'Main Staff' })
@@ -30,6 +30,11 @@ export class CreateBarberDto {
   @IsOptional()
   @IsEnum(StaffRole)
   role?: StaffRole;
+
+  @ApiPropertyOptional({ enum: StaffGender, example: StaffGender.FEMALE })
+  @IsOptional()
+  @IsEnum(StaffGender)
+  gender?: StaffGender;
 
   @ApiPropertyOptional({ example: 'Australia/Sydney' })
   @IsOptional()

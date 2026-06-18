@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS services (
 CREATE TABLE IF NOT EXISTS staff (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     display_name text NOT NULL,
+    gender text NOT NULL DEFAULT 'unspecified',
     timezone text NOT NULL DEFAULT 'Australia/Sydney',
     buffer_after_minutes smallint NOT NULL DEFAULT 15,
     created_at timestamptz NOT NULL DEFAULT now()
@@ -122,6 +123,7 @@ INSERT INTO
     staff (
         id,
         display_name,
+        gender,
         timezone,
         buffer_after_minutes,
         created_at
@@ -129,6 +131,7 @@ INSERT INTO
 VALUES (
         '11111111-1111-1111-1111-111111111111',
         'Main Staff',
+        'unspecified',
         'Australia/Sydney',
         15,
         NOW() -- ✅ explicitly set created_at

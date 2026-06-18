@@ -11,6 +11,7 @@ import {
   Service,
   ServiceComplexity,
   Staff,
+  StaffGender,
   StaffRole,
 } from '@coopers/entities';
 import { Repository } from 'typeorm';
@@ -147,6 +148,10 @@ export class ConsultationService {
         match.staff,
       ),
       previousHairHistoryCount: previousHairHistory.length,
+      generation: {
+        source: 'fallback',
+        model: null,
+      },
     };
   }
 
@@ -457,6 +462,7 @@ export class ConsultationService {
     return {
       id: match.staff.id,
       displayName: match.staff.displayName,
+      gender: match.staff.gender ?? StaffGender.UNSPECIFIED,
       role: match.staff.role,
       rating: match.staff.rating ?? 0,
       matchedSkills: match.matchedSkills,

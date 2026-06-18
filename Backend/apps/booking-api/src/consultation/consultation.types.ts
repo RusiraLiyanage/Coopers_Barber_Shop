@@ -1,6 +1,7 @@
 import {
   SafetyRuleSeverity,
   ServiceComplexity,
+  StaffGender,
   StaffRole,
 } from '@coopers/entities';
 
@@ -9,6 +10,8 @@ export type ConsultationQuestion = {
   label: string;
   helperText?: string;
   required: boolean;
+  answerType?: 'text' | 'single_choice' | 'multi_choice';
+  options?: string[];
 };
 
 export type ConsultationServiceSummary = {
@@ -36,12 +39,13 @@ export type ConsultationStartResponse = {
 export type ConsultationSafetyNote = {
   severity: SafetyRuleSeverity;
   message: string;
-  source: 'safety-rule' | 'service-trigger';
+  source: 'safety-rule' | 'service-trigger' | 'ai-observation';
 };
 
 export type ConsultationBarberMatch = {
   id: string;
   displayName: string;
+  gender: StaffGender;
   role: StaffRole;
   rating: number;
   matchedSkills: string[];
@@ -58,4 +62,38 @@ export type ConsultationSubmitResponse = {
   desiredLook: string | null;
   consultationSummary: string;
   previousHairHistoryCount: number;
+  generation: {
+    source: 'claude' | 'fallback';
+    model: string | null;
+  };
 };
+
+export type ConsultationStreamEvent =
+  | {
+      type: 'status';
+      message: string;
+    }
+  | {
+      type: 'text_delta';
+      text: string;
+    }
+  | {
+      type: 'tool_use';
+      name: string;
+    }
+  | {
+      type: 'tool_result';
+      name: string;
+      ok: boolean;
+    }
+  | {
+      type: 'result';
+      result: ConsultationSubmitResponse;
+    }
+  | {
+      type: 'error';
+      message: string;
+    }
+  | {
+      type: 'done';
+    };

@@ -39,6 +39,18 @@ export class AppointmentBrief {
   @Column({ name: 'desired_look', type: 'text', nullable: true })
   desiredLook: string | null;
 
+  @Column({ name: 'goal_photo_media_type', type: 'text', nullable: true })
+  goalPhotoMediaType: string | null;
+
+  @Column({ name: 'goal_photo_data', type: 'text', nullable: true })
+  goalPhotoData: string | null;
+
+  @Column({ name: 'generation_source', type: 'text', default: 'fallback' })
+  generationSource: string;
+
+  @Column({ name: 'generation_model', type: 'text', nullable: true })
+  generationModel: string | null;
+
   @CreateDateColumn({
     name: 'generated_at',
     type: 'timestamptz',

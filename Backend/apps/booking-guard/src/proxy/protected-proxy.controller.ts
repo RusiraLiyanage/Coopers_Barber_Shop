@@ -31,6 +31,12 @@ type AppointmentRequestBody = {
   safetyNotes?: string;
   hairState?: string[];
   desiredLook?: string;
+  goalPhoto?: {
+    mediaType: 'image/jpeg' | 'image/png' | 'image/webp';
+    data: string;
+  };
+  consultationGenerationSource?: 'claude' | 'fallback';
+  consultationGenerationModel?: string;
 };
 
 type UpdateAppointmentRequestBody = {
@@ -79,6 +85,25 @@ export class ProtectedProxyController {
           items: { type: 'string' },
         },
         desiredLook: { type: 'string' },
+        goalPhoto: {
+          type: 'object',
+          required: ['mediaType', 'data'],
+          properties: {
+            mediaType: {
+              type: 'string',
+              enum: ['image/jpeg', 'image/png', 'image/webp'],
+            },
+            data: {
+              type: 'string',
+              description: 'Base64-encoded image data without a data URL prefix.',
+            },
+          },
+        },
+        consultationGenerationSource: {
+          type: 'string',
+          enum: ['claude', 'fallback'],
+        },
+        consultationGenerationModel: { type: 'string' },
       },
     },
   })

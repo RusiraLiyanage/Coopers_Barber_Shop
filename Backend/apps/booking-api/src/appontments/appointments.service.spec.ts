@@ -405,6 +405,8 @@ describe('AppointmentsService', () => {
         safetyNotes: 'Confirm recent bleach before applying colour.',
         hairState: ['dry hair', 'recent bleach', 'dry hair'],
         desiredLook: 'Natural brown colour.',
+        consultationGenerationSource: 'claude',
+        consultationGenerationModel: 'claude-opus-4-8',
       },
     );
 
@@ -416,6 +418,10 @@ describe('AppointmentsService', () => {
       safetyNotes: 'Confirm recent bleach before applying colour.',
       hairState: ['dry hair', 'recent bleach'],
       desiredLook: 'Natural brown colour.',
+      goalPhotoMediaType: null,
+      goalPhotoData: null,
+      generationSource: 'claude',
+      generationModel: 'claude-opus-4-8',
     });
     expect(mockAppointmentBriefsRepo.save).toHaveBeenCalledWith(savedBrief);
   });

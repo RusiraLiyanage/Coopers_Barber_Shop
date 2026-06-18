@@ -3,11 +3,37 @@ import {
   ArrayMaxSize,
   IsArray,
   IsDateString,
+  IsIn,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
+  Matches,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  HAIR_PHOTO_MEDIA_TYPES,
+} from '../../consultation/dto/hair-photo.dto';
+import type { HairPhotoMediaType } from '../../consultation/dto/hair-photo.dto';
+
+export class AppointmentGoalPhotoDto {
+  @ApiProperty({
+    enum: HAIR_PHOTO_MEDIA_TYPES,
+    example: 'image/jpeg',
+  })
+  @IsIn(HAIR_PHOTO_MEDIA_TYPES)
+  mediaType!: HairPhotoMediaType;
+
+  @ApiProperty({
+    description:
+      'Base64-encoded image data without a data URL prefix. This is persisted on the appointment brief for the barber.',
+  })
+  @IsString()
+  @MaxLength(5_000_000)
+  @Matches(/^[A-Za-z0-9+/]+={0,2}$/)
+  data!: string;
+}
 
 export class CreateAppointmentDto {
   // The ID of the service to book an appointment for.
@@ -77,4 +103,35 @@ export class CreateAppointmentDto {
   @IsString()
   @MaxLength(500)
   desiredLook?: string;
+
+  @ApiProperty({
+    required: false,
+    type: AppointmentGoalPhotoDto,
+    description:
+      'Optional goal/reference photo showing the look the customer wants to achieve.',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AppointmentGoalPhotoDto)
+  goalPhoto?: AppointmentGoalPhotoDto;
+
+  @ApiProperty({
+    example: 'claude',
+    enum: ['claude', 'fallback'],
+    required: false,
+    description: 'Source that generated the consultation recommendation.',
+  })
+  @IsOptional()
+  @IsIn(['claude', 'fallback'])
+  consultationGenerationSource?: 'claude' | 'fallback';
+
+  @ApiProperty({
+    example: 'claude-opus-4-8',
+    required: false,
+    description: 'Model that generated the consultation recommendation.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  consultationGenerationModel?: string;
 }

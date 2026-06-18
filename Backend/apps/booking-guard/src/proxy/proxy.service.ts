@@ -92,4 +92,27 @@ export class ProxyService {
       );
     }
   }
+
+  async forwardStream(options: ProxyRequestOptions): Promise<Response> {
+    const upstreams = this.guardConfig.getUpstreams();
+    const baseUrl = getUpstreamBaseUrl(upstreams, options.target);
+
+    try {
+      return await fetch(buildUrl(baseUrl, options.path, options.query), {
+        method: options.method,
+        headers: {
+          accept: 'text/event-stream',
+          'content-type': 'application/json',
+          'x-internal-gateway-secret': this.guardConfig.internalGatewaySecret,
+          ...options.headers,
+        },
+        body:
+          options.body === undefined ? undefined : JSON.stringify(options.body),
+      });
+    } catch {
+      throw new ServiceUnavailableException(
+        `${options.target} upstream is unavailable`,
+      );
+    }
+  }
 }

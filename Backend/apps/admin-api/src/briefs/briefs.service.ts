@@ -5,6 +5,51 @@ import { Appointment, AppointmentBrief, Staff } from '@coopers/entities';
 import { BriefsQueryDto } from './dto/briefs-query.dto';
 import { CreateBriefDto } from './dto/create-brief.dto';
 
+interface BriefUserResponse {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+}
+
+interface BriefServiceResponse {
+  id: string;
+  name: string;
+  durationMinutes: number;
+}
+
+interface BriefStaffResponse {
+  id: string;
+  displayName: string;
+}
+
+interface BriefBookingResponse {
+  id: string;
+  status: string;
+  startAt: Date;
+  endAt: Date;
+  customer: BriefUserResponse;
+  service: BriefServiceResponse;
+  staff: BriefStaffResponse;
+}
+
+export interface AppointmentBriefResponse {
+  id: string;
+  booking: BriefBookingResponse;
+  barber: Staff | null;
+  clientSummary: string;
+  safetyNotes: string | null;
+  hairState: string[];
+  desiredLook: string | null;
+  goalPhoto: {
+    mediaType: string;
+    data: string;
+  } | null;
+  generationSource: string;
+  generationModel: string | null;
+  generatedAt: Date;
+}
+
 function normalizeStringArray(values: string[]): string[] {
   return Array.from(
     new Set(
@@ -24,7 +69,51 @@ export class BriefsService {
     private readonly staffRepository: Repository<Staff>,
   ) {}
 
-  findAll(query: BriefsQueryDto = {}): Promise<AppointmentBrief[]> {
+  private toBriefResponse(brief: AppointmentBrief): AppointmentBriefResponse {
+    return {
+      id: brief.id,
+      booking: {
+        id: brief.booking.id,
+        status: brief.booking.status,
+        startAt: brief.booking.startAt,
+        endAt: brief.booking.endAt,
+        customer: {
+          id: brief.booking.customer.id,
+          email: brief.booking.customer.email,
+          firstName: brief.booking.customer.firstName,
+          lastName: brief.booking.customer.lastName,
+        },
+        service: {
+          id: brief.booking.service.id,
+          name: brief.booking.service.name,
+          durationMinutes: brief.booking.service.durationMinutes,
+        },
+        staff: {
+          id: brief.booking.staff.id,
+          displayName: brief.booking.staff.displayName,
+        },
+      },
+      barber: brief.barber,
+      clientSummary: brief.clientSummary,
+      safetyNotes: brief.safetyNotes,
+      hairState: brief.hairState,
+      desiredLook: brief.desiredLook,
+      goalPhoto:
+        brief.goalPhotoMediaType && brief.goalPhotoData
+          ? {
+              mediaType: brief.goalPhotoMediaType,
+              data: brief.goalPhotoData,
+            }
+          : null,
+      generationSource: brief.generationSource,
+      generationModel: brief.generationModel,
+      generatedAt: brief.generatedAt,
+    };
+  }
+
+  async findAll(
+    query: BriefsQueryDto = {},
+  ): Promise<AppointmentBriefResponse[]> {
     const limit = query.limit ?? 50;
     const offset = query.offset ?? 0;
     const briefsQuery = this.appointmentBriefRepository
@@ -58,10 +147,12 @@ export class BriefsService {
       briefsQuery.andWhere('brief.safetyNotes IS NULL');
     }
 
-    return briefsQuery.getMany();
+    const briefs = await briefsQuery.getMany();
+
+    return briefs.map((brief) => this.toBriefResponse(brief));
   }
 
-  async findOne(id: string): Promise<AppointmentBrief> {
+  async findOne(id: string): Promise<AppointmentBriefResponse> {
     const appointmentBrief = await this.appointmentBriefRepository.findOne({
       where: { id },
       relations: {
@@ -78,10 +169,12 @@ export class BriefsService {
       throw new NotFoundException('Appointment brief not found.');
     }
 
-    return appointmentBrief;
+    return this.toBriefResponse(appointmentBrief);
   }
 
-  async create(createBriefDto: CreateBriefDto): Promise<AppointmentBrief> {
+  async create(
+    createBriefDto: CreateBriefDto,
+  ): Promise<AppointmentBriefResponse> {
     const booking = await this.appointmentRepository.findOne({
       where: { id: createBriefDto.bookingId },
     });

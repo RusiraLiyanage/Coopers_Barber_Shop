@@ -5,7 +5,12 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Appointment, Staff, StaffRole } from '@coopers/entities';
+import {
+  Appointment,
+  Staff,
+  StaffGender,
+  StaffRole,
+} from '@coopers/entities';
 import { CreateBarberDto } from './dto/create-barber.dto';
 import { UpdateBarberDto } from './dto/update-barber.dto';
 
@@ -53,6 +58,7 @@ function normalizeStaffResponse(staff: Staff): Staff {
     ...staff,
     skills: staff.skills ?? [],
     rating: normalizeRating(staff.rating),
+    gender: staff.gender ?? StaffGender.UNSPECIFIED,
     available: staff.available !== false,
     active: staff.active !== false,
   };
@@ -93,6 +99,7 @@ export class BarbersService {
       displayName: normalizeText(createBarberDto.displayName),
       email: normalizeOptionalText(createBarberDto.email),
       role: createBarberDto.role ?? StaffRole.JUNIOR,
+      gender: createBarberDto.gender ?? StaffGender.UNSPECIFIED,
       timezone: timezone ?? DEFAULT_BARBER_TIMEZONE,
       skills: normalizeSkillTags(createBarberDto.skills) ?? [],
       rating: createBarberDto.rating ?? 0,

@@ -14,10 +14,9 @@ import {
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
-import { AppointmentBrief } from '@coopers/entities';
 import { AdminRoleGuard } from '../auth/guards/admin-role.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { BriefsService } from './briefs.service';
+import { AppointmentBriefResponse, BriefsService } from './briefs.service';
 import { BriefsQueryDto } from './dto/briefs-query.dto';
 import { CreateBriefDto } from './dto/create-brief.dto';
 
@@ -30,7 +29,7 @@ export class BriefsController {
   @ApiOperation({ summary: 'List generated appointment briefs' })
   @UseGuards(JwtAuthGuard, AdminRoleGuard)
   @Get()
-  findAll(@Query() query: BriefsQueryDto): Promise<AppointmentBrief[]> {
+  findAll(@Query() query: BriefsQueryDto): Promise<AppointmentBriefResponse[]> {
     return this.briefsService.findAll(query);
   }
 
@@ -38,7 +37,7 @@ export class BriefsController {
   @ApiParam({ name: 'id' })
   @UseGuards(JwtAuthGuard, AdminRoleGuard)
   @Get(':id')
-  findOne(@Param('id') id: string): Promise<AppointmentBrief> {
+  findOne(@Param('id') id: string): Promise<AppointmentBriefResponse> {
     return this.briefsService.findOne(id);
   }
 
@@ -47,7 +46,9 @@ export class BriefsController {
   })
   @ApiBody({ type: CreateBriefDto })
   @Post('internal')
-  create(@Body() createBriefDto: CreateBriefDto): Promise<AppointmentBrief> {
+  create(
+    @Body() createBriefDto: CreateBriefDto,
+  ): Promise<AppointmentBriefResponse> {
     return this.briefsService.create(createBriefDto);
   }
 }

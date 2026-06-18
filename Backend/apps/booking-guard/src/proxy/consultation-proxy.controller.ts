@@ -21,9 +21,37 @@ type ConsultationAnswerRequestBody = {
   answer: string;
 };
 
+type HairPhotoRequestBody = {
+  mediaType: 'image/jpeg' | 'image/png' | 'image/webp';
+  data: string;
+};
+
 type SubmitConsultationRequestBody = {
   serviceId: string;
   answers: ConsultationAnswerRequestBody[];
+  hairPhoto?: HairPhotoRequestBody;
+};
+
+const HAIR_PHOTO_SCHEMA = {
+  type: 'object',
+  required: ['mediaType', 'data'],
+  properties: {
+    mediaType: {
+      type: 'string',
+      enum: ['image/jpeg', 'image/png', 'image/webp'],
+    },
+    data: {
+      type: 'string',
+      description: 'Base64-encoded image data without a data URL prefix.',
+    },
+  },
+};
+
+type EventStreamResponse = AuthCookieResponse & {
+  status: (statusCode: number) => void;
+  setHeader: (name: string, value: string) => void;
+  write: (chunk: Uint8Array | string) => void;
+  end: () => void;
 };
 
 function writeProxyResponse(
@@ -35,6 +63,37 @@ function writeProxyResponse(
 
   if (result.refreshedTokens) {
     setAuthCookies(response, result.refreshedTokens, { rememberMe });
+  }
+}
+
+async function pipeUpstreamEventStream(
+  response: EventStreamResponse,
+  upstreamResponse: globalThis.Response,
+): Promise<void> {
+  response.status(upstreamResponse.status);
+  response.setHeader('Content-Type', 'text/event-stream');
+  response.setHeader('Cache-Control', 'no-cache, no-transform');
+  response.setHeader('Connection', 'keep-alive');
+
+  if (!upstreamResponse.body) {
+    response.end();
+    return;
+  }
+
+  const reader = upstreamResponse.body.getReader();
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        break;
+      }
+
+      response.write(Buffer.from(value));
+    }
+  } finally {
+    response.end();
   }
 }
 
@@ -105,6 +164,7 @@ export class ConsultationProxyController {
             },
           },
         },
+        hairPhoto: HAIR_PHOTO_SCHEMA,
       },
     },
   })
@@ -137,5 +197,60 @@ export class ConsultationProxyController {
     );
 
     return result.body;
+  }
+
+  @ApiOperation({
+    summary: 'Stream consultation answer submission to booking-api',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['serviceId', 'answers'],
+      properties: {
+        serviceId: { type: 'string' },
+        answers: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: ['questionId', 'answer'],
+            properties: {
+              questionId: { type: 'string' },
+              answer: { type: 'string' },
+            },
+          },
+        },
+        hairPhoto: HAIR_PHOTO_SCHEMA,
+      },
+    },
+  })
+  @Post('submit/stream')
+  async submitConsultationStream(
+    @Headers('authorization') authorizationHeader: string | undefined,
+    @Headers('x-refresh-token') refreshTokenHeader: string | undefined,
+    @Headers('cookie') cookieHeader: string | undefined,
+    @Body() body: SubmitConsultationRequestBody,
+    @Res() response: EventStreamResponse,
+  ): Promise<void> {
+    const result = await this.protectedProxyService.forwardStream({
+      authorizationHeader: getAuthorizationHeaderFromRequest(
+        authorizationHeader,
+        cookieHeader,
+      ),
+      refreshToken: getRefreshTokenFromRequest(
+        refreshTokenHeader,
+        cookieHeader,
+      ),
+      method: 'POST',
+      path: '/consultation/submit/stream',
+      body,
+    });
+
+    if (result.refreshedTokens) {
+      setAuthCookies(response, result.refreshedTokens, {
+        rememberMe: getRememberMeFromCookie(cookieHeader) ?? false,
+      });
+    }
+
+    await pipeUpstreamEventStream(response, result.upstreamResponse);
   }
 }

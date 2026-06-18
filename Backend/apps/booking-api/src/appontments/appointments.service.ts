@@ -313,6 +313,12 @@ export class AppointmentsService {
       safetyNotes: this.normalizeOptionalText(dto.safetyNotes),
       hairState: this.normalizeStringArray(dto.hairState),
       desiredLook: this.normalizeOptionalText(dto.desiredLook),
+      goalPhotoMediaType: dto.goalPhoto?.mediaType ?? null,
+      goalPhotoData: dto.goalPhoto?.data ?? null,
+      generationSource: dto.consultationGenerationSource ?? 'fallback',
+      generationModel: this.normalizeOptionalText(
+        dto.consultationGenerationModel,
+      ),
     });
 
     await this.appointmentBriefsRepo.save(appointmentBrief);

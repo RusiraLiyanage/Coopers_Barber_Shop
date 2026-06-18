@@ -175,6 +175,32 @@ export class ProtectedProxyService {
     };
   }
 
+  async forwardStream(options: ProtectedForwardOptions): Promise<{
+    upstreamResponse: Response;
+    refreshedTokens?: AuthTokensResponse;
+  }> {
+    const context = await this.authenticateOrRefresh(
+      options.authorizationHeader,
+      options.refreshToken,
+    );
+    const upstreamResponse = await this.proxyService.forwardStream({
+      target: options.target ?? 'booking',
+      method: options.method,
+      path: options.path,
+      query: options.query,
+      body: options.body,
+      headers: createUserContextHeaders(
+        context.authorizationHeader,
+        context.user,
+      ),
+    });
+
+    return {
+      upstreamResponse,
+      refreshedTokens: context.refreshedTokens,
+    };
+  }
+
   async validateSession(
     options: SessionValidationOptions,
   ): Promise<ProtectedProxyResponse> {

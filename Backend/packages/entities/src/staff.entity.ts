@@ -15,6 +15,13 @@ export enum StaffRole {
   OWNER = 'owner',
 }
 
+export enum StaffGender {
+  MALE = 'male',
+  FEMALE = 'female',
+  NON_BINARY = 'non_binary',
+  UNSPECIFIED = 'unspecified',
+}
+
 // The structure of the staff data table is defined as follows,
 @Entity({ name: 'staff' })
 export class Staff {
@@ -25,6 +32,10 @@ export class Staff {
   // the display name of the staff member.
   @Column({ name: 'display_name', type: 'text' })
   displayName: string;
+
+  // customer-facing gender metadata shown with the recommended barber.
+  @Column({ type: 'text', default: StaffGender.UNSPECIFIED })
+  gender: StaffGender;
 
   // optional contact email for admin/team management.
   @Column({ type: 'text', unique: true, nullable: true })
