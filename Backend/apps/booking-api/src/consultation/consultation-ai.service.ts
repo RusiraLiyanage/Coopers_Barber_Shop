@@ -108,6 +108,16 @@ const MAX_AI_HAIR_STATE = 10;
 const MAX_TOOL_ITERATIONS = 6;
 const QUESTION_CACHE_TTL_MS = 10 * 60 * 1000;
 const DEFAULT_CLAUDE_MODEL = 'claude-haiku-4-5';
+// Models that accept output_config.effort. Sending effort to others (e.g.
+// Haiku 4.5 / Sonnet 4.5) returns a 400, so it is omitted for them.
+const EFFORT_SUPPORTED_MODELS = new Set<string>([
+  'claude-opus-4-8',
+  'claude-opus-4-7',
+  'claude-opus-4-6',
+  'claude-opus-4-5',
+  'claude-sonnet-4-6',
+  'claude-fable-5',
+]);
 const QUESTION_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 function normalizeString(value: unknown): string {
@@ -182,6 +192,7 @@ export class ConsultationAiService {
   private readonly logger = new Logger(ConsultationAiService.name);
   private readonly anthropic: Anthropic | null;
   private readonly model: string;
+  private readonly supportsEffort: boolean;
   private readonly questionCache = new Map<string, QuestionCacheEntry>();
 
   constructor(
@@ -199,6 +210,7 @@ export class ConsultationAiService {
     const apiKey = this.configService.get<string>('ANTHROPIC_API_KEY');
     this.model =
       this.configService.get<string>('ANTHROPIC_MODEL') ?? DEFAULT_CLAUDE_MODEL;
+    this.supportsEffort = EFFORT_SUPPORTED_MODELS.has(this.model);
     this.anthropic = apiKey ? new Anthropic({ apiKey }) : null;
   }
 
@@ -271,7 +283,12 @@ export class ConsultationAiService {
     hairPhoto?: HairPhotoDto,
   ): Promise<ConsultationSubmitResponse> {
     try {
-      return this.createAiSubmitResult(userId, serviceId, answers, hairPhoto);
+      return await this.createAiSubmitResult(
+        userId,
+        serviceId,
+        answers,
+        hairPhoto,
+      );
     } catch (error) {
       this.logAiFallback('submitConsultation', error);
       return this.fallbackConsultationService.submitConsultation(
@@ -621,7 +638,10 @@ export class ConsultationAiService {
       tools: params.tools,
       tool_choice: params.tool_choice,
       thinking: { type: 'disabled' },
-      output_config: { effort: params.effort },
+      // effort is unsupported on some models (e.g. Haiku 4.5) and 400s there.
+      ...(this.supportsEffort
+        ? { output_config: { effort: params.effort } }
+        : {}),
       max_tokens: params.max_tokens,
     } satisfies Anthropic.Messages.MessageCreateParamsNonStreaming;
 
