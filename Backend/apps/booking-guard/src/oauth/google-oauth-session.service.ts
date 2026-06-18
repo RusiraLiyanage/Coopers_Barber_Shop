@@ -11,6 +11,7 @@ import {
   clearGoogleOAuthLinkCookie,
   getGoogleOAuthLinkTicket,
   setGoogleOAuthLinkCookie,
+  setGoogleOAuthSessionSwitchCookie,
 } from './oauth-state-cookie.util';
 import type { NormalizedOAuthProfile } from './oauth.types';
 
@@ -26,7 +27,8 @@ type AuthStatusResponse = {
 
 type GoogleOAuthCompletionResult =
   | { status: 'authenticated'; tokens: AuthTokensResponse }
-  | { status: 'link_required'; linkTicket: string };
+  | { status: 'link_required'; linkTicket: string }
+  | { status: 'session_switch_required'; linkTicket: string; email: string };
 
 function isAuthTokensResponse(value: unknown): value is AuthTokensResponse {
   if (typeof value !== 'object' || value === null) {
@@ -56,6 +58,7 @@ function parseCompletionResult(
     status: unknown;
     tokens?: unknown;
     linkTicket?: unknown;
+    email?: unknown;
   };
 
   if (
@@ -70,6 +73,18 @@ function parseCompletionResult(
     typeof result.linkTicket === 'string'
   ) {
     return { status: 'link_required', linkTicket: result.linkTicket };
+  }
+
+  if (
+    result.status === 'session_switch_required' &&
+    typeof result.linkTicket === 'string' &&
+    typeof result.email === 'string'
+  ) {
+    return {
+      status: 'session_switch_required',
+      linkTicket: result.linkTicket,
+      email: result.email,
+    };
   }
 
   return null;
@@ -96,6 +111,18 @@ function buildLinkRedirectUrl(
   const url = new URL(googleConfig.successRedirectUrl);
 
   url.searchParams.set('link_google', '1');
+  url.searchParams.set('email', email);
+
+  return url.toString();
+}
+
+function buildSessionSwitchRedirectUrl(
+  googleConfig: GoogleOAuthConfig,
+  email: string,
+): string {
+  const url = new URL(googleConfig.successRedirectUrl);
+
+  url.searchParams.set('switch_google', '1');
   url.searchParams.set('email', email);
 
   return url.toString();
@@ -136,6 +163,14 @@ export class GoogleOAuthSessionService {
       return;
     }
 
+    if (completion?.status === 'session_switch_required') {
+      setGoogleOAuthSessionSwitchCookie(response, completion.linkTicket);
+      response.redirect(
+        buildSessionSwitchRedirectUrl(googleConfig, completion.email),
+      );
+      return;
+    }
+
     clearAuthCookies(response);
     clearGoogleOAuthLinkCookie(response);
     response.redirect(googleConfig.failureRedirectUrl);
@@ -143,6 +178,7 @@ export class GoogleOAuthSessionService {
 
   async linkGoogleAccount(
     password: string | undefined,
+    endExistingSessions: boolean | undefined,
     cookieHeader: string | undefined,
     response: GoogleLinkResponse,
   ): Promise<unknown> {
@@ -159,7 +195,7 @@ export class GoogleOAuthSessionService {
       target: 'auth',
       method: 'POST',
       path: '/auth/oauth/google/link',
-      body: { linkTicket, password },
+      body: { linkTicket, password, endExistingSessions },
     });
 
     response.status(result.statusCode);
@@ -179,6 +215,43 @@ export class GoogleOAuthSessionService {
     if (result.statusCode !== 401) {
       clearGoogleOAuthLinkCookie(response);
     }
+
+    return result.body;
+  }
+
+  async completeGoogleSessionSwitch(
+    cookieHeader: string | undefined,
+    response: GoogleLinkResponse,
+  ): Promise<unknown> {
+    const linkTicket = getGoogleOAuthLinkTicket(cookieHeader);
+
+    if (!linkTicket) {
+      clearGoogleOAuthLinkCookie(response);
+      response.status(400);
+
+      return { message: 'Google session switch request is missing or expired.' };
+    }
+
+    const result = await this.proxyService.forward({
+      target: 'auth',
+      method: 'POST',
+      path: '/auth/oauth/google/session-switch',
+      body: { linkTicket },
+    });
+
+    response.status(result.statusCode);
+
+    if (
+      isSuccessStatus(result.statusCode) &&
+      isAuthTokensResponse(result.body)
+    ) {
+      setAuthCookies(response, result.body, { rememberMe: true });
+      clearGoogleOAuthLinkCookie(response);
+
+      return { authenticated: true } satisfies AuthStatusResponse;
+    }
+
+    clearGoogleOAuthLinkCookie(response);
 
     return result.body;
   }

@@ -21,6 +21,7 @@ import {
   shouldShowAdminLoginAfterExpiry,
   isSessionExpiredError,
   isSessionIdleExpiredError,
+  logoutPreviousAdminSession,
 } from './lib/api';
 import {
   ADMIN_SESSION_EXPIRED_MESSAGE,
@@ -282,14 +283,14 @@ function App() {
   const handleContinueAuthSwitch = useCallback(async () => {
     setAuthSwitchLoading(true);
     setSessionTimeoutFlowState('none');
-    clearAdminAuthSession();
-    dispatch(resetStore());
 
     try {
-      await dispatch(logoutAction()).unwrap();
+      await logoutPreviousAdminSession();
     } catch {
       // Cookie/session state is cleared locally; continue to the requested auth flow.
     } finally {
+      clearAdminAuthSession();
+      dispatch(resetStore());
       setAuthSwitchLoading(false);
       setAuthSwitchPromptOpen(false);
       navigate(authSwitchContinuePath, { replace: true });

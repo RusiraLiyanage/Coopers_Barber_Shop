@@ -11,10 +11,13 @@ import MakeAppointmentModal from './Models/makeAppointment';
 import {
   clearClientAuthSession,
   clearGoogleLinkPromptFromUrl,
+  completeGoogleSessionSwitch,
   canRestoreClientAuthSession,
   isSessionExpiredError,
   isSessionIdleExpiredError,
+  logoutPreviousClientSession,
   readGoogleLinkPrompt,
+  readGoogleSessionSwitchPrompt,
   SESSION_EXPIRED_EVENT,
   SESSION_IDLE_EXPIRED_EVENT,
   shouldClearStaleClientAuthSession,
@@ -22,6 +25,7 @@ import {
   type AppointmentRecord,
   type AuthSession,
   type GoogleLinkPrompt,
+  type GoogleSessionSwitchPrompt,
 } from './lib/api';
 import { resetStore } from './store';
 import { useAppDispatch, useAppSelector } from './store/hooks';
@@ -63,6 +67,10 @@ function App() {
     useState<SessionTimeoutFlowState>('none');
   const [googleLinkPrompt, setGoogleLinkPrompt] =
     useState<GoogleLinkPrompt | null>(() => readGoogleLinkPrompt());
+  const [googleSessionSwitchPrompt, setGoogleSessionSwitchPrompt] =
+    useState<GoogleSessionSwitchPrompt | null>(() =>
+      readGoogleSessionSwitchPrompt(),
+    );
   const [authSwitchPromptOpen, setAuthSwitchPromptOpen] = useState(false);
   const [authSwitchLoading, setAuthSwitchLoading] = useState(false);
 
@@ -184,10 +192,10 @@ function App() {
     // Strip the link markers from the URL once captured so a refresh or share
     // doesn't re-trigger the prompt; the httpOnly link ticket cookie still
     // drives the actual linking request.
-    if (googleLinkPrompt) {
+    if (googleLinkPrompt || googleSessionSwitchPrompt) {
       clearGoogleLinkPromptFromUrl();
     }
-  }, [googleLinkPrompt]);
+  }, [googleLinkPrompt, googleSessionSwitchPrompt]);
 
   useEffect(() => {
     const handleSessionIdleExpired = () => {
@@ -251,6 +259,11 @@ function App() {
     setOpenAuthModal(true);
   };
 
+  const requestSessionSwitchFromAuthModal = () => {
+    setOpenAuthModal(false);
+    setAuthSwitchPromptOpen(true);
+  };
+
   const handleCancelAuthSwitch = () => {
     setAuthSwitchPromptOpen(false);
   };
@@ -258,20 +271,40 @@ function App() {
   const handleContinueAuthSwitch = async () => {
     setAuthSwitchLoading(true);
     setSessionTimeoutFlowState('none');
-    setAuthSession(null);
-    setEditingAppointment(null);
-    setOpenAppointmentModal(false);
-    dispatch(resetStore());
-    navigate('/');
 
     try {
-      await dispatch(logoutAction()).unwrap();
+      await logoutPreviousClientSession();
     } catch {
       // Local state is already cleared; allow the user to continue signing in.
     } finally {
+      setAuthSession(null);
+      setEditingAppointment(null);
+      setOpenAppointmentModal(false);
+      dispatch(resetStore());
+      navigate('/');
       setAuthSwitchLoading(false);
       setAuthSwitchPromptOpen(false);
       setOpenAuthModal(true);
+    }
+  };
+
+  const handleGoogleSessionSwitchCancel = () => {
+    setGoogleSessionSwitchPrompt(null);
+    navigate('/');
+  };
+
+  const handleGoogleSessionSwitchConfirm = async () => {
+    setAuthSwitchLoading(true);
+
+    try {
+      const response = await completeGoogleSessionSwitch();
+      setAuthSession(toAuthSession(response));
+      setGoogleSessionSwitchPrompt(null);
+      setOpenAuthModal(false);
+      setSessionTimeoutFlowState('none');
+      navigate('/');
+    } finally {
+      setAuthSwitchLoading(false);
     }
   };
 
@@ -434,6 +467,8 @@ function App() {
         onExtendSession={handleExtendSession}
         onSessionLogout={handleSessionTimeoutLogout}
         onSessionTimeoutAcknowledged={handleSessionTimeoutAcknowledged}
+        hasActiveSession={isAuthenticated}
+        onRequestSessionSwitch={requestSessionSwitchFromAuthModal}
         onAuthSuccess={(session) => {
           setAuthSession(session);
           setSessionTimeoutFlowState('none'); // none means no need to show the extend screen
@@ -472,6 +507,30 @@ function App() {
           navigate('/appointments');
         }}
       />
+
+      <Modal
+        title="Active session found"
+        open={googleSessionSwitchPrompt !== null}
+        okText="End previous session"
+        cancelText="Cancel"
+        confirmLoading={authSwitchLoading}
+        onOk={() => {
+          void handleGoogleSessionSwitchConfirm();
+        }}
+        onCancel={handleGoogleSessionSwitchCancel}
+        centered
+      >
+        <p>
+          {googleSessionSwitchPrompt?.email
+            ? `${googleSessionSwitchPrompt.email} already has an active session.`
+            : 'This Google account already has an active session.'}
+        </p>
+        <p>
+          Continuing will end the previous session for this account before
+          signing in with Google here.
+        </p>
+        <p>Do you want to continue?</p>
+      </Modal>
 
       <Modal
         title="Already signed in"

@@ -10,6 +10,7 @@ import {
 } from 'antd';
 import { useEffect, useState } from 'react';
 import {
+  ACTIVE_ACCOUNT_SESSION_EXISTS_CODE,
   ApiRequestError,
   beginGoogleOAuthLogin,
   toAuthSession,
@@ -39,6 +40,8 @@ interface UserAuthModalProps {
   onExtendSession?: () => Promise<void>;
   onSessionLogout?: () => Promise<void>;
   onSessionTimeoutAcknowledged?: () => void;
+  hasActiveSession?: boolean;
+  onRequestSessionSwitch?: () => void;
   onAuthSuccess: (session: AuthSession) => void;
 }
 
@@ -94,6 +97,8 @@ export default function UserAuthModal({
   onExtendSession,
   onSessionLogout,
   onSessionTimeoutAcknowledged,
+  hasActiveSession = false,
+  onRequestSessionSwitch,
   onAuthSuccess,
 }: UserAuthModalProps) {
   const dispatch = useAppDispatch();
@@ -105,6 +110,8 @@ export default function UserAuthModal({
   const [passwordResetStep, setPasswordResetStep] =
     useState<PasswordResetStep>('request');
   const [authAlert, setAuthAlert] = useState<AuthAlertState | null>(null);
+  const [sessionConflictLoginValues, setSessionConflictLoginValues] =
+    useState<FieldType | null>(null);
   const [messageApi, contextHolder] = message.useMessage();
   const [loginForm] = Form.useForm<FieldType>();
   const [registerForm] = Form.useForm<FieldType>();
@@ -116,6 +123,15 @@ export default function UserAuthModal({
   const isExpiredNotice = sessionTimeoutState === 'expired_notice';
   const shouldShowSessionExtendFailure =
     isSessionTimeoutMode && sessionExtendFailed && authAlert !== null;
+
+  const shouldSwitchExistingSession = () => {
+    if (!hasActiveSession || isSessionTimeoutMode) {
+      return false;
+    }
+
+    onRequestSessionSwitch?.();
+    return true;
+  };
 
   useEffect(() => {
     if (open) {
@@ -227,7 +243,14 @@ export default function UserAuthModal({
     }
   };
 
-  const handleLogin = async (values: FieldType) => {
+  const handleLogin = async (
+    values: FieldType,
+    endExistingSessions = false,
+  ) => {
+    if (shouldSwitchExistingSession()) {
+      return;
+    }
+
     if (!values.email || !values.password) {
       return;
     }
@@ -241,8 +264,10 @@ export default function UserAuthModal({
           email: values.email,
           password: values.password,
           remember: values.remember === true,
+          endExistingSessions,
         }),
       ).unwrap();
+      setSessionConflictLoginValues(null);
       messageApi.success({
         content: 'Successful Login!',
         style: {
@@ -254,6 +279,14 @@ export default function UserAuthModal({
       });
       onAuthSuccess(toAuthSession(response));
     } catch (error) {
+      if (
+        error instanceof ApiRequestError &&
+        error.code === ACTIVE_ACCOUNT_SESSION_EXISTS_CODE
+      ) {
+        setSessionConflictLoginValues(values);
+        return;
+      }
+
       messageApi.error(getLoginErrorMessage(error));
     } finally {
       setConfirmLoading(false);
@@ -261,11 +294,19 @@ export default function UserAuthModal({
   };
 
   const handleGoogleOAuthLogin = () => {
+    if (shouldSwitchExistingSession()) {
+      return;
+    }
+
     setAuthAlert(null);
     beginGoogleOAuthLogin();
   };
 
   const handleRegister = async (values: FieldType) => {
+    if (shouldSwitchExistingSession()) {
+      return;
+    }
+
     const { firstName, lastName, mobile, suburb, email, password } = values;
 
     if (!firstName || !lastName || !mobile || !suburb || !email || !password) {
@@ -978,6 +1019,27 @@ export default function UserAuthModal({
             </>
           )}
         </div>
+      </Modal>
+      <Modal
+        title="Active session found"
+        open={sessionConflictLoginValues !== null}
+        okText="End previous session"
+        cancelText="Cancel"
+        confirmLoading={confirmLoading}
+        onOk={() => {
+          if (sessionConflictLoginValues) {
+            void handleLogin(sessionConflictLoginValues, true);
+          }
+        }}
+        onCancel={() => setSessionConflictLoginValues(null)}
+        centered
+      >
+        <p>This account already has an active session.</p>
+        <p>
+          Continuing will end the previous session for this account before
+          signing in here.
+        </p>
+        <p>Do you want to continue?</p>
       </Modal>
     </>
   );

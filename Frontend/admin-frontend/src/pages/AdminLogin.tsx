@@ -1,8 +1,20 @@
 import { useState } from 'react';
-import { Alert, Button, Checkbox, Form, Input, Typography, message } from 'antd';
+import {
+  Alert,
+  Button,
+  Checkbox,
+  Form,
+  Input,
+  Modal,
+  Typography,
+  message,
+} from 'antd';
 import { LockOutlined, MailOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { ApiRequestError } from '../lib/api';
+import {
+  ACTIVE_ACCOUNT_SESSION_EXISTS_CODE,
+  ApiRequestError,
+} from '../lib/api';
 import { getUserFriendlyErrorMessage } from '../lib/errors';
 import { loginAdminAction } from '../store/auth/action';
 import { useAppDispatch } from '../store/hooks';
@@ -32,8 +44,13 @@ export default function AdminLogin({ initialError = null }: AdminLoginProps) {
   const [messageApi, contextHolder] = message.useMessage();
   const [error, setError] = useState<string | null>(initialError);
   const [submitting, setSubmitting] = useState(false);
+  const [sessionConflictValues, setSessionConflictValues] =
+    useState<AdminLoginFormValues | null>(null);
 
-  const handleSubmit = async (values: AdminLoginFormValues) => {
+  const handleSubmit = async (
+    values: AdminLoginFormValues,
+    endExistingSessions = false,
+  ) => {
     setSubmitting(true);
     setError(null);
 
@@ -43,10 +60,20 @@ export default function AdminLogin({ initialError = null }: AdminLoginProps) {
           email: values.email,
           password: values.password,
           remember: values.remember === true,
+          endExistingSessions,
         }),
       ).unwrap();
+      setSessionConflictValues(null);
       navigate('/');
     } catch (loginError) {
+      if (
+        loginError instanceof ApiRequestError &&
+        loginError.code === ACTIVE_ACCOUNT_SESSION_EXISTS_CODE
+      ) {
+        setSessionConflictValues(values);
+        return;
+      }
+
       const nextError = getAdminLoginErrorMessage(loginError);
 
       setError(nextError);
@@ -110,6 +137,27 @@ export default function AdminLogin({ initialError = null }: AdminLoginProps) {
           </Button>
         </Form>
       </section>
+      <Modal
+        title="Active session found"
+        open={sessionConflictValues !== null}
+        okText="End previous session"
+        cancelText="Cancel"
+        confirmLoading={submitting}
+        onOk={() => {
+          if (sessionConflictValues) {
+            void handleSubmit(sessionConflictValues, true);
+          }
+        }}
+        onCancel={() => setSessionConflictValues(null)}
+        centered
+      >
+        <p>This account already has an active session.</p>
+        <p>
+          Continuing will end the previous session for this account before
+          signing in here.
+        </p>
+        <p>Do you want to continue?</p>
+      </Modal>
     </main>
   );
 }

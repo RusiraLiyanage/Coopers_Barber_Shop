@@ -230,6 +230,24 @@ export class SessionService {
       .execute();
   }
 
+  async hasActiveUserSession(userId: string, now = new Date()): Promise<boolean> {
+    const idleCutoff = new Date(
+      now.getTime() -
+        (this.getSessionIdleTimeoutMs() + this.getSessionExtensionGraceMs()),
+    );
+    const count = await this.sessionsRepo
+      .createQueryBuilder('session')
+      .where('session.user_id = :userId', { userId })
+      .andWhere('session.revoked_at IS NULL')
+      .andWhere('session.expires_at > :now', { now })
+      .andWhere('COALESCE(session.last_used_at, session.created_at) > :idleCutoff', {
+        idleCutoff,
+      })
+      .getCount();
+
+    return count > 0;
+  }
+
   async revokeExpiredSessions(now = new Date()): Promise<number> {
     const idleCutoff = new Date(
       now.getTime() -

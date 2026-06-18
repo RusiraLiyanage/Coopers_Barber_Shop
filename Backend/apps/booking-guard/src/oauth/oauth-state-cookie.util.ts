@@ -7,6 +7,7 @@ const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
 const OAUTH_LINK_TTL_MS = 10 * 60 * 1000;
 const GOOGLE_CALLBACK_PATH = '/auth/google/callback';
 const GOOGLE_LINK_PATH = '/auth/google/link';
+const GOOGLE_SESSION_SWITCH_PATH = '/auth/google/session-switch';
 
 type OAuthCookieOptions = {
   httpOnly: boolean;
@@ -83,12 +84,27 @@ export function setGoogleOAuthLinkCookie(
   );
 }
 
+export function setGoogleOAuthSessionSwitchCookie(
+  response: OAuthStateCookieResponse,
+  linkTicket: string,
+): void {
+  response.cookie(
+    GOOGLE_OAUTH_LINK_COOKIE,
+    linkTicket,
+    createCookieOptions(GOOGLE_SESSION_SWITCH_PATH, OAUTH_LINK_TTL_MS),
+  );
+}
+
 export function clearGoogleOAuthLinkCookie(
   response: OAuthStateCookieResponse,
 ): void {
   response.clearCookie(
     GOOGLE_OAUTH_LINK_COOKIE,
     createCookieOptions(GOOGLE_LINK_PATH),
+  );
+  response.clearCookie(
+    GOOGLE_OAUTH_LINK_COOKIE,
+    createCookieOptions(GOOGLE_SESSION_SWITCH_PATH),
   );
 }
 

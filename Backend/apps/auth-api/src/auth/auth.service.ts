@@ -20,6 +20,7 @@ import { RegisterDto } from './dto/register.dto';
 import {
   AuthenticatedUser,
   AuthTokensResponse,
+  ACTIVE_ACCOUNT_SESSION_EXISTS_CODE,
   EmailService,
   JwtTokenService,
   LogoutResponse,
@@ -64,10 +65,15 @@ export type PasswordResetConfirmResponse = {
 // account, asks the caller to confirm ownership with a password before linking.
 export type GoogleOAuthCompletionResult =
   | { status: 'authenticated'; tokens: AuthTokensResponse }
-  | { status: 'link_required'; linkTicket: string };
+  | { status: 'link_required'; linkTicket: string }
+  | { status: 'session_switch_required'; linkTicket: string; email: string };
 
 const DEFAULT_PASSWORD_RESET_TTL_MINUTES = 10;
 const DEFAULT_PASSWORD_RESET_MAX_ATTEMPTS = 5;
+
+type CreateSessionOptions = {
+  endExistingSessions?: boolean;
+};
 
 function toAccountProfile(user: User): AccountProfileResponse {
   return {
@@ -125,8 +131,11 @@ export class AuthService {
     };
   }
 
-  async login(user: AuthenticatedUser): Promise<AuthTokensResponse> {
-    return this.createSessionTokens(user);
+  async login(
+    user: AuthenticatedUser,
+    options: CreateSessionOptions = {},
+  ): Promise<AuthTokensResponse> {
+    return this.createSessionTokens(user, options);
   }
 
   async register(dto: RegisterDto): Promise<AuthTokensResponse> {
@@ -148,11 +157,14 @@ export class AuthService {
       role: UserRole.CUSTOMER,
     });
 
-    return this.login({
-      id: user.id,
-      email: user.email,
-      role: user.role,
-    });
+    return this.createSessionTokens(
+      {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      },
+      { endExistingSessions: true },
+    );
   }
 
   async completeGoogleOAuthLogin(
@@ -181,6 +193,19 @@ export class AuthService {
 
     if (existingIdentity) {
       await this.syncIdentityEmail(existingIdentity, email);
+
+      if (await this.sessionService.hasActiveUserSession(existingIdentity.user.id)) {
+        return {
+          status: 'session_switch_required',
+          linkTicket: this.oauthLinkTicketService.sign({
+            provider: OAuthProvider.GOOGLE,
+            providerUserId,
+            email,
+            userId: existingIdentity.user.id,
+          }),
+          email,
+        };
+      }
 
       return this.authenticated(existingIdentity.user);
     }
@@ -217,9 +242,7 @@ export class AuthService {
     return this.authenticated(user);
   }
 
-  async linkGoogleOAuthIdentity(
-    dto: LinkGoogleOAuthDto,
-  ): Promise<AuthTokensResponse> {
+  async linkGoogleOAuthIdentity(dto: LinkGoogleOAuthDto): Promise<AuthTokensResponse> {
     const claims = this.oauthLinkTicketService.verify(dto.linkTicket);
     const user = await this.usersService.findById(claims.userId);
 
@@ -240,7 +263,40 @@ export class AuthService {
 
     await this.linkGoogleIdentity(user, claims.providerUserId, claims.email);
 
-    return this.createSessionTokens(this.toAuthenticatedUser(user));
+    return this.createSessionTokens(this.toAuthenticatedUser(user), {
+      endExistingSessions: dto.endExistingSessions,
+    });
+  }
+
+  async completeGoogleOAuthSessionSwitch(
+    linkTicket: string,
+  ): Promise<AuthTokensResponse> {
+    const claims = this.oauthLinkTicketService.verify(linkTicket);
+    const user = await this.usersService.findById(claims.userId);
+
+    if (!user || this.normalizeEmail(user.email) !== claims.email) {
+      throw new UnauthorizedException(
+        'Google session switch request is no longer valid.',
+      );
+    }
+
+    const identity = await this.oauthIdentitiesRepo.findOne({
+      where: {
+        userId: user.id,
+        provider: OAuthProvider.GOOGLE,
+        providerUserId: claims.providerUserId,
+      },
+    });
+
+    if (!identity) {
+      throw new UnauthorizedException(
+        'Google session switch request is no longer valid.',
+      );
+    }
+
+    return this.createSessionTokens(this.toAuthenticatedUser(user), {
+      endExistingSessions: true,
+    });
   }
 
   async refresh(refreshToken: string): Promise<AuthTokensResponse> {
@@ -352,7 +408,19 @@ export class AuthService {
 
   private async createSessionTokens(
     user: AuthenticatedUser,
+    options: CreateSessionOptions = {},
   ): Promise<AuthTokensResponse> {
+    if (await this.sessionService.hasActiveUserSession(user.id)) {
+      if (!options.endExistingSessions) {
+        throw new ConflictException({
+          code: ACTIVE_ACCOUNT_SESSION_EXISTS_CODE,
+          message: 'This account already has an active session.',
+        });
+      }
+
+      await this.sessionService.revokeUserSessions(user.id);
+    }
+
     const refreshToken = this.jwtTokenService.generateRefreshToken();
 
     const session = await this.sessionService.createSession({

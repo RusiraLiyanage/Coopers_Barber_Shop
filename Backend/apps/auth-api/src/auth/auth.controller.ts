@@ -32,6 +32,7 @@ import { VerifyPasswordResetCodeDto } from './dto/verify-password-reset-code.dto
 import { ConfirmPasswordResetDto } from './dto/confirm-password-reset.dto';
 import { CompleteGoogleOAuthDto } from './dto/complete-google-oauth.dto';
 import { LinkGoogleOAuthDto } from './dto/link-google-oauth.dto';
+import { GoogleSessionSwitchDto } from './dto/google-session-switch.dto';
 import type {
   GoogleOAuthCompletionResult,
   PasswordResetConfirmResponse,
@@ -48,8 +49,13 @@ export class AuthController {
   @ApiBody({ type: LoginDto })
   @UseGuards(LocalAuthGuard)
   @Post('login')
-  login(@Request() req: AuthenticatedRequest): Promise<AuthTokensResponse> {
-    return this.authService.login(req.user);
+  login(
+    @Request() req: AuthenticatedRequest,
+    @Body() dto: LoginDto,
+  ): Promise<AuthTokensResponse> {
+    return this.authService.login(req.user, {
+      endExistingSessions: dto.endExistingSessions,
+    });
   }
 
   @ApiOperation({ summary: 'Register a new customer account' })
@@ -81,6 +87,18 @@ export class AuthController {
     @Body() dto: LinkGoogleOAuthDto,
   ): Promise<AuthTokensResponse> {
     return this.authService.linkGoogleOAuthIdentity(dto);
+  }
+
+  @ApiOperation({
+    summary: 'Complete Google OAuth login after active session confirmation',
+  })
+  @ApiBody({ type: GoogleSessionSwitchDto })
+  @HttpCode(200)
+  @Post('oauth/google/session-switch')
+  completeGoogleOAuthSessionSwitch(
+    @Body() dto: GoogleSessionSwitchDto,
+  ): Promise<AuthTokensResponse> {
+    return this.authService.completeGoogleOAuthSessionSwitch(dto.linkTicket);
   }
 
   @ApiOperation({ summary: 'Refresh access and refresh tokens' })

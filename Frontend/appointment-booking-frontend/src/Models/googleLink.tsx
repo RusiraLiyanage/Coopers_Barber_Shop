@@ -1,6 +1,7 @@
 import { Alert, Button, Form, Input, Modal, message } from 'antd';
 import { useState } from 'react';
 import {
+  ACTIVE_ACCOUNT_SESSION_EXISTS_CODE,
   ApiRequestError,
   linkGoogleAccount,
   toAuthSession,
@@ -29,9 +30,14 @@ export default function GoogleLinkModal({
 }: GoogleLinkModalProps) {
   const [form] = Form.useForm<FieldType>();
   const [confirmLoading, setConfirmLoading] = useState(false);
+  const [sessionConflictPassword, setSessionConflictPassword] =
+    useState<string | null>(null);
   const [messageApi, contextHolder] = message.useMessage();
 
-  const handleSubmit = async (values: FieldType) => {
+  const handleSubmit = async (
+    values: FieldType,
+    endExistingSessions = false,
+  ) => {
     if (!values.password) {
       return;
     }
@@ -39,11 +45,22 @@ export default function GoogleLinkModal({
     setConfirmLoading(true);
 
     try {
-      const response = await linkGoogleAccount(values.password);
+      const response = await linkGoogleAccount(values.password, {
+        endExistingSessions,
+      });
       messageApi.success('Google connected to your account.');
+      setSessionConflictPassword(null);
       form.resetFields();
       onLinked(toAuthSession(response));
     } catch (error) {
+      if (
+        error instanceof ApiRequestError &&
+        error.code === ACTIVE_ACCOUNT_SESSION_EXISTS_CODE
+      ) {
+        setSessionConflictPassword(values.password);
+        return;
+      }
+
       if (error instanceof ApiRequestError && error.statusCode === 401) {
         logDevelopmentError('Link Google', error);
         messageApi.error('Incorrect password. Please try again.');
@@ -116,6 +133,30 @@ export default function GoogleLinkModal({
             </Button>
           </Form>
         </div>
+      </Modal>
+      <Modal
+        title="Active session found"
+        open={sessionConflictPassword !== null}
+        okText="End previous session"
+        cancelText="Cancel"
+        confirmLoading={confirmLoading}
+        onOk={() => {
+          if (sessionConflictPassword) {
+            void handleSubmit(
+              { password: sessionConflictPassword },
+              true,
+            );
+          }
+        }}
+        onCancel={() => setSessionConflictPassword(null)}
+        centered
+      >
+        <p>This account already has an active session.</p>
+        <p>
+          Continuing will end the previous session for this account before
+          signing in with Google here.
+        </p>
+        <p>Do you want to continue?</p>
       </Modal>
     </>
   );

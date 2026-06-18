@@ -20,6 +20,7 @@ export type LoginPayload = {
   email: string;
   password: string;
   remember: boolean;
+  endExistingSessions?: boolean;
 };
 
 export type LogoutResponse = {

@@ -36,11 +36,13 @@ type LoginRequestBody = {
   email: string;
   password: string;
   remember?: boolean;
+  endExistingSessions?: boolean;
 };
 
 type AuthApiLoginRequestBody = {
   email: string;
   password: string;
+  endExistingSessions?: boolean;
 };
 
 type RegisterRequestBody = {
@@ -140,6 +142,7 @@ function createLoginAuthApiBody(
   return {
     email: body.email,
     password: body.password,
+    endExistingSessions: body.endExistingSessions,
   };
 }
 

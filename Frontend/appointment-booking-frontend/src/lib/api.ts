@@ -4,6 +4,8 @@ const AUTH_REMEMBERED_SESSION_KEY = "coopers_auth_remembered_session";
 const AUTH_HAD_SESSION_KEY = "coopers_auth_had_session";
 export const SESSION_IDLE_EXPIRED_CODE = "SESSION_IDLE_EXPIRED";
 export const SESSION_EXPIRED_CODE = "SESSION_EXPIRED";
+export const ACTIVE_ACCOUNT_SESSION_EXISTS_CODE =
+  "ACTIVE_ACCOUNT_SESSION_EXISTS";
 export const SESSION_IDLE_EXPIRED_EVENT = "coopers-session-idle-expired";
 export const SESSION_EXPIRED_EVENT = "coopers-session-expired";
 
@@ -164,6 +166,10 @@ export type RegisterPayload = {
   email: string;
   password: string;
   remember: boolean;
+};
+
+export type LoginOptions = {
+  endExistingSessions?: boolean;
 };
 
 export type UpdateAccountPayload = {
@@ -471,11 +477,21 @@ export async function extendSession() {
   return response;
 }
 
-export async function login(email: string, password: string, remember: boolean) {
+export async function login(
+  email: string,
+  password: string,
+  remember: boolean,
+  options: LoginOptions = {},
+) {
   const response = await request<AuthResponse>("/auth/login", {
     method: "POST",
     headers: buildHeaders(),
-    body: JSON.stringify({ email, password, remember }),
+    body: JSON.stringify({
+      email,
+      password,
+      remember,
+      endExistingSessions: options.endExistingSessions,
+    }),
   });
 
   if (response.authenticated) {
@@ -494,6 +510,10 @@ export interface GoogleLinkPrompt {
   email: string;
 }
 
+export interface GoogleSessionSwitchPrompt {
+  email: string;
+}
+
 export function readGoogleLinkPrompt(): GoogleLinkPrompt | null {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -508,11 +528,26 @@ export function readGoogleLinkPrompt(): GoogleLinkPrompt | null {
   }
 }
 
+export function readGoogleSessionSwitchPrompt(): GoogleSessionSwitchPrompt | null {
+  try {
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.get("switch_google") !== "1") {
+      return null;
+    }
+
+    return { email: params.get("email")?.trim() ?? "" };
+  } catch {
+    return null;
+  }
+}
+
 export function clearGoogleLinkPromptFromUrl(): void {
   try {
     const url = new URL(window.location.href);
 
     url.searchParams.delete("link_google");
+    url.searchParams.delete("switch_google");
     url.searchParams.delete("email");
     window.history.replaceState(
       {},
@@ -524,11 +559,31 @@ export function clearGoogleLinkPromptFromUrl(): void {
   }
 }
 
-export async function linkGoogleAccount(password: string) {
+export async function linkGoogleAccount(
+  password: string,
+  options: LoginOptions = {},
+) {
   const response = await request<AuthResponse>("/auth/google/link", {
     method: "POST",
     headers: buildHeaders(),
-    body: JSON.stringify({ password }),
+    body: JSON.stringify({
+      password,
+      endExistingSessions: options.endExistingSessions,
+    }),
+  });
+
+  if (response.authenticated) {
+    rememberClientAuthSession(true);
+  }
+
+  return response;
+}
+
+export async function completeGoogleSessionSwitch() {
+  const response = await request<AuthResponse>("/auth/google/session-switch", {
+    method: "POST",
+    headers: buildHeaders(),
+    body: JSON.stringify({}),
   });
 
   if (response.authenticated) {
@@ -559,6 +614,16 @@ export function logout() {
     method: "POST",
     headers: buildHeaders(),
     body: JSON.stringify({}),
+  });
+}
+
+export function logoutPreviousClientSession() {
+  return request<{ success: boolean }>("/auth/logout", {
+    method: "POST",
+    headers: buildHeaders(),
+    body: JSON.stringify({}),
+  }).finally(() => {
+    clearClientAuthSession();
   });
 }
 

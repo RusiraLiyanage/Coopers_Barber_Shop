@@ -20,6 +20,7 @@ import type { OAuthAuthenticatedRequest } from './oauth.types';
 
 type GoogleLinkRequestBody = {
   password?: string;
+  endExistingSessions?: boolean;
 };
 
 @ApiTags('guard-oauth')
@@ -69,6 +70,21 @@ export class GoogleOAuthController {
   ): Promise<unknown> {
     return this.googleOAuthSessionService.linkGoogleAccount(
       body?.password,
+      body?.endExistingSessions,
+      cookieHeader,
+      response,
+    );
+  }
+
+  @ApiOperation({
+    summary: 'Confirm ending active sessions before Google OAuth login',
+  })
+  @Post('session-switch')
+  completeGoogleSessionSwitch(
+    @Headers('cookie') cookieHeader: string | undefined,
+    @Res({ passthrough: true }) response: GoogleLinkResponse,
+  ): Promise<unknown> {
+    return this.googleOAuthSessionService.completeGoogleSessionSwitch(
       cookieHeader,
       response,
     );

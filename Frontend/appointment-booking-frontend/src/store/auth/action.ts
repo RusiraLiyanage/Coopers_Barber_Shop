@@ -42,7 +42,8 @@ export const extendSessionAction = createAppAsyncThunk<AuthResponse>(
 
 export const loginAction = createAppAsyncThunk<AuthResponse, LoginPayload>(
   `${SLICE_NAME}/login`,
-  async ({ email, password, remember }) => login(email, password, remember),
+  async ({ email, password, remember, endExistingSessions }) =>
+    login(email, password, remember, { endExistingSessions }),
 );
 
 export const registerAction = createAppAsyncThunk<AuthResponse, RegisterPayload>(

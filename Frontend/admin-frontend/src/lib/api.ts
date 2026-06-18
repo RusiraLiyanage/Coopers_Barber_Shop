@@ -8,6 +8,8 @@ const DEFAULT_SESSION_IDLE_TIMEOUT_SECONDS = 300;
 const DEFAULT_SESSION_EXTENSION_GRACE_SECONDS = 300;
 export const SESSION_EXPIRED_CODE = 'SESSION_EXPIRED';
 export const SESSION_IDLE_EXPIRED_CODE = 'SESSION_IDLE_EXPIRED';
+export const ACTIVE_ACCOUNT_SESSION_EXISTS_CODE =
+  'ACTIVE_ACCOUNT_SESSION_EXISTS';
 export const SESSION_IDLE_EXPIRED_EVENT = 'coopers-admin-session-idle-expired';
 export const SESSION_EXPIRED_EVENT = 'coopers-admin-session-expired';
 
@@ -80,6 +82,7 @@ export type AdminLoginPayload = {
   email: string;
   password: string;
   remember?: boolean;
+  endExistingSessions?: boolean;
 };
 
 export interface BarberRecord {
@@ -700,6 +703,16 @@ export function logout() {
     method: 'POST',
     headers: buildHeaders(),
     body: JSON.stringify({}),
+  });
+}
+
+export function logoutPreviousAdminSession() {
+  return request<{ success: boolean }>('/admin-auth/logout', {
+    method: 'POST',
+    headers: buildHeaders(),
+    body: JSON.stringify({}),
+  }).finally(() => {
+    clearAdminAuthSession();
   });
 }
 

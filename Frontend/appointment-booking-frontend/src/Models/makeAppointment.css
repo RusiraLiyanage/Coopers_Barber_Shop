@@ -121,6 +121,33 @@
   gap: 3px;
 }
 
+.appointment-consultation-barber-profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.appointment-consultation-barber-avatar {
+  flex: 0 0 auto;
+  border: 2px solid #bfdbfe;
+  background:
+    radial-gradient(circle at 50% 30%, #f8fafc 0 30%, #dbeafe 31% 100%),
+    #eff6ff;
+  color: #2563eb;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.14);
+}
+
+.appointment-consultation-barber-details {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.appointment-consultation-barber-details strong {
+  color: #111827;
+  font-size: 17px;
+}
+
 .appointment-consultation-customer-note {
   margin: 12px 0;
   color: #4b5563;

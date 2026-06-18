@@ -1,5 +1,6 @@
 import {
   Alert,
+  Avatar,
   Button,
   Checkbox,
   DatePicker,
@@ -10,6 +11,7 @@ import {
   Spin,
   message,
 } from 'antd';
+import { UserOutlined } from '@ant-design/icons';
 import { useCallback, useEffect, useState, type ChangeEvent } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 import {
@@ -991,21 +993,34 @@ export default function MakeAppointmentModal({
                 ) : currentConsultationResult ? (
                   <div className="appointment-consultation-result">
                     <div>
-                      <span className="appointment-consultation-eyebrow">
-                        Recommended barber
-                      </span>
-                      <strong>
-                        {currentConsultationResult.matchedBarber.displayName}
-                      </strong>
-                      <span>
-                        Match score: {currentConsultationResult.matchScore}%
-                      </span>
-                      <span>
-                        Gender:{' '}
-                        {formatBarberGender(
-                          currentConsultationResult.matchedBarber.gender,
-                        )}
-                      </span>
+                      <div className="appointment-consultation-barber-profile">
+                        <Avatar
+                          size={72}
+                          icon={<UserOutlined />}
+                          className="appointment-consultation-barber-avatar"
+                        />
+                        <div className="appointment-consultation-barber-details">
+                          <span className="appointment-consultation-eyebrow">
+                            Recommended barber
+                          </span>
+                          <strong>
+                            {
+                              currentConsultationResult.matchedBarber
+                                .displayName
+                            }
+                          </strong>
+                          <span>
+                            Match score:{' '}
+                            {currentConsultationResult.matchScore}%
+                          </span>
+                          <span>
+                            Gender:{' '}
+                            {formatBarberGender(
+                              currentConsultationResult.matchedBarber.gender,
+                            )}
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
                     <p className="appointment-consultation-customer-note">

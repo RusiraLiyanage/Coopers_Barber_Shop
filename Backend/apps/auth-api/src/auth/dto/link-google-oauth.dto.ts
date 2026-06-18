@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class LinkGoogleOAuthDto {
   @ApiProperty({ description: 'Signed link ticket issued by the OAuth flow' })
@@ -11,4 +11,9 @@ export class LinkGoogleOAuthDto {
   @IsString()
   @IsNotEmpty()
   password!: string;
+
+  @ApiProperty({ example: false, required: false })
+  @IsOptional()
+  @IsBoolean()
+  endExistingSessions?: boolean;
 }
