@@ -6,6 +6,11 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Service } from '@coopers/entities';
+import {
+  PaginatedResult,
+  PagingMetaDto,
+  PagingReqDto,
+} from '../common/pagination.dto';
 import { CreateServiceDto } from './dto/create-service.dto';
 import { UpdateServiceAiConfigDto } from './dto/update-service-ai-config.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
@@ -57,12 +62,21 @@ export class AdminServicesService {
     return this.servicesRepository.save(service);
   }
 
-  findAll(): Promise<Service[]> {
-    return this.servicesRepository.find({
+  async findAll(
+    pagination: PagingReqDto = new PagingReqDto(),
+  ): Promise<PaginatedResult<Service>> {
+    const [services, totalItem] = await this.servicesRepository.findAndCount({
       order: {
         name: 'ASC',
       },
+      skip: pagination.skip,
+      take: pagination.take,
     });
+
+    return {
+      data: services,
+      pagingMeta: new PagingMetaDto(pagination, totalItem),
+    };
   }
 
   async findOne(id: string): Promise<Service> {

@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -18,6 +19,7 @@ import {
 import { Staff } from '@coopers/entities';
 import { AdminRoleGuard } from '../auth/guards/admin-role.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PaginatedResult, PagingReqDto } from '../common/pagination.dto';
 import { BarbersService, DeleteBarberResponse } from './barbers.service';
 import { CreateBarberDto } from './dto/create-barber.dto';
 import { UpdateBarberDto } from './dto/update-barber.dto';
@@ -31,8 +33,8 @@ export class BarbersController {
 
   @ApiOperation({ summary: 'List barber profiles' })
   @Get()
-  findAll(): Promise<Staff[]> {
-    return this.barbersService.findAll();
+  findAll(@Query() pagination: PagingReqDto): Promise<PaginatedResult<Staff>> {
+    return this.barbersService.findAll(pagination);
   }
 
   @ApiOperation({ summary: 'Get a barber profile' })

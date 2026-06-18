@@ -9,6 +9,11 @@ import type { ReferenceDataItemRecord, ReferenceDataState } from './types';
 
 const initialState: ReferenceDataState = {
   items: [],
+  pagingMeta: null,
+  pagingMetaByType: {
+    barber_capability: null,
+    safety_trigger: null,
+  },
   loading: false,
   saving: false,
   error: null,
@@ -41,7 +46,19 @@ const referenceDataSlice = createSlice({
         state.error = null;
       })
       .addCase(getReferenceDataAction.fulfilled, (state, action) => {
-        state.items = action.payload;
+        const type = action.meta.arg?.type;
+
+        if (type) {
+          state.items = [
+            ...state.items.filter((item) => item.type !== type),
+            ...action.payload.data,
+          ];
+          state.pagingMetaByType[type] = action.payload.pagingMeta;
+        } else {
+          state.items = action.payload.data;
+          state.pagingMeta = action.payload.pagingMeta;
+        }
+        state.pagingMeta = action.payload.pagingMeta;
         state.loading = false;
       })
       .addCase(getReferenceDataAction.rejected, (state, action) => {

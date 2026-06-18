@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Layout } from 'antd';
+import { Layout, Modal } from 'antd';
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import HeaderNav from './components/HeaderNav';
 import Home from './pages/HomePage';
@@ -63,6 +63,8 @@ function App() {
     useState<SessionTimeoutFlowState>('none');
   const [googleLinkPrompt, setGoogleLinkPrompt] =
     useState<GoogleLinkPrompt | null>(() => readGoogleLinkPrompt());
+  const [authSwitchPromptOpen, setAuthSwitchPromptOpen] = useState(false);
+  const [authSwitchLoading, setAuthSwitchLoading] = useState(false);
 
   const isAuthenticated = Boolean(authSession?.authenticated);
   const isSessionTimeoutPromptOpen = sessionTimeoutFlowState !== 'none';
@@ -160,6 +162,25 @@ function App() {
   ]);
 
   useEffect(() => {
+    if (
+      !authSessionResolved ||
+      !openAuthModal ||
+      !isAuthenticated ||
+      isSessionTimeoutPromptOpen
+    ) {
+      return;
+    }
+
+    setOpenAuthModal(false);
+    setAuthSwitchPromptOpen(true);
+  }, [
+    authSessionResolved,
+    isAuthenticated,
+    isSessionTimeoutPromptOpen,
+    openAuthModal,
+  ]);
+
+  useEffect(() => {
     // Strip the link markers from the URL once captured so a refresh or share
     // doesn't re-trigger the prompt; the httpOnly link ticket cookie still
     // drives the actual linking request.
@@ -219,6 +240,39 @@ function App() {
     void dispatch(logoutAction())
       .unwrap()
       .catch(() => undefined);
+  };
+
+  const requestAuthModal = () => {
+    if (isAuthenticated) {
+      setAuthSwitchPromptOpen(true);
+      return;
+    }
+
+    setOpenAuthModal(true);
+  };
+
+  const handleCancelAuthSwitch = () => {
+    setAuthSwitchPromptOpen(false);
+  };
+
+  const handleContinueAuthSwitch = async () => {
+    setAuthSwitchLoading(true);
+    setSessionTimeoutFlowState('none');
+    setAuthSession(null);
+    setEditingAppointment(null);
+    setOpenAppointmentModal(false);
+    dispatch(resetStore());
+    navigate('/');
+
+    try {
+      await dispatch(logoutAction()).unwrap();
+    } catch {
+      // Local state is already cleared; allow the user to continue signing in.
+    } finally {
+      setAuthSwitchLoading(false);
+      setAuthSwitchPromptOpen(false);
+      setOpenAuthModal(true);
+    }
   };
 
   const handleSessionTimeoutLogout = async () => {
@@ -331,7 +385,7 @@ function App() {
       <HeaderNav
         isAuthenticated={isAuthenticated}
         onLogout={handleLogout}
-        onOpenAuthModal={() => setOpenAuthModal(true)}
+        onOpenAuthModal={requestAuthModal}
         onOpenMyAccount={openMyAccountFlow}
         onOpenMyAppointments={openMyAppointmentsFlow}
         onOpenAppointmentModal={openBookingFlow}
@@ -418,6 +472,26 @@ function App() {
           navigate('/appointments');
         }}
       />
+
+      <Modal
+        title="Already signed in"
+        open={authSwitchPromptOpen}
+        okText="End previous session"
+        cancelText="Keep current session"
+        confirmLoading={authSwitchLoading}
+        onOk={() => {
+          void handleContinueAuthSwitch();
+        }}
+        onCancel={handleCancelAuthSwitch}
+        centered
+      >
+        <p>You are already signed in to this account.</p>
+        <p>
+          Continuing will end the previous session on this browser before you
+          sign in again.
+        </p>
+        <p>Do you want to continue?</p>
+      </Modal>
 
       <Footer className="app-footer">
         ©2025 Cooper's Barber Shop | All Rights Reserved

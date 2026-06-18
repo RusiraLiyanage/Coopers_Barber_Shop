@@ -1,31 +1,13 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
 import {
   IsBooleanString,
   IsDateString,
-  IsInt,
   IsOptional,
   IsUUID,
-  Max,
-  Min,
 } from 'class-validator';
+import { PagingReqDto } from '../../common/pagination.dto';
 
-export class BriefsQueryDto {
-  @ApiPropertyOptional({ example: 50 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  limit?: number;
-
-  @ApiPropertyOptional({ example: 0 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  offset?: number;
-
+export class BriefsQueryDto extends PagingReqDto {
   @ApiPropertyOptional({ example: '2026-06-14' })
   @IsOptional()
   @IsDateString()

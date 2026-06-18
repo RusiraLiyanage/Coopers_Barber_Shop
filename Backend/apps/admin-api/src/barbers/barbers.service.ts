@@ -11,6 +11,11 @@ import {
   StaffGender,
   StaffRole,
 } from '@coopers/entities';
+import {
+  PaginatedResult,
+  PagingMetaDto,
+  PagingReqDto,
+} from '../common/pagination.dto';
 import { CreateBarberDto } from './dto/create-barber.dto';
 import { UpdateBarberDto } from './dto/update-barber.dto';
 
@@ -73,14 +78,21 @@ export class BarbersService {
     private readonly appointmentRepository: Repository<Appointment>,
   ) {}
 
-  async findAll(): Promise<Staff[]> {
-    const staff = await this.staffRepository.find({
+  async findAll(
+    pagination: PagingReqDto = new PagingReqDto(),
+  ): Promise<PaginatedResult<Staff>> {
+    const [staff, totalItem] = await this.staffRepository.findAndCount({
       order: {
         displayName: 'ASC',
       },
+      skip: pagination.skip,
+      take: pagination.take,
     });
 
-    return staff.map(normalizeStaffResponse);
+    return {
+      data: staff.map(normalizeStaffResponse),
+      pagingMeta: new PagingMetaDto(pagination, totalItem),
+    };
   }
 
   async findOne(id: string): Promise<Staff> {

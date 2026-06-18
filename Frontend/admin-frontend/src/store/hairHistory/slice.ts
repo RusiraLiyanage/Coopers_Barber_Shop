@@ -4,6 +4,7 @@ import type { HairHistoryState } from './types';
 
 const initialState: HairHistoryState = {
   items: [],
+  pagingMeta: null,
   loading: false,
   error: null,
 };
@@ -19,7 +20,8 @@ const hairHistorySlice = createSlice({
         state.error = null;
       })
       .addCase(getHairHistoryAction.fulfilled, (state, action) => {
-        state.items = action.payload;
+        state.items = action.payload.data;
+        state.pagingMeta = action.payload.pagingMeta;
         state.loading = false;
       })
       .addCase(getHairHistoryAction.rejected, (state, action) => {

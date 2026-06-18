@@ -19,6 +19,7 @@ import {
 import { ReferenceDataItem, ReferenceDataType } from '@coopers/entities';
 import { AdminRoleGuard } from '../auth/guards/admin-role.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PaginatedResult } from '../common/pagination.dto';
 import { CreateReferenceDataItemDto } from './dto/create-reference-data-item.dto';
 import { ReferenceDataQueryDto } from './dto/reference-data-query.dto';
 import { UpdateReferenceDataItemDto } from './dto/update-reference-data-item.dto';
@@ -41,7 +42,9 @@ export class ReferenceDataController {
     enum: ReferenceDataType,
   })
   @Get()
-  findAll(@Query() query: ReferenceDataQueryDto): Promise<ReferenceDataItem[]> {
+  findAll(
+    @Query() query: ReferenceDataQueryDto,
+  ): Promise<PaginatedResult<ReferenceDataItem>> {
     return this.referenceDataService.findAll(query);
   }
 

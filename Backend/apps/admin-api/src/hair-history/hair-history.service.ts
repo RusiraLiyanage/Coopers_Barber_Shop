@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { HairHistory, Staff, User } from '@coopers/entities';
+import { PaginatedResult, PagingMetaDto } from '../common/pagination.dto';
 import { CreateHairHistoryDto } from './dto/create-hair-history.dto';
 import { HairHistoryQueryDto } from './dto/hair-history-query.dto';
 
@@ -24,17 +25,17 @@ export class HairHistoryService {
     private readonly staffRepository: Repository<Staff>,
   ) {}
 
-  findAll(query: HairHistoryQueryDto = {}): Promise<HairHistory[]> {
-    const limit = query.limit ?? 50;
-    const offset = query.offset ?? 0;
+  async findAll(
+    query: HairHistoryQueryDto = new HairHistoryQueryDto(),
+  ): Promise<PaginatedResult<HairHistory>> {
     const historyQuery = this.hairHistoryRepository
       .createQueryBuilder('history')
       .leftJoinAndSelect('history.client', 'client')
       .leftJoinAndSelect('history.barber', 'barber')
       .orderBy('history.visitDate', 'DESC')
       .addOrderBy('history.createdAt', 'DESC')
-      .take(limit)
-      .skip(offset);
+      .take(query.take)
+      .skip(query.skip);
 
     if (query.clientId) {
       historyQuery.andWhere('client.id = :clientId', {
@@ -60,7 +61,20 @@ export class HairHistoryService {
       });
     }
 
-    return historyQuery.getMany();
+    const [history, totalItem] = await historyQuery.getManyAndCount();
+
+    return {
+      data: history,
+      pagingMeta: new PagingMetaDto(query, totalItem),
+    };
+  }
+
+  async findAllRecords(
+    query: HairHistoryQueryDto = new HairHistoryQueryDto(),
+  ): Promise<HairHistory[]> {
+    const result = await this.findAll(query);
+
+    return result.data;
   }
 
   async create(

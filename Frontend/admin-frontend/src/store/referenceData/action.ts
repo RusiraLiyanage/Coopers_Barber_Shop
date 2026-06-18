@@ -5,7 +5,10 @@ import {
   updateReferenceDataItem,
   type CreateReferenceDataItemPayload,
   type DeleteReferenceDataItemResponse,
+  type PaginatedResponse,
+  type PaginationRequest,
   type ReferenceDataItemRecord,
+  type ReferenceDataType,
   type UpdateReferenceDataItemPayload,
 } from '../../lib/api';
 import { createAppAsyncThunk } from '../createAppAsyncThunk';
@@ -13,8 +16,11 @@ import { createAppAsyncThunk } from '../createAppAsyncThunk';
 const SLICE_NAME = 'referenceData';
 
 export const getReferenceDataAction = createAppAsyncThunk<
-  ReferenceDataItemRecord[]
->(`${SLICE_NAME}/getReferenceData`, async () => getReferenceData());
+  PaginatedResponse<ReferenceDataItemRecord>,
+  ({ type?: ReferenceDataType } & PaginationRequest) | undefined
+>(`${SLICE_NAME}/getReferenceData`, async (params) =>
+  getReferenceData(params?.type, params),
+);
 
 export const createReferenceDataItemAction = createAppAsyncThunk<
   ReferenceDataItemRecord,

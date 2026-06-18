@@ -3,6 +3,8 @@ import {
   getSafetyRules,
   updateSafetyRule,
   type CreateSafetyRulePayload,
+  type PaginatedResponse,
+  type PaginationRequest,
   type SafetyRuleRecord,
   type UpdateSafetyRulePayload,
 } from '../../lib/api';
@@ -10,9 +12,12 @@ import { createAppAsyncThunk } from '../createAppAsyncThunk';
 
 const SLICE_NAME = 'safetyRules';
 
-export const getSafetyRulesAction = createAppAsyncThunk<SafetyRuleRecord[]>(
+export const getSafetyRulesAction = createAppAsyncThunk<
+  PaginatedResponse<SafetyRuleRecord>,
+  PaginationRequest | undefined
+>(
   `${SLICE_NAME}/getSafetyRules`,
-  async () => getSafetyRules(),
+  async (pagination) => getSafetyRules(pagination),
 );
 
 export const createSafetyRuleAction = createAppAsyncThunk<

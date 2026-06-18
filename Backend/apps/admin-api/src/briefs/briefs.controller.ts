@@ -16,6 +16,7 @@ import {
 } from '@nestjs/swagger';
 import { AdminRoleGuard } from '../auth/guards/admin-role.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PaginatedResult } from '../common/pagination.dto';
 import { AppointmentBriefResponse, BriefsService } from './briefs.service';
 import { BriefsQueryDto } from './dto/briefs-query.dto';
 import { CreateBriefDto } from './dto/create-brief.dto';
@@ -29,7 +30,9 @@ export class BriefsController {
   @ApiOperation({ summary: 'List generated appointment briefs' })
   @UseGuards(JwtAuthGuard, AdminRoleGuard)
   @Get()
-  findAll(@Query() query: BriefsQueryDto): Promise<AppointmentBriefResponse[]> {
+  findAll(
+    @Query() query: BriefsQueryDto,
+  ): Promise<PaginatedResult<AppointmentBriefResponse>> {
     return this.briefsService.findAll(query);
   }
 

@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -16,6 +17,7 @@ import {
 import { Service } from '@coopers/entities';
 import { AdminRoleGuard } from '../auth/guards/admin-role.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PaginatedResult, PagingReqDto } from '../common/pagination.dto';
 import { AdminServicesService } from './admin-services.service';
 import { CreateServiceDto } from './dto/create-service.dto';
 import { UpdateServiceAiConfigDto } from './dto/update-service-ai-config.dto';
@@ -36,8 +38,10 @@ export class AdminServicesController {
 
   @ApiOperation({ summary: 'List services with AI configuration' })
   @Get()
-  findAll(): Promise<Service[]> {
-    return this.adminServicesService.findAll();
+  findAll(
+    @Query() pagination: PagingReqDto,
+  ): Promise<PaginatedResult<Service>> {
+    return this.adminServicesService.findAll(pagination);
   }
 
   @ApiOperation({ summary: 'Get service AI configuration' })

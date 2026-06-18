@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { ReferenceDataItem, ReferenceDataType } from '@coopers/entities';
 import { DataSource, Repository } from 'typeorm';
+import { PaginatedResult, PagingMetaDto } from '../common/pagination.dto';
 import { CreateReferenceDataItemDto } from './dto/create-reference-data-item.dto';
 import { ReferenceDataQueryDto } from './dto/reference-data-query.dto';
 import { UpdateReferenceDataItemDto } from './dto/update-reference-data-item.dto';
@@ -30,14 +31,23 @@ export class ReferenceDataService {
     private readonly dataSource: DataSource,
   ) {}
 
-  findAll(query: ReferenceDataQueryDto): Promise<ReferenceDataItem[]> {
-    return this.referenceDataRepository.find({
+  async findAll(
+    query: ReferenceDataQueryDto,
+  ): Promise<PaginatedResult<ReferenceDataItem>> {
+    const [items, totalItem] = await this.referenceDataRepository.findAndCount({
       where: query.type ? { type: query.type } : {},
       order: {
         type: 'ASC',
         label: 'ASC',
       },
+      skip: query.skip,
+      take: query.take,
     });
+
+    return {
+      data: items,
+      pagingMeta: new PagingMetaDto(query, totalItem),
+    };
   }
 
   async create(

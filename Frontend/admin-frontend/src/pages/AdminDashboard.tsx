@@ -44,17 +44,20 @@ import {
 import {
   selectBarbers,
   selectBarbersLoading,
+  selectBarbersPagingMeta,
   selectBarbersSaving,
 } from '../store/barbers/selector';
 import { getAppointmentBriefsAction } from '../store/briefs/action';
 import {
   selectAppointmentBriefs,
   selectAppointmentBriefsLoading,
+  selectAppointmentBriefsPagingMeta,
 } from '../store/briefs/selector';
 import { getHairHistoryAction } from '../store/hairHistory/action';
 import {
   selectHairHistory,
   selectHairHistoryLoading,
+  selectHairHistoryPagingMeta,
 } from '../store/hairHistory/selector';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
@@ -66,6 +69,7 @@ import {
 import {
   selectReferenceData,
   selectReferenceDataLoading,
+  selectReferenceDataPagingMetaByType,
   selectReferenceDataSaving,
 } from '../store/referenceData/selector';
 import {
@@ -76,6 +80,7 @@ import {
 import {
   selectSafetyRules,
   selectSafetyRulesLoading,
+  selectSafetyRulesPagingMeta,
   selectSafetyRulesSaving,
 } from '../store/safetyRules/selector';
 import {
@@ -86,6 +91,7 @@ import {
 import {
   selectServiceConfigs,
   selectServiceConfigsLoading,
+  selectServiceConfigsPagingMeta,
   selectServiceConfigsSaving,
 } from '../store/serviceConfigs/selector';
 import type {
@@ -180,6 +186,14 @@ const SEVERITY_OPTIONS = [
 
 const BOOTSTRAP_STAFF_ID = '11111111-1111-1111-1111-111111111111';
 const BOOTSTRAP_STAFF_NAME = 'Main Staff';
+const DEFAULT_TABLE_PAGE_SIZE = 8;
+const REFERENCE_TABLE_PAGE_SIZE = 6;
+
+type TablePage = {
+  page: number;
+  limit: number;
+};
+
 function toTitleCase(value: string | null | undefined): string {
   if (!value) {
     return 'Unknown';
@@ -480,6 +494,34 @@ export default function AdminDashboard() {
     useState<ReferenceDataType>('barber_capability');
   const [selectedBrief, setSelectedBrief] =
     useState<AppointmentBriefRecord | null>(null);
+  const [barbersPage, setBarbersPage] = useState<TablePage>({
+    page: 1,
+    limit: DEFAULT_TABLE_PAGE_SIZE,
+  });
+  const [servicesPage, setServicesPage] = useState<TablePage>({
+    page: 1,
+    limit: DEFAULT_TABLE_PAGE_SIZE,
+  });
+  const [safetyPage, setSafetyPage] = useState<TablePage>({
+    page: 1,
+    limit: DEFAULT_TABLE_PAGE_SIZE,
+  });
+  const [barberCapabilityPage, setBarberCapabilityPage] = useState<TablePage>({
+    page: 1,
+    limit: REFERENCE_TABLE_PAGE_SIZE,
+  });
+  const [safetyTriggerPage, setSafetyTriggerPage] = useState<TablePage>({
+    page: 1,
+    limit: REFERENCE_TABLE_PAGE_SIZE,
+  });
+  const [briefsPage, setBriefsPage] = useState<TablePage>({
+    page: 1,
+    limit: DEFAULT_TABLE_PAGE_SIZE,
+  });
+  const [hairHistoryPage, setHairHistoryPage] = useState<TablePage>({
+    page: 1,
+    limit: DEFAULT_TABLE_PAGE_SIZE,
+  });
   const watchedServiceName = Form.useWatch('name', serviceConfigForm);
 
   const barbers = useAppSelector(selectBarbers);
@@ -488,6 +530,19 @@ export default function AdminDashboard() {
   const safetyRules = useAppSelector(selectSafetyRules);
   const appointmentBriefs = useAppSelector(selectAppointmentBriefs);
   const hairHistory = useAppSelector(selectHairHistory);
+  const barberCapabilityPagingMeta = useAppSelector(
+    selectReferenceDataPagingMetaByType('barber_capability'),
+  );
+  const safetyTriggerPagingMeta = useAppSelector(
+    selectReferenceDataPagingMetaByType('safety_trigger'),
+  );
+  const barbersPagingMeta = useAppSelector(selectBarbersPagingMeta);
+  const serviceConfigsPagingMeta = useAppSelector(
+    selectServiceConfigsPagingMeta,
+  );
+  const safetyRulesPagingMeta = useAppSelector(selectSafetyRulesPagingMeta);
+  const briefsPagingMeta = useAppSelector(selectAppointmentBriefsPagingMeta);
+  const hairHistoryPagingMeta = useAppSelector(selectHairHistoryPagingMeta);
   const barbersLoading = useAppSelector(selectBarbersLoading);
   const referenceDataLoading = useAppSelector(selectReferenceDataLoading);
   const referenceDataSaving = useAppSelector(selectReferenceDataSaving);
@@ -638,17 +693,38 @@ export default function AdminDashboard() {
   const loadAdminData = useCallback(async () => {
     try {
       await Promise.all([
-        dispatch(getBarbersAction()).unwrap(),
-        dispatch(getReferenceDataAction()).unwrap(),
-        dispatch(getServiceConfigsAction()).unwrap(),
-        dispatch(getSafetyRulesAction()).unwrap(),
-        dispatch(getAppointmentBriefsAction()).unwrap(),
-        dispatch(getHairHistoryAction()).unwrap(),
+        dispatch(getBarbersAction(barbersPage)).unwrap(),
+        dispatch(
+          getReferenceDataAction({
+            type: 'barber_capability',
+            ...barberCapabilityPage,
+          }),
+        ).unwrap(),
+        dispatch(
+          getReferenceDataAction({
+            type: 'safety_trigger',
+            ...safetyTriggerPage,
+          }),
+        ).unwrap(),
+        dispatch(getServiceConfigsAction(servicesPage)).unwrap(),
+        dispatch(getSafetyRulesAction(safetyPage)).unwrap(),
+        dispatch(getAppointmentBriefsAction(briefsPage)).unwrap(),
+        dispatch(getHairHistoryAction(hairHistoryPage)).unwrap(),
       ]);
     } catch (error) {
       showRequestError(error);
     }
-  }, [dispatch, showRequestError]);
+  }, [
+    barberCapabilityPage,
+    barbersPage,
+    briefsPage,
+    dispatch,
+    hairHistoryPage,
+    safetyPage,
+    safetyTriggerPage,
+    servicesPage,
+    showRequestError,
+  ]);
 
   useEffect(() => {
     void loadAdminData();
@@ -838,6 +914,7 @@ export default function AdminDashboard() {
         await dispatch(createBarberAction(payload)).unwrap();
       }
 
+      await dispatch(getBarbersAction(barbersPage)).unwrap();
       messageApi.success('Barber profile saved.');
       setBarberModalOpen(false);
     } catch (error) {
@@ -848,6 +925,7 @@ export default function AdminDashboard() {
   const handleDeleteBarber = async (barber: BarberRecord) => {
     try {
       await dispatch(deleteBarberAction(barber.id)).unwrap();
+      await dispatch(getBarbersAction(barbersPage)).unwrap();
       messageApi.success(`${barber.displayName} deleted.`);
     } catch (error) {
       showRequestError(error);
@@ -878,6 +956,7 @@ export default function AdminDashboard() {
         await dispatch(createServiceConfigAction(payload)).unwrap();
       }
 
+      await dispatch(getServiceConfigsAction(servicesPage)).unwrap();
       messageApi.success('Service saved.');
       setServiceModalOpen(false);
     } catch (error) {
@@ -913,6 +992,7 @@ export default function AdminDashboard() {
         await dispatch(createSafetyRuleAction(payload)).unwrap();
       }
 
+      await dispatch(getSafetyRulesAction(safetyPage)).unwrap();
       messageApi.success('Safety rule saved.');
       setSafetyModalOpen(false);
     } catch (error) {
@@ -942,6 +1022,14 @@ export default function AdminDashboard() {
         ).unwrap();
       }
 
+      await dispatch(
+        getReferenceDataAction({
+          type: referenceDataType,
+          ...(referenceDataType === 'barber_capability'
+            ? barberCapabilityPage
+            : safetyTriggerPage),
+        }),
+      ).unwrap();
       messageApi.success('Reference data saved.');
       setReferenceDataModalOpen(false);
     } catch (error) {
@@ -954,6 +1042,14 @@ export default function AdminDashboard() {
   ) => {
     try {
       await dispatch(deleteReferenceDataItemAction(item.id)).unwrap();
+      await dispatch(
+        getReferenceDataAction({
+          type: item.type,
+          ...(item.type === 'barber_capability'
+            ? barberCapabilityPage
+            : safetyTriggerPage),
+        }),
+      ).unwrap();
       messageApi.success(`${item.label} deleted.`);
     } catch (error) {
       showRequestError(error);
@@ -1510,7 +1606,13 @@ export default function AdminDashboard() {
                   dataSource={visibleBarbers}
                   loading={barbersLoading}
                   scroll={{ x: 980 }}
-                  pagination={{ pageSize: 8 }}
+                  pagination={{
+                    current: barbersPagingMeta?.page ?? barbersPage.page,
+                    pageSize: barbersPagingMeta?.limit ?? barbersPage.limit,
+                    total: barbersPagingMeta?.totalItem ?? 0,
+                    showSizeChanger: false,
+                    onChange: (page, limit) => setBarbersPage({ page, limit }),
+                  }}
                   locale={{
                     emptyText: (
                       <Empty description="No AI-ready barbers yet. Add barber profiles manually to start matching clients." />
@@ -1571,7 +1673,14 @@ export default function AdminDashboard() {
                   dataSource={sortedServiceConfigs}
                   loading={serviceConfigsLoading}
                   scroll={{ x: 1040 }}
-                  pagination={{ pageSize: 8 }}
+                  pagination={{
+                    current: serviceConfigsPagingMeta?.page ?? servicesPage.page,
+                    pageSize:
+                      serviceConfigsPagingMeta?.limit ?? servicesPage.limit,
+                    total: serviceConfigsPagingMeta?.totalItem ?? 0,
+                    showSizeChanger: false,
+                    onChange: (page, limit) => setServicesPage({ page, limit }),
+                  }}
                   locale={{
                     emptyText: (
                       <Empty description="No booking services available yet." />
@@ -1619,7 +1728,18 @@ export default function AdminDashboard() {
                       columns={referenceDataColumns}
                       dataSource={barberCapabilityItems}
                       loading={referenceDataLoading}
-                      pagination={{ pageSize: 6 }}
+                      pagination={{
+                        current:
+                          barberCapabilityPagingMeta?.page ??
+                          barberCapabilityPage.page,
+                        pageSize:
+                          barberCapabilityPagingMeta?.limit ??
+                          barberCapabilityPage.limit,
+                        total: barberCapabilityPagingMeta?.totalItem ?? 0,
+                        showSizeChanger: false,
+                        onChange: (page, limit) =>
+                          setBarberCapabilityPage({ page, limit }),
+                      }}
                       locale={{
                         emptyText: (
                           <Empty description="No barber capabilities added yet." />
@@ -1652,7 +1772,18 @@ export default function AdminDashboard() {
                       columns={referenceDataColumns}
                       dataSource={safetyTriggerItems}
                       loading={referenceDataLoading}
-                      pagination={{ pageSize: 6 }}
+                      pagination={{
+                        current:
+                          safetyTriggerPagingMeta?.page ??
+                          safetyTriggerPage.page,
+                        pageSize:
+                          safetyTriggerPagingMeta?.limit ??
+                          safetyTriggerPage.limit,
+                        total: safetyTriggerPagingMeta?.totalItem ?? 0,
+                        showSizeChanger: false,
+                        onChange: (page, limit) =>
+                          setSafetyTriggerPage({ page, limit }),
+                      }}
                       locale={{
                         emptyText: (
                           <Empty description="No safety triggers added yet." />
@@ -1692,7 +1823,13 @@ export default function AdminDashboard() {
                   dataSource={safetyRules}
                   loading={safetyRulesLoading}
                   scroll={{ x: 900 }}
-                  pagination={{ pageSize: 8 }}
+                  pagination={{
+                    current: safetyRulesPagingMeta?.page ?? safetyPage.page,
+                    pageSize: safetyRulesPagingMeta?.limit ?? safetyPage.limit,
+                    total: safetyRulesPagingMeta?.totalItem ?? 0,
+                    showSizeChanger: false,
+                    onChange: (page, limit) => setSafetyPage({ page, limit }),
+                  }}
                   locale={{
                     emptyText: (
                       <Empty description="No safety rules yet. Add rules after configuring the services they apply to." />
@@ -1728,7 +1865,13 @@ export default function AdminDashboard() {
                     dataSource={appointmentBriefs}
                     loading={briefsLoading}
                     scroll={{ x: 980 }}
-                    pagination={{ pageSize: 8 }}
+                    pagination={{
+                      current: briefsPagingMeta?.page ?? briefsPage.page,
+                      pageSize: briefsPagingMeta?.limit ?? briefsPage.limit,
+                      total: briefsPagingMeta?.totalItem ?? 0,
+                      showSizeChanger: false,
+                      onChange: (page, limit) => setBriefsPage({ page, limit }),
+                    }}
                   />
                 )}
               </div>
@@ -1758,7 +1901,16 @@ export default function AdminDashboard() {
                     dataSource={hairHistory}
                     loading={hairHistoryLoading}
                     scroll={{ x: 1100 }}
-                    pagination={{ pageSize: 8 }}
+                    pagination={{
+                      current:
+                        hairHistoryPagingMeta?.page ?? hairHistoryPage.page,
+                      pageSize:
+                        hairHistoryPagingMeta?.limit ?? hairHistoryPage.limit,
+                      total: hairHistoryPagingMeta?.totalItem ?? 0,
+                      showSizeChanger: false,
+                      onChange: (page, limit) =>
+                        setHairHistoryPage({ page, limit }),
+                    }}
                   />
                 )}
               </div>

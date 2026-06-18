@@ -8,6 +8,7 @@ import type { SafetyRuleRecord, SafetyRulesState } from './types';
 
 const initialState: SafetyRulesState = {
   items: [],
+  pagingMeta: null,
   loading: false,
   saving: false,
   error: null,
@@ -38,7 +39,8 @@ const safetyRulesSlice = createSlice({
         state.error = null;
       })
       .addCase(getSafetyRulesAction.fulfilled, (state, action) => {
-        state.items = action.payload;
+        state.items = action.payload.data;
+        state.pagingMeta = action.payload.pagingMeta;
         state.loading = false;
       })
       .addCase(getSafetyRulesAction.rejected, (state, action) => {

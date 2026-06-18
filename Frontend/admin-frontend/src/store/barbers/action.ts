@@ -6,15 +6,20 @@ import {
   type BarberRecord,
   type CreateBarberPayload,
   type DeleteBarberResponse,
+  type PaginatedResponse,
+  type PaginationRequest,
   type UpdateBarberPayload,
 } from '../../lib/api';
 import { createAppAsyncThunk } from '../createAppAsyncThunk';
 
 const SLICE_NAME = 'barbers';
 
-export const getBarbersAction = createAppAsyncThunk<BarberRecord[]>(
+export const getBarbersAction = createAppAsyncThunk<
+  PaginatedResponse<BarberRecord>,
+  PaginationRequest | undefined
+>(
   `${SLICE_NAME}/getBarbers`,
-  async () => getBarbers(),
+  async (pagination) => getBarbers(pagination),
 );
 
 export const createBarberAction = createAppAsyncThunk<

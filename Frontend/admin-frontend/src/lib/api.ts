@@ -18,6 +18,25 @@ export type SafetyRuleSeverity = 'low' | 'medium' | 'high';
 export type UserRole = 'customer' | 'admin';
 export type ReferenceDataType = 'barber_capability' | 'safety_trigger';
 
+export interface PagingMeta {
+  page: number;
+  limit: number;
+  totalItem: number;
+  totalPage: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  pagingMeta: PagingMeta;
+}
+
+export type PaginationRequest = {
+  page?: number;
+  limit?: number;
+};
+
 type ApiErrorPayload = {
   message?: string | string[];
   code?: string;
@@ -287,6 +306,20 @@ function buildApiUrl(path: string): string {
   const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');
 
   return `${normalizedBaseUrl}${normalizedPath}`;
+}
+
+function buildQueryString(params: Record<string, string | number | undefined>) {
+  const query = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined) {
+      query.set(key, String(value));
+    }
+  });
+
+  const value = query.toString();
+
+  return value ? `?${value}` : '';
 }
 
 function toPositiveNumber(value: unknown, fallback: number): number {
@@ -670,13 +703,19 @@ export function logout() {
   });
 }
 
-export function getBarbers() {
-  return request<BarberRecord[]>('/admin/barbers', {
-    headers: buildHeaders(),
-  }).then((barbers) => {
+export function getBarbers(pagination: PaginationRequest = {}) {
+  return request<PaginatedResponse<BarberRecord>>(
+    `/admin/barbers${buildQueryString(pagination)}`,
+    {
+      headers: buildHeaders(),
+    },
+  ).then((response) => {
     recordAdminSessionActivity();
 
-    return barbers.map(normalizeBarberRecord);
+    return {
+      ...response,
+      data: response.data.map(normalizeBarberRecord),
+    };
   });
 }
 
@@ -715,10 +754,13 @@ export function deleteBarber(id: string) {
   });
 }
 
-export function getServiceAiConfigs() {
-  return request<ServiceAiConfigRecord[]>('/admin/services', {
-    headers: buildHeaders(),
-  }).then((response) => {
+export function getServiceAiConfigs(pagination: PaginationRequest = {}) {
+  return request<PaginatedResponse<ServiceAiConfigRecord>>(
+    `/admin/services${buildQueryString(pagination)}`,
+    {
+      headers: buildHeaders(),
+    },
+  ).then((response) => {
     recordAdminSessionActivity();
 
     return response;
@@ -764,10 +806,13 @@ export function updateServiceAiConfig(
   });
 }
 
-export function getSafetyRules() {
-  return request<SafetyRuleRecord[]>('/admin/safety-rules', {
-    headers: buildHeaders(),
-  }).then((response) => {
+export function getSafetyRules(pagination: PaginationRequest = {}) {
+  return request<PaginatedResponse<SafetyRuleRecord>>(
+    `/admin/safety-rules${buildQueryString(pagination)}`,
+    {
+      headers: buildHeaders(),
+    },
+  ).then((response) => {
     recordAdminSessionActivity();
 
     return response;
@@ -798,12 +843,18 @@ export function updateSafetyRule(id: string, payload: UpdateSafetyRulePayload) {
   });
 }
 
-export function getReferenceData(type?: ReferenceDataType) {
-  const query = type ? `?type=${encodeURIComponent(type)}` : '';
+export function getReferenceData(
+  type?: ReferenceDataType,
+  pagination: PaginationRequest = {},
+) {
+  const query = buildQueryString({ type, ...pagination });
 
-  return request<ReferenceDataItemRecord[]>(`/admin/reference-data${query}`, {
-    headers: buildHeaders(),
-  }).then((response) => {
+  return request<PaginatedResponse<ReferenceDataItemRecord>>(
+    `/admin/reference-data${query}`,
+    {
+      headers: buildHeaders(),
+    },
+  ).then((response) => {
     recordAdminSessionActivity();
 
     return response;
@@ -851,20 +902,26 @@ export function deleteReferenceDataItem(id: string) {
   });
 }
 
-export function getAppointmentBriefs() {
-  return request<AppointmentBriefRecord[]>('/admin/briefs', {
-    headers: buildHeaders(),
-  }).then((response) => {
+export function getAppointmentBriefs(pagination: PaginationRequest = {}) {
+  return request<PaginatedResponse<AppointmentBriefRecord>>(
+    `/admin/briefs${buildQueryString(pagination)}`,
+    {
+      headers: buildHeaders(),
+    },
+  ).then((response) => {
     recordAdminSessionActivity();
 
     return response;
   });
 }
 
-export function getHairHistory() {
-  return request<HairHistoryRecord[]>('/admin/hair-history', {
-    headers: buildHeaders(),
-  }).then((response) => {
+export function getHairHistory(pagination: PaginationRequest = {}) {
+  return request<PaginatedResponse<HairHistoryRecord>>(
+    `/admin/hair-history${buildQueryString(pagination)}`,
+    {
+      headers: buildHeaders(),
+    },
+  ).then((response) => {
     recordAdminSessionActivity();
 
     return response;

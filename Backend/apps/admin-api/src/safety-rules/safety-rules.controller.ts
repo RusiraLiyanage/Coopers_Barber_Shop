@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -16,6 +17,7 @@ import {
 import { SafetyRule } from '@coopers/entities';
 import { AdminRoleGuard } from '../auth/guards/admin-role.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PaginatedResult, PagingReqDto } from '../common/pagination.dto';
 import { CreateSafetyRuleDto } from './dto/create-safety-rule.dto';
 import { UpdateSafetyRuleDto } from './dto/update-safety-rule.dto';
 import { SafetyRulesService } from './safety-rules.service';
@@ -29,8 +31,10 @@ export class SafetyRulesController {
 
   @ApiOperation({ summary: 'List safety rules' })
   @Get()
-  findAll(): Promise<SafetyRule[]> {
-    return this.safetyRulesService.findAll();
+  findAll(
+    @Query() pagination: PagingReqDto,
+  ): Promise<PaginatedResult<SafetyRule>> {
+    return this.safetyRulesService.findAll(pagination);
   }
 
   @ApiOperation({ summary: 'Get a safety rule' })

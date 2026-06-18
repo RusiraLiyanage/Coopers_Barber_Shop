@@ -1,5 +1,6 @@
 import type {
   CreateServicePayload,
+  PagingMeta,
   ServiceAiConfigRecord,
   UpdateServicePayload,
 } from '../../lib/api';
@@ -12,6 +13,7 @@ export type {
 
 export type ServiceConfigsState = {
   items: ServiceAiConfigRecord[];
+  pagingMeta: PagingMeta | null;
   loading: boolean;
   saving: boolean;
   error: string | null;

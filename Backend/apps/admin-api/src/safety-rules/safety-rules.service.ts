@@ -2,6 +2,11 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SafetyRule } from '@coopers/entities';
+import {
+  PaginatedResult,
+  PagingMetaDto,
+  PagingReqDto,
+} from '../common/pagination.dto';
 import { CreateSafetyRuleDto } from './dto/create-safety-rule.dto';
 import { UpdateSafetyRuleDto } from './dto/update-safety-rule.dto';
 
@@ -24,12 +29,21 @@ export class SafetyRulesService {
     private readonly safetyRuleRepository: Repository<SafetyRule>,
   ) {}
 
-  findAll(): Promise<SafetyRule[]> {
-    return this.safetyRuleRepository.find({
+  async findAll(
+    pagination: PagingReqDto = new PagingReqDto(),
+  ): Promise<PaginatedResult<SafetyRule>> {
+    const [rules, totalItem] = await this.safetyRuleRepository.findAndCount({
       order: {
         createdAt: 'DESC',
       },
+      skip: pagination.skip,
+      take: pagination.take,
     });
+
+    return {
+      data: rules,
+      pagingMeta: new PagingMetaDto(pagination, totalItem),
+    };
   }
 
   async findOne(id: string): Promise<SafetyRule> {

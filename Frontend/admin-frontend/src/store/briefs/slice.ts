@@ -4,6 +4,7 @@ import type { BriefsState } from './types';
 
 const initialState: BriefsState = {
   items: [],
+  pagingMeta: null,
   loading: false,
   error: null,
 };
@@ -19,7 +20,8 @@ const briefsSlice = createSlice({
         state.error = null;
       })
       .addCase(getAppointmentBriefsAction.fulfilled, (state, action) => {
-        state.items = action.payload;
+        state.items = action.payload.data;
+        state.pagingMeta = action.payload.pagingMeta;
         state.loading = false;
       })
       .addCase(getAppointmentBriefsAction.rejected, (state, action) => {

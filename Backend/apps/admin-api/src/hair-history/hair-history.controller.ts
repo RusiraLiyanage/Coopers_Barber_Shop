@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { HairHistory } from '@coopers/entities';
 import { AdminRoleGuard } from '../auth/guards/admin-role.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PaginatedResult } from '../common/pagination.dto';
 import { CreateHairHistoryDto } from './dto/create-hair-history.dto';
 import { HairHistoryQueryDto } from './dto/hair-history-query.dto';
 import { HairHistoryService } from './hair-history.service';
@@ -16,7 +17,9 @@ export class HairHistoryController {
   @ApiOperation({ summary: 'List client hair history records' })
   @UseGuards(JwtAuthGuard, AdminRoleGuard)
   @Get()
-  findAll(@Query() query: HairHistoryQueryDto): Promise<HairHistory[]> {
+  findAll(
+    @Query() query: HairHistoryQueryDto,
+  ): Promise<PaginatedResult<HairHistory>> {
     return this.hairHistoryService.findAll(query);
   }
 
@@ -44,6 +47,6 @@ export class HairHistoryController {
   @ApiOperation({ summary: 'Read client hair history from an internal agent' })
   @Get('internal')
   findAllInternal(@Query() query: HairHistoryQueryDto): Promise<HairHistory[]> {
-    return this.hairHistoryService.findAll(query);
+    return this.hairHistoryService.findAllRecords(query);
   }
 }

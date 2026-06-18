@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Appointment, AppointmentBrief, Staff } from '@coopers/entities';
+import { PaginatedResult, PagingMetaDto } from '../common/pagination.dto';
 import { BriefsQueryDto } from './dto/briefs-query.dto';
 import { CreateBriefDto } from './dto/create-brief.dto';
 
@@ -112,10 +113,8 @@ export class BriefsService {
   }
 
   async findAll(
-    query: BriefsQueryDto = {},
-  ): Promise<AppointmentBriefResponse[]> {
-    const limit = query.limit ?? 50;
-    const offset = query.offset ?? 0;
+    query: BriefsQueryDto = new BriefsQueryDto(),
+  ): Promise<PaginatedResult<AppointmentBriefResponse>> {
     const briefsQuery = this.appointmentBriefRepository
       .createQueryBuilder('brief')
       .leftJoinAndSelect('brief.booking', 'booking')
@@ -124,8 +123,8 @@ export class BriefsService {
       .leftJoinAndSelect('booking.staff', 'bookingStaff')
       .leftJoinAndSelect('brief.barber', 'barber')
       .orderBy('brief.generatedAt', 'DESC')
-      .take(limit)
-      .skip(offset);
+      .take(query.take)
+      .skip(query.skip);
 
     if (query.barberId) {
       briefsQuery.andWhere('barber.id = :barberId', {
@@ -147,9 +146,12 @@ export class BriefsService {
       briefsQuery.andWhere('brief.safetyNotes IS NULL');
     }
 
-    const briefs = await briefsQuery.getMany();
+    const [briefs, totalItem] = await briefsQuery.getManyAndCount();
 
-    return briefs.map((brief) => this.toBriefResponse(brief));
+    return {
+      data: briefs.map((brief) => this.toBriefResponse(brief)),
+      pagingMeta: new PagingMetaDto(query, totalItem),
+    };
   }
 
   async findOne(id: string): Promise<AppointmentBriefResponse> {

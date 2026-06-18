@@ -8,6 +8,7 @@ import type { ServiceAiConfigRecord, ServiceConfigsState } from './types';
 
 const initialState: ServiceConfigsState = {
   items: [],
+  pagingMeta: null,
   loading: false,
   saving: false,
   error: null,
@@ -38,7 +39,8 @@ const serviceConfigsSlice = createSlice({
         state.error = null;
       })
       .addCase(getServiceConfigsAction.fulfilled, (state, action) => {
-        state.items = action.payload;
+        state.items = action.payload.data;
+        state.pagingMeta = action.payload.pagingMeta;
         state.loading = false;
       })
       .addCase(getServiceConfigsAction.rejected, (state, action) => {

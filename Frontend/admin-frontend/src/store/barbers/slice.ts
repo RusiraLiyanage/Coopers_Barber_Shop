@@ -9,6 +9,7 @@ import type { BarberRecord, BarbersState } from './types';
 
 const initialState: BarbersState = {
   items: [],
+  pagingMeta: null,
   loading: false,
   saving: false,
   error: null,
@@ -36,7 +37,8 @@ const barbersSlice = createSlice({
         state.error = null;
       })
       .addCase(getBarbersAction.fulfilled, (state, action) => {
-        state.items = action.payload;
+        state.items = action.payload.data;
+        state.pagingMeta = action.payload.pagingMeta;
         state.loading = false;
       })
       .addCase(getBarbersAction.rejected, (state, action) => {

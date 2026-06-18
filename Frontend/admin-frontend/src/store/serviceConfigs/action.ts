@@ -3,6 +3,8 @@ import {
   getServiceAiConfigs,
   updateService,
   type CreateServicePayload,
+  type PaginatedResponse,
+  type PaginationRequest,
   type ServiceAiConfigRecord,
   type UpdateServicePayload,
 } from '../../lib/api';
@@ -11,8 +13,11 @@ import { createAppAsyncThunk } from '../createAppAsyncThunk';
 const SLICE_NAME = 'serviceConfigs';
 
 export const getServiceConfigsAction = createAppAsyncThunk<
-  ServiceAiConfigRecord[]
->(`${SLICE_NAME}/getServiceConfigs`, async () => getServiceAiConfigs());
+  PaginatedResponse<ServiceAiConfigRecord>,
+  PaginationRequest | undefined
+>(`${SLICE_NAME}/getServiceConfigs`, async (pagination) =>
+  getServiceAiConfigs(pagination),
+);
 
 export const createServiceConfigAction = createAppAsyncThunk<
   ServiceAiConfigRecord,
