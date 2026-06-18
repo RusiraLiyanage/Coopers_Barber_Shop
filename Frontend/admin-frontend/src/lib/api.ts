@@ -12,6 +12,7 @@ export const SESSION_IDLE_EXPIRED_EVENT = 'coopers-admin-session-idle-expired';
 export const SESSION_EXPIRED_EVENT = 'coopers-admin-session-expired';
 
 export type StaffRole = 'junior' | 'senior' | 'owner';
+export type StaffGender = 'male' | 'female' | 'non_binary' | 'unspecified';
 export type ServiceComplexity = 'low' | 'medium' | 'high';
 export type SafetyRuleSeverity = 'low' | 'medium' | 'high';
 export type UserRole = 'customer' | 'admin';
@@ -66,6 +67,7 @@ export interface BarberRecord {
   id: string;
   displayName: string;
   email: string | null;
+  gender: StaffGender;
   role: StaffRole;
   timezone: string;
   bufferAfterMinutes: number;
@@ -145,6 +147,12 @@ export interface AppointmentBriefRecord {
   safetyNotes: string | null;
   hairState: string[];
   desiredLook: string | null;
+  goalPhoto: {
+    mediaType: 'image/jpeg' | 'image/png' | 'image/webp';
+    data: string;
+  } | null;
+  generationSource: 'claude' | 'fallback';
+  generationModel: string | null;
   generatedAt: string;
 }
 
@@ -163,6 +171,7 @@ export interface HairHistoryRecord {
 export type CreateBarberPayload = {
   displayName: string;
   email?: string;
+  gender?: StaffGender;
   role?: StaffRole;
   timezone?: string;
   skills?: string[];
@@ -590,6 +599,7 @@ function toFiniteNumber(value: unknown, fallback = 0): number {
 function normalizeBarberRecord(barber: BarberRecord): BarberRecord {
   return {
     ...barber,
+    gender: barber.gender ?? 'unspecified',
     role: barber.role ?? 'junior',
     timezone: barber.timezone ?? 'Australia/Sydney',
     skills: Array.isArray(barber.skills) ? barber.skills : [],

@@ -14,6 +14,47 @@ interface HomePageProps {
   onMakeAppointment: () => void;
 }
 
+function getServiceEmoji(serviceName: string) {
+  const normalizedName = serviceName.toLowerCase();
+
+  if (normalizedName.includes('colour correction')) {
+    return '🎨';
+  }
+
+  if (
+    normalizedName.includes('color') ||
+    normalizedName.includes('colour') ||
+    normalizedName.includes('bleach')
+  ) {
+    return '🌈';
+  }
+
+  if (normalizedName.includes('beard') || normalizedName.includes('shave')) {
+    return '🧔';
+  }
+
+  if (normalizedName.includes('styling') || normalizedName.includes('style')) {
+    return '💈';
+  }
+
+  if (
+    normalizedName.includes('conditioning') ||
+    normalizedName.includes('treatment')
+  ) {
+    return '✨';
+  }
+
+  if (normalizedName.includes('consultation')) {
+    return '📝';
+  }
+
+  if (normalizedName.includes('cut') || normalizedName.includes('trim')) {
+    return '✂️';
+  }
+
+  return '💇';
+}
+
 const HomePage: React.FC<HomePageProps> = ({ onMakeAppointment }) => {
   const dispatch = useAppDispatch();
   const [messageApi, contextHolder] = message.useMessage();
@@ -51,7 +92,13 @@ const HomePage: React.FC<HomePageProps> = ({ onMakeAppointment }) => {
                 <ul className="home-services-list">
                   {services.map((service) => (
                     <li key={service.id} className="home-services-list-item">
-                      {service.name}
+                      <span
+                        className="home-services-list-emoji"
+                        aria-hidden="true"
+                      >
+                        {getServiceEmoji(service.name)}
+                      </span>
+                      <span>{service.name}</span>
                     </li>
                   ))}
                 </ul>

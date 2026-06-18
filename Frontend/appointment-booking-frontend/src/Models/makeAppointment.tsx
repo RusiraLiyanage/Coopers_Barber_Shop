@@ -1,6 +1,7 @@
 import {
   Alert,
   Button,
+  Checkbox,
   DatePicker,
   Form,
   Input,
@@ -9,14 +10,16 @@ import {
   Spin,
   message,
 } from 'antd';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ChangeEvent } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 import {
   isSessionIdleExpiredError,
   type AppointmentRecord,
   type AuthSession,
+  type HairPhotoPayload,
   type ConsultationStartResponse,
   type ConsultationSubmitResponse,
+  submitConsultationStream,
 } from '../lib/api';
 import { getGenericErrorMessage } from '../lib/errors';
 import { SAModalHeader } from '../components/common';
@@ -37,7 +40,6 @@ import {
 } from '../store/appointments/slice';
 import {
   startConsultationAction,
-  submitConsultationAction,
 } from '../store/consultation/action';
 import {
   selectConsultationError,
@@ -49,6 +51,7 @@ import {
 import {
   clearConsultation,
   clearConsultationResult,
+  setConsultationResult,
 } from '../store/consultation/slice';
 import { getServicesAction } from '../store/services/action';
 import {
@@ -72,6 +75,39 @@ type AppointmentFormValues = {
 };
 
 type ConsultationAnswers = Record<string, string>;
+
+const ADDITIONAL_COMMENTS_QUESTION_ID = 'additional-comments';
+const MAX_HAIR_PHOTO_BYTES = 3_750_000;
+const ACCEPTED_HAIR_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+function decodeEscapedUnicode(value: string) {
+  return value.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex: string) =>
+    String.fromCharCode(Number.parseInt(hex, 16)),
+  );
+}
+
+function cleanConsultationText(value: string) {
+  return decodeEscapedUnicode(value)
+    .replace(/\u2014/g, ' - ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function formatBarberGender(
+  gender: ConsultationSubmitResponse['matchedBarber']['gender'],
+) {
+  switch (gender) {
+    case 'female':
+      return 'Female';
+    case 'male':
+      return 'Male';
+    case 'non_binary':
+      return 'Non-binary';
+    case 'unspecified':
+    default:
+      return 'Not specified';
+  }
+}
 
 function parseAppointmentDateTime(value: string) {
   const [datePart = '', timePart = ''] = value.split(', ');
@@ -138,7 +174,10 @@ function formatAppointmentSlot(slot: string) {
 
 function getSafetyNotesText(result: ConsultationSubmitResponse) {
   return result.safetyNotes
-    .map((note) => `[${note.severity.toUpperCase()}] ${note.message}`)
+    .map(
+      (note) =>
+        `[${note.severity.toUpperCase()}] ${cleanConsultationText(note.message)}`,
+    )
     .join('\n');
 }
 
@@ -153,6 +192,29 @@ function getConsultationAnswersComplete(
   return startResult.questions.every(
     (question) => !question.required || Boolean(answers[question.id]?.trim()),
   );
+}
+
+function fileToHairPhotoPayload(file: File): Promise<HairPhotoPayload> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onerror = () => reject(new Error('Unable to read the photo'));
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        reject(new Error('Unable to read the photo'));
+        return;
+      }
+
+      const [, base64Data = ''] = reader.result.split(',');
+
+      resolve({
+        mediaType: file.type as HairPhotoPayload['mediaType'],
+        data: base64Data,
+      });
+    };
+
+    reader.readAsDataURL(file);
+  });
 }
 
 export default function MakeAppointmentModal({
@@ -182,6 +244,14 @@ export default function MakeAppointmentModal({
   const [currentSlotPulseKey, setCurrentSlotPulseKey] = useState(0);
   const [consultationAnswers, setConsultationAnswers] =
     useState<ConsultationAnswers>({});
+  const [additionalComments, setAdditionalComments] = useState('');
+  const [hairPhoto, setHairPhoto] = useState<HairPhotoPayload | undefined>();
+  const [hairPhotoName, setHairPhotoName] = useState('');
+  const [hairPhotoError, setHairPhotoError] = useState<string | null>(null);
+  const [goalPhoto, setGoalPhoto] = useState<HairPhotoPayload | undefined>();
+  const [goalPhotoName, setGoalPhotoName] = useState('');
+  const [goalPhotoError, setGoalPhotoError] = useState<string | null>(null);
+  const [consultationStreaming, setConsultationStreaming] = useState(false);
   const [form] = Form.useForm<AppointmentFormValues>();
   const selectedServiceId = Form.useWatch('serviceId', form);
   const selectedAppointmentDate = Form.useWatch('appointmentDate', form);
@@ -293,6 +363,14 @@ export default function MakeAppointmentModal({
     setSelectedSlot(null);
     setCurrentSlotPulseKey(0);
     setConsultationAnswers({});
+    setAdditionalComments('');
+    setHairPhoto(undefined);
+    setHairPhotoName('');
+    setHairPhotoError(null);
+    setGoalPhoto(undefined);
+    setGoalPhotoName('');
+    setGoalPhotoError(null);
+    setConsultationStreaming(false);
 
     dispatch(getServicesAction())
       .unwrap()
@@ -380,6 +458,13 @@ export default function MakeAppointmentModal({
 
     dispatch(clearConsultation());
     setConsultationAnswers({});
+    setAdditionalComments('');
+    setHairPhoto(undefined);
+    setHairPhotoName('');
+    setHairPhotoError(null);
+    setGoalPhoto(undefined);
+    setGoalPhotoName('');
+    setGoalPhotoError(null);
 
     try {
       await dispatch(startConsultationAction({ serviceId })).unwrap();
@@ -392,18 +477,107 @@ export default function MakeAppointmentModal({
     }
   };
 
-  const handleConsultationAnswerChange = (
-    questionId: string,
-    answer: string,
-  ) => {
+  const clearConsultationOutcome = () => {
     dispatch(clearConsultationResult());
     dispatch(clearAvailabilitySlots());
     form.setFieldValue('appointmentTime', undefined);
     setSelectedSlot(null);
+  };
+
+  const handleConsultationAnswerChange = (
+    questionId: string,
+    answer: string,
+  ) => {
+    clearConsultationOutcome();
     setConsultationAnswers((currentAnswers) => ({
       ...currentAnswers,
       [questionId]: answer,
     }));
+  };
+
+  const handleAdditionalCommentsChange = (
+    event: ChangeEvent<HTMLTextAreaElement>,
+  ) => {
+    clearConsultationOutcome();
+    setAdditionalComments(event.target.value);
+  };
+
+  const handleHairPhotoChange = async (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+
+    event.target.value = '';
+    clearConsultationOutcome();
+    setHairPhoto(undefined);
+    setHairPhotoName('');
+    setHairPhotoError(null);
+
+    if (!file) {
+      return;
+    }
+
+    if (!ACCEPTED_HAIR_PHOTO_TYPES.includes(file.type)) {
+      setHairPhotoError('Please upload a JPEG, PNG, or WebP photo.');
+      return;
+    }
+
+    if (file.size > MAX_HAIR_PHOTO_BYTES) {
+      setHairPhotoError('Please upload a photo under 3.75 MB.');
+      return;
+    }
+
+    try {
+      setHairPhoto(await fileToHairPhotoPayload(file));
+      setHairPhotoName(file.name);
+    } catch (error) {
+      setHairPhotoError(getGenericErrorMessage('Read hair photo', error));
+    }
+  };
+
+  const handleRemoveHairPhoto = () => {
+    clearConsultationOutcome();
+    setHairPhoto(undefined);
+    setHairPhotoName('');
+    setHairPhotoError(null);
+  };
+
+  const handleGoalPhotoChange = async (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+
+    event.target.value = '';
+    setGoalPhoto(undefined);
+    setGoalPhotoName('');
+    setGoalPhotoError(null);
+
+    if (!file) {
+      return;
+    }
+
+    if (!ACCEPTED_HAIR_PHOTO_TYPES.includes(file.type)) {
+      setGoalPhotoError('Please upload a JPEG, PNG, or WebP photo.');
+      return;
+    }
+
+    if (file.size > MAX_HAIR_PHOTO_BYTES) {
+      setGoalPhotoError('Please upload a photo under 3.75 MB.');
+      return;
+    }
+
+    try {
+      setGoalPhoto(await fileToHairPhotoPayload(file));
+      setGoalPhotoName(file.name);
+    } catch (error) {
+      setGoalPhotoError(getGenericErrorMessage('Read goal photo', error));
+    }
+  };
+
+  const handleRemoveGoalPhoto = () => {
+    setGoalPhoto(undefined);
+    setGoalPhotoName('');
+    setGoalPhotoError(null);
   };
 
   const handleMatchBarber = async () => {
@@ -418,13 +592,27 @@ export default function MakeAppointmentModal({
       }),
     );
 
+    const trimmedAdditionalComments = additionalComments.trim();
+
+    if (trimmedAdditionalComments) {
+      answers.push({
+        questionId: ADDITIONAL_COMMENTS_QUESTION_ID,
+        answer: trimmedAdditionalComments,
+      });
+    }
+
     try {
-      const result = await dispatch(
-        submitConsultationAction({
+      setConsultationStreaming(true);
+
+      const result = await submitConsultationStream(
+        {
           serviceId: selectedServiceId,
           answers,
-        }),
-      ).unwrap();
+          hairPhoto,
+        },
+      );
+
+      dispatch(setConsultationResult(result));
 
       const appointmentDate = form.getFieldValue('appointmentDate');
 
@@ -442,6 +630,8 @@ export default function MakeAppointmentModal({
       }
 
       messageApi.error(getGenericErrorMessage('Match barber', error));
+    } finally {
+      setConsultationStreaming(false);
     }
   };
 
@@ -482,8 +672,17 @@ export default function MakeAppointmentModal({
             staffId: currentConsultationResult.matchedBarber.id,
             consultationSummary: currentConsultationResult.consultationSummary,
             safetyNotes: getSafetyNotesText(currentConsultationResult),
-            hairState: currentConsultationResult.hairState,
-            desiredLook: currentConsultationResult.desiredLook ?? undefined,
+            hairState: currentConsultationResult.hairState.map(
+              cleanConsultationText,
+            ),
+            desiredLook: currentConsultationResult.desiredLook
+              ? cleanConsultationText(currentConsultationResult.desiredLook)
+              : undefined,
+            goalPhoto,
+            consultationGenerationSource:
+              currentConsultationResult.generation.source,
+            consultationGenerationModel:
+              currentConsultationResult.generation.model ?? undefined,
           }),
         ).unwrap();
         messageApi.success('Appointment created successfully');
@@ -494,6 +693,13 @@ export default function MakeAppointmentModal({
       dispatch(clearConsultation());
       setSelectedSlot(null);
       setConsultationAnswers({});
+      setAdditionalComments('');
+      setHairPhoto(undefined);
+      setHairPhotoName('');
+      setHairPhotoError(null);
+      setGoalPhoto(undefined);
+      setGoalPhotoName('');
+      setGoalPhotoError(null);
       onBooked();
     } catch (error) {
       if (isSessionIdleExpiredError(error)) {
@@ -547,6 +753,13 @@ export default function MakeAppointmentModal({
                 } else {
                   dispatch(clearConsultation());
                   setConsultationAnswers({});
+                  setAdditionalComments('');
+                  setHairPhoto(undefined);
+                  setHairPhotoName('');
+                  setHairPhotoError(null);
+                  setGoalPhoto(undefined);
+                  setGoalPhotoName('');
+                  setGoalPhotoError(null);
                 }
 
                 return;
@@ -587,7 +800,11 @@ export default function MakeAppointmentModal({
                   <span className="appointment-consultation-eyebrow">
                     AI barber match
                   </span>
-                  <strong>Tell us what you need before choosing a time.</strong>
+                  {!currentConsultationResult ? (
+                    <strong>
+                      Tell us what you need before choosing a time.
+                    </strong>
+                  ) : null}
                 </div>
 
                 {consultationLoadingStart ? (
@@ -612,7 +829,7 @@ export default function MakeAppointmentModal({
 
                     {currentConsultationStartResult.questions.map(
                       (question) => (
-                        <label
+                        <div
                           key={question.id}
                           className="appointment-consultation-question"
                         >
@@ -627,27 +844,145 @@ export default function MakeAppointmentModal({
                           {question.helperText ? (
                             <small>{question.helperText}</small>
                           ) : null}
-                          <Input.TextArea
-                            value={consultationAnswers[question.id] ?? ''}
-                            onChange={(event) =>
-                              handleConsultationAnswerChange(
-                                question.id,
-                                event.target.value,
-                              )
-                            }
-                            rows={2}
-                            maxLength={1000}
-                            showCount
-                            placeholder="Add your answer"
-                          />
-                        </label>
+                          {question.answerType === 'single_choice' &&
+                          question.options?.length ? (
+                            <Select
+                              value={consultationAnswers[question.id]}
+                              onChange={(value) =>
+                                handleConsultationAnswerChange(
+                                  question.id,
+                                  value,
+                                )
+                              }
+                              placeholder="Choose one"
+                              options={question.options.map((option) => ({
+                                value: option,
+                                label: option,
+                              }))}
+                            />
+                          ) : question.answerType === 'multi_choice' &&
+                            question.options?.length ? (
+                            <Checkbox.Group
+                              value={
+                                consultationAnswers[question.id]
+                                  ?.split(', ')
+                                  .filter(Boolean) ?? []
+                              }
+                              options={question.options.map((option) => ({
+                                value: option,
+                                label: option,
+                              }))}
+                              onChange={(values) =>
+                                handleConsultationAnswerChange(
+                                  question.id,
+                                  values.join(', '),
+                                )
+                              }
+                            />
+                          ) : (
+                            <Input.TextArea
+                              value={consultationAnswers[question.id] ?? ''}
+                              onChange={(event) =>
+                                handleConsultationAnswerChange(
+                                  question.id,
+                                  event.target.value,
+                                )
+                              }
+                              rows={2}
+                              maxLength={1000}
+                              showCount
+                              placeholder="Add your answer"
+                            />
+                          )}
+                        </div>
                       ),
                     )}
 
+                    <div className="appointment-consultation-question">
+                      <span>Upload a current hair photo</span>
+                      <small>
+                        Optional, but useful for color, length, and condition
+                        checks.
+                      </small>
+                      <div className="appointment-consultation-photo-row">
+                        <label className="appointment-consultation-photo-picker">
+                          Choose Photo
+                          <input
+                            type="file"
+                            accept={ACCEPTED_HAIR_PHOTO_TYPES.join(',')}
+                            onChange={handleHairPhotoChange}
+                          />
+                        </label>
+                        {hairPhotoName ? (
+                          <>
+                            <span className="appointment-consultation-photo-name">
+                              {hairPhotoName}
+                            </span>
+                            <Button onClick={handleRemoveHairPhoto}>
+                              Remove
+                            </Button>
+                          </>
+                        ) : null}
+                      </div>
+                      {hairPhotoError ? (
+                        <Alert type="error" showIcon message={hairPhotoError} />
+                      ) : null}
+                    </div>
+
+                    <div className="appointment-consultation-question">
+                      <span>Upload a goal photo</span>
+                      <small>
+                        Optional reference image showing the look you want to
+                        achieve. This will be shared with the barber.
+                      </small>
+                      <div className="appointment-consultation-photo-row">
+                        <label className="appointment-consultation-photo-picker">
+                          Choose Goal Photo
+                          <input
+                            type="file"
+                            accept={ACCEPTED_HAIR_PHOTO_TYPES.join(',')}
+                            onChange={handleGoalPhotoChange}
+                          />
+                        </label>
+                        {goalPhotoName ? (
+                          <>
+                            <span className="appointment-consultation-photo-name">
+                              {goalPhotoName}
+                            </span>
+                            <Button onClick={handleRemoveGoalPhoto}>
+                              Remove
+                            </Button>
+                          </>
+                        ) : null}
+                      </div>
+                      {goalPhotoError ? (
+                        <Alert type="error" showIcon message={goalPhotoError} />
+                      ) : null}
+                    </div>
+
+                    <label className="appointment-consultation-question">
+                      <span>Anything else the barber should know?</span>
+                      <small>
+                        Optional comments are included in the consultation
+                        result.
+                      </small>
+                      <Input.TextArea
+                        value={additionalComments}
+                        onChange={handleAdditionalCommentsChange}
+                        rows={2}
+                        maxLength={1000}
+                        showCount
+                        placeholder="Add extra context"
+                      />
+                    </label>
+
                     <Button
                       type="primary"
-                      loading={consultationSubmitting}
-                      disabled={!areConsultationAnswersComplete}
+                      loading={consultationSubmitting || consultationStreaming}
+                      disabled={
+                        !areConsultationAnswersComplete ||
+                        Boolean(hairPhotoError || goalPhotoError)
+                      }
                       onClick={handleMatchBarber}
                     >
                       Match Barber
@@ -665,22 +1000,43 @@ export default function MakeAppointmentModal({
                       <span>
                         Match score: {currentConsultationResult.matchScore}%
                       </span>
+                      <span>
+                        Gender:{' '}
+                        {formatBarberGender(
+                          currentConsultationResult.matchedBarber.gender,
+                        )}
+                      </span>
                     </div>
 
-                    <ul>
-                      {currentConsultationResult.matchReasons.map((reason) => (
-                        <li key={reason}>{reason}</li>
-                      ))}
-                    </ul>
+                    <p className="appointment-consultation-customer-note">
+                      We have shared your circumstances with the barber so they
+                      can prepare before your appointment.
+                    </p>
+
+                    {currentConsultationResult.matchReasons.length > 0 ? (
+                      <div className="appointment-consultation-reasons">
+                        <span className="appointment-consultation-subheading">
+                          Why{' '}
+                          {currentConsultationResult.matchedBarber.displayName}
+                        </span>
+                        <ul>
+                          {currentConsultationResult.matchReasons
+                            .slice(0, 4)
+                            .map((reason) => cleanConsultationText(reason))
+                            .filter(Boolean)
+                            .map((reason) => (
+                              <li key={reason}>{reason}</li>
+                            ))}
+                        </ul>
+                      </div>
+                    ) : null}
 
                     {currentConsultationResult.safetyNotes.length > 0 ? (
                       <Alert
-                        type="warning"
+                        type="info"
                         showIcon
-                        message="Safety notes will be shared with the barber."
-                        description={currentConsultationResult.safetyNotes
-                          .map((note) => note.message)
-                          .join(' ')}
+                        message="Your notes are ready for the barber."
+                        description="The barber will review your colour history, hair condition, and any preparation details before the service."
                       />
                     ) : null}
                   </div>

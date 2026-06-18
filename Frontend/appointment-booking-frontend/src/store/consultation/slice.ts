@@ -1,9 +1,9 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import {
   startConsultationAction,
   submitConsultationAction,
 } from './action';
-import type { ConsultationState } from './types';
+import type { ConsultationState, ConsultationSubmitResponse } from './types';
 
 const initialState: ConsultationState = {
   startResult: null,
@@ -26,6 +26,13 @@ const consultationSlice = createSlice({
     },
     clearConsultationResult(state) {
       state.result = null;
+      state.error = null;
+    },
+    setConsultationResult(
+      state,
+      action: PayloadAction<ConsultationSubmitResponse>,
+    ) {
+      state.result = action.payload;
       state.error = null;
     },
   },
@@ -61,7 +68,10 @@ const consultationSlice = createSlice({
   },
 });
 
-export const { clearConsultation, clearConsultationResult } =
-  consultationSlice.actions;
+export const {
+  clearConsultation,
+  clearConsultationResult,
+  setConsultationResult,
+} = consultationSlice.actions;
 
 export default consultationSlice.reducer;

@@ -1,11 +1,13 @@
 import type {
   ConsultationAnswerPayload,
+  HairPhotoPayload,
   ConsultationStartResponse,
   ConsultationSubmitResponse,
 } from '../../lib/api';
 
 export type {
   ConsultationAnswerPayload,
+  HairPhotoPayload,
   ConsultationStartResponse,
   ConsultationSubmitResponse,
 };
@@ -17,6 +19,7 @@ export type StartConsultationPayload = {
 export type SubmitConsultationPayload = {
   serviceId: string;
   answers: ConsultationAnswerPayload[];
+  hairPhoto?: HairPhotoPayload;
 };
 
 export type ConsultationState = {

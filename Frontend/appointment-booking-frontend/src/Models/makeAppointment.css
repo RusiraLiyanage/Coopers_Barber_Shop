@@ -54,9 +54,58 @@
   font-weight: 500;
 }
 
+.appointment-consultation-question .ant-checkbox-group {
+  display: grid;
+  gap: 8px;
+}
+
 .appointment-consultation-required {
   margin-left: 4px;
   color: #ff4d4f;
+}
+
+.appointment-consultation-photo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.appointment-consultation-photo-picker {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 15px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  background: #fff;
+  color: #262626;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 400;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.appointment-consultation-photo-picker:hover {
+  border-color: #4096ff;
+  color: #1677ff;
+}
+
+.appointment-consultation-photo-picker input {
+  display: none;
+}
+
+.appointment-consultation-photo-name {
+  max-width: 260px;
+  overflow: hidden;
+  color: #4b5563;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .appointment-consultation-result {
@@ -72,11 +121,39 @@
   gap: 3px;
 }
 
-.appointment-consultation-result ul {
-  margin: 4px 0 0;
+.appointment-consultation-customer-note {
+  margin: 12px 0;
+  color: #4b5563;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.appointment-consultation-reasons {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.appointment-consultation-subheading {
+  color: #111827;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.appointment-consultation-reasons ul {
+  margin: 0;
   padding-left: 18px;
   color: #4b5563;
   font-size: 14px;
+  line-height: 1.45;
+}
+
+.appointment-consultation-reasons li + li {
+  margin-top: 6px;
 }
 
 .appointment-original-date-cell {

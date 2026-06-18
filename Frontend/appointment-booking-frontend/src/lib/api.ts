@@ -27,6 +27,8 @@ export interface ConsultationQuestion {
   label: string;
   helperText?: string;
   required: boolean;
+  answerType?: 'text' | 'single_choice' | 'multi_choice';
+  options?: string[];
 }
 
 export interface ConsultationServiceSummary {
@@ -54,12 +56,13 @@ export interface ConsultationStartResponse {
 export interface ConsultationSafetyNote {
   severity: 'low' | 'medium' | 'high';
   message: string;
-  source: 'safety-rule' | 'service-trigger';
+  source: 'safety-rule' | 'service-trigger' | 'ai-observation';
 }
 
 export interface ConsultationBarberMatch {
   id: string;
   displayName: string;
+  gender: 'male' | 'female' | 'non_binary' | 'unspecified';
   role: 'junior' | 'senior' | 'owner';
   rating: number;
   matchedSkills: string[];
@@ -76,6 +79,10 @@ export interface ConsultationSubmitResponse {
   desiredLook: string | null;
   consultationSummary: string;
   previousHairHistoryCount: number;
+  generation: {
+    source: 'claude' | 'fallback';
+    model: string | null;
+  };
 }
 
 export type ConsultationAnswerPayload = {
@@ -86,6 +93,25 @@ export type ConsultationAnswerPayload = {
 export type ConsultationSubmitPayload = {
   serviceId: string;
   answers: ConsultationAnswerPayload[];
+  hairPhoto?: HairPhotoPayload;
+};
+
+export type HairPhotoPayload = {
+  mediaType: 'image/jpeg' | 'image/png' | 'image/webp';
+  data: string;
+};
+
+export type ConsultationStreamEvent =
+  | { type: 'status'; message: string }
+  | { type: 'text_delta'; text: string }
+  | { type: 'tool_use'; name: string }
+  | { type: 'tool_result'; name: string }
+  | { type: 'result'; result: ConsultationSubmitResponse }
+  | { type: 'error'; message: string }
+  | { type: 'done' };
+
+export type SubmitConsultationStreamOptions = {
+  onEvent?: (event: ConsultationStreamEvent) => void;
 };
 
 export type AppointmentAvailabilityRequest = {
@@ -104,6 +130,9 @@ export type CreateAppointmentRequest = {
   safetyNotes?: string;
   hairState?: string[];
   desiredLook?: string;
+  goalPhoto?: HairPhotoPayload;
+  consultationGenerationSource?: 'claude' | 'fallback';
+  consultationGenerationModel?: string;
 };
 
 export interface AppointmentRecord {
@@ -593,6 +622,99 @@ export function submitConsultation(payload: ConsultationSubmitPayload) {
     headers: buildHeaders(),
     body: JSON.stringify(payload),
   });
+}
+
+export async function submitConsultationStream(
+  payload: ConsultationSubmitPayload,
+  options: SubmitConsultationStreamOptions = {},
+): Promise<ConsultationSubmitResponse> {
+  const response = await fetch(buildApiUrl("/consultation/submit/stream"), {
+    method: "POST",
+    credentials: "include",
+    headers: buildHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok || !response.body) {
+    const data = await parseResponse<ConsultationSubmitResponse>(response);
+    const errorMessage = getApiErrorMessage(data);
+    const message = Array.isArray(errorMessage)
+      ? errorMessage.join(", ")
+      : errorMessage || response.statusText;
+    const error = new ApiRequestError(
+      message || "Request failed",
+      response.status,
+      getApiErrorCode(data),
+      getApiErrorCanExtend(data),
+    );
+
+    if (isSessionIdleExpiredError(error)) {
+      dispatchSessionIdleExpiredEvent();
+    } else if (isSessionExpiredError(error)) {
+      dispatchSessionExpiredEvent();
+    }
+
+    throw error;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let finalResult: ConsultationSubmitResponse | null = null;
+
+  const emitEvent = (rawEvent: string) => {
+    const dataLine = rawEvent
+      .split("\n")
+      .find((line) => line.startsWith("data:"));
+
+    if (!dataLine) {
+      return;
+    }
+
+    const rawData = dataLine.slice("data:".length).trim();
+
+    if (!rawData) {
+      return;
+    }
+
+    const event = JSON.parse(rawData) as ConsultationStreamEvent;
+
+    if (event.type === "result") {
+      finalResult = event.result;
+    }
+
+    if (event.type === "error") {
+      throw new Error(event.message);
+    }
+
+    options.onEvent?.(event);
+  };
+
+  while (true) {
+    const { value, done } = await reader.read();
+
+    buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+    const events = buffer.split("\n\n");
+    buffer = events.pop() ?? "";
+
+    for (const event of events) {
+      emitEvent(event);
+    }
+
+    if (done) {
+      break;
+    }
+  }
+
+  if (buffer.trim()) {
+    emitEvent(buffer);
+  }
+
+  if (!finalResult) {
+    throw new Error("Consultation stream finished without a result");
+  }
+
+  return finalResult;
 }
 
 export function getAvailability({
