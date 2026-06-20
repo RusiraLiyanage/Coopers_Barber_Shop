@@ -9,6 +9,8 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
+import { createLoginThrottleOptions } from '@coopers/common';
 import type { AuthTokensResponse } from '@coopers/common';
 import { ProxyService } from './proxy.service';
 import {
@@ -179,6 +181,7 @@ export class PublicProxyController {
       },
     },
   })
+  @Throttle(createLoginThrottleOptions())
   @Post('auth/login')
   async login(
     @Body() body: LoginRequestBody,

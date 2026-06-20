@@ -1,7 +1,6 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import {
-  ApiRateLimitModule,
   createAppConfigOptions,
   InternalServiceAuthModule,
   XssProtectionMiddleware,
@@ -20,7 +19,9 @@ import { AdminServicesModule } from './services/admin-services.module';
 @Module({
   imports: [
     ConfigModule.forRoot(createAppConfigOptions()),
-    ApiRateLimitModule.forRoot(),
+    // Throttling is centralised on the booking-guard (the edge), where the real
+    // client IP is known. This internal API only ever sees the guard's IP, so a
+    // per-IP limit here would be a global cap, not per-user protection.
     InternalServiceAuthModule,
     DatabaseModule.forRoot(),
     AdminAuthModule,

@@ -1,6 +1,7 @@
 import {
   configureApiSecurity,
   configureSwagger,
+  configureTrustProxy,
   createFrontendCorsOptions,
   ensureNodeCryptoGlobal,
   GuardConfigService,
@@ -16,6 +17,11 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
   const guardConfig = app.get(GuardConfigService);
+
+  // This is the only browser-facing service and it sits behind a reverse proxy in
+  // staging/production, so honour X-Forwarded-For (via TRUST_PROXY) to throttle on
+  // the real client IP instead of the proxy's.
+  configureTrustProxy(app);
 
   // Validate upstream URLs at startup before proxy routes depend on them.
   guardConfig.getUpstreams();

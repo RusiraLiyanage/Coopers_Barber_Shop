@@ -9,6 +9,10 @@ import {
 
 export const DEFAULT_RATE_LIMIT_TTL_SECONDS = 300;
 export const DEFAULT_RATE_LIMIT_MAX_REQUESTS = 10;
+// Login is brute-force bait, so it gets a tighter bucket than the generic limit:
+// 5 attempts per 5 minutes per client IP by default.
+export const DEFAULT_LOGIN_RATE_LIMIT_TTL_SECONDS = 300;
+export const DEFAULT_LOGIN_RATE_LIMIT_MAX_REQUESTS = 5;
 const MILLISECONDS_PER_SECOND = 1000;
 
 // by default, only 10 requests per 300 seconds are allowed.
@@ -43,6 +47,30 @@ export function createApiRateLimitOptions(
       limit: options.maxRequests ?? DEFAULT_RATE_LIMIT_MAX_REQUESTS,
     },
   ];
+}
+
+// Per-route override applied with @Throttle on the login endpoints. Keyed on the
+// "default" throttler so it tightens the same bucket the global guard manages.
+// Tunable via LOGIN_RATE_LIMIT_* without redeploying code.
+export function createLoginThrottleOptions(): Record<
+  'default',
+  { limit: number; ttl: number }
+> {
+  const ttlSeconds = toPositiveNumber(
+    process.env.LOGIN_RATE_LIMIT_TTL_SECONDS,
+    DEFAULT_LOGIN_RATE_LIMIT_TTL_SECONDS,
+  );
+  const maxRequests = toPositiveNumber(
+    process.env.LOGIN_RATE_LIMIT_MAX_REQUESTS,
+    DEFAULT_LOGIN_RATE_LIMIT_MAX_REQUESTS,
+  );
+
+  return {
+    default: {
+      limit: maxRequests,
+      ttl: ttlSeconds * MILLISECONDS_PER_SECOND,
+    },
+  };
 }
 
 @Module({})
