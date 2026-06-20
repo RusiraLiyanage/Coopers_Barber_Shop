@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import {
   ApiRateLimitModule,
   createAppConfigOptions,
+  CsrfProtectionModule,
   GuardConfigModule,
   XssProtectionMiddleware,
 } from '@coopers/common';
@@ -14,6 +15,7 @@ import { ProxyModule } from './proxy/proxy.module';
   imports: [
     ConfigModule.forRoot(createAppConfigOptions()), // configuration key and values are injected into the App Module
     ApiRateLimitModule.forRoot(), // adding rate limitor to the application
+    CsrfProtectionModule, // rejects state-changing requests from untrusted origins (CSRF defence)
     GuardConfigModule,
     OAuthModule,
     ProxyModule,
