@@ -728,9 +728,14 @@ export default function UserAuthModal({
                             message: 'Please input your new password!',
                           },
                           {
-                            min: 6,
+                            min: 8,
                             message:
-                              'Password must be at least 6 characters long!',
+                              'Password must be at least 8 characters long!',
+                          },
+                          {
+                            max: 72,
+                            message:
+                              'Password must be at most 72 characters long!',
                           },
                         ]}
                       >
@@ -956,8 +961,12 @@ export default function UserAuthModal({
                         message: 'Please input your password!',
                       },
                       {
-                        min: 6,
-                        message: 'Password must be at least 6 characters long!',
+                        min: 8,
+                        message: 'Password must be at least 8 characters long!',
+                      },
+                      {
+                        max: 72,
+                        message: 'Password must be at most 72 characters long!',
                       },
                     ]}
                   >
