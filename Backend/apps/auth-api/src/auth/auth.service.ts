@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomInt } from 'node:crypto';
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -75,6 +76,12 @@ type CreateSessionOptions = {
   endExistingSessions?: boolean;
 };
 
+type LoginOptions = CreateSessionOptions & {
+  // When set, the authenticated account must hold this role or login is refused
+  // before any session is created (used by the admin portal login).
+  requiredRole?: UserRole;
+};
+
 function toAccountProfile(user: User): AccountProfileResponse {
   return {
     id: user.id,
@@ -133,8 +140,16 @@ export class AuthService {
 
   async login(
     user: AuthenticatedUser,
-    options: CreateSessionOptions = {},
+    options: LoginOptions = {},
   ): Promise<AuthTokensResponse> {
+    if (options.requiredRole && user.role !== options.requiredRole) {
+      // Credentials are valid but the account lacks the role this login surface
+      // requires. Refuse here so no session/cookies are ever issued for it.
+      throw new ForbiddenException(
+        'This account does not have access to this area.',
+      );
+    }
+
     return this.createSessionTokens(user, options);
   }
 
@@ -194,7 +209,9 @@ export class AuthService {
     if (existingIdentity) {
       await this.syncIdentityEmail(existingIdentity, email);
 
-      if (await this.sessionService.hasActiveUserSession(existingIdentity.user.id)) {
+      if (
+        await this.sessionService.hasActiveUserSession(existingIdentity.user.id)
+      ) {
         return {
           status: 'session_switch_required',
           linkTicket: this.oauthLinkTicketService.sign({
@@ -242,7 +259,9 @@ export class AuthService {
     return this.authenticated(user);
   }
 
-  async linkGoogleOAuthIdentity(dto: LinkGoogleOAuthDto): Promise<AuthTokensResponse> {
+  async linkGoogleOAuthIdentity(
+    dto: LinkGoogleOAuthDto,
+  ): Promise<AuthTokensResponse> {
     const claims = this.oauthLinkTicketService.verify(dto.linkTicket);
     const user = await this.usersService.findById(claims.userId);
 

@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { createLoginThrottleOptions } from '@coopers/common';
+import { createLoginThrottleOptions, UserRole } from '@coopers/common';
 import type { AuthTokensResponse } from '@coopers/common';
 import {
   AuthCookieResponse,
@@ -40,6 +40,7 @@ type AuthApiLoginRequestBody = {
   email: string;
   password: string;
   endExistingSessions?: boolean;
+  requiredRole?: UserRole;
 };
 
 type RefreshTokenRequestBody = {
@@ -107,6 +108,9 @@ function createLoginAuthApiBody(
     email: body.email,
     password: body.password,
     endExistingSessions: body.endExistingSessions,
+    // This is the admin portal login, so only admin accounts may obtain a
+    // session here. auth-api enforces this before any token is issued.
+    requiredRole: UserRole.ADMIN,
   };
 }
 

@@ -54,6 +54,7 @@ export class AuthController {
   ): Promise<AuthTokensResponse> {
     return this.authService.login(req.user, {
       endExistingSessions: dto.endExistingSessions,
+      requiredRole: dto.requiredRole,
     });
   }
 
