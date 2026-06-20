@@ -9,6 +9,7 @@ import { DatabaseModule } from '@coopers/database';
 import { AdminAuthModule } from './auth/admin-auth.module';
 import { BarbersModule } from './barbers/barbers.module';
 import { BriefsModule } from './briefs/briefs.module';
+import { DataVersionModule } from './data-version/data-version.module';
 import { HairHistoryModule } from './hair-history/hair-history.module';
 import { HealthController } from './health.controller';
 import { InvitesModule } from './invites/invites.module';
@@ -32,6 +33,7 @@ import { AdminServicesModule } from './services/admin-services.module';
     BriefsModule,
     HairHistoryModule,
     InvitesModule,
+    DataVersionModule,
   ],
   controllers: [HealthController],
 })

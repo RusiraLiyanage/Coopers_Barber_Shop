@@ -29,6 +29,7 @@ import {
 } from '@ant-design/icons';
 import { format } from 'date-fns';
 import { SACard, SAModalHeader, SAStatusTag } from '../components/common';
+import { useAdminDataFreshness } from '../hooks/useAdminDataFreshness';
 import { getServiceAiStarterConfig } from '../lib/adminOptions';
 import { createAdminInvite } from '../lib/api';
 import {
@@ -315,6 +316,48 @@ function getStatusTag(active: boolean, available?: boolean) {
   }
 
   return <SAStatusTag color="green">Active</SAStatusTag>;
+}
+
+function getAppointmentStatusCategory(status: string) {
+  switch (status) {
+    case 'cancelled':
+    case 'cancelled_by_client':
+      return 'cancelledClient';
+    case 'cancelled_by_barber':
+      return 'cancelledBarber';
+    default:
+      return 'scheduled';
+  }
+}
+
+function getAppointmentStatusLabel(status: string) {
+  switch (getAppointmentStatusCategory(status)) {
+    case 'cancelledClient':
+      return 'Cancelled by client';
+    case 'cancelledBarber':
+      return 'Cancelled by barber';
+    default:
+      return 'Booked';
+  }
+}
+
+function getAppointmentStatusTagColor(status: string) {
+  switch (getAppointmentStatusCategory(status)) {
+    case 'cancelledClient':
+      return 'red';
+    case 'cancelledBarber':
+      return 'gold';
+    default:
+      return 'green';
+  }
+}
+
+function renderAppointmentStatusTag(status: string) {
+  return (
+    <Tag color={getAppointmentStatusTagColor(status)}>
+      {getAppointmentStatusLabel(status)}
+    </Tag>
+  );
 }
 
 function getCustomerName(brief: AppointmentBriefRecord): string {
@@ -629,6 +672,11 @@ export default function AdminDashboard() {
     },
     [messageApi],
   );
+  const {
+    hasFreshData,
+    dismissFreshDataNotice,
+    refreshKnownVersion,
+  } = useAdminDataFreshness();
 
   const configuredServiceConfigs = useMemo(
     () =>
@@ -711,6 +759,7 @@ export default function AdminDashboard() {
         dispatch(getAppointmentBriefsAction(briefsPage)).unwrap(),
         dispatch(getHairHistoryAction(hairHistoryPage)).unwrap(),
       ]);
+      await refreshKnownVersion();
     } catch (error) {
       showRequestError(error);
     }
@@ -724,6 +773,7 @@ export default function AdminDashboard() {
     safetyTriggerPage,
     servicesPage,
     showRequestError,
+    refreshKnownVersion,
   ]);
 
   useEffect(() => {
@@ -1393,13 +1443,14 @@ export default function AdminDashboard() {
     {
       title: 'Appointment',
       key: 'appointment',
-      width: 260,
+      width: 280,
       render: (_, brief) => (
         <div className="admin-primary-cell">
           <Typography.Text strong>{brief.booking.service.name}</Typography.Text>
           <Typography.Text type="secondary">
             {formatDateTime(brief.booking.startAt)}
           </Typography.Text>
+          <div>{renderAppointmentStatusTag(brief.booking.status)}</div>
         </div>
       ),
     },
@@ -1515,6 +1566,30 @@ export default function AdminDashboard() {
           Refresh
         </Button>
       </section>
+      {hasFreshData ? (
+        <Alert
+          className="admin-fresh-data-alert"
+          type="info"
+          showIcon
+          message="Updated information available"
+          description="Refresh to load the latest admin data."
+          action={
+            <Space>
+              <Button size="small" onClick={dismissFreshDataNotice}>
+                Dismiss
+              </Button>
+              <Button
+                size="small"
+                type="primary"
+                icon={<ReloadOutlined />}
+                onClick={() => void loadAdminData()}
+              >
+                Refresh
+              </Button>
+            </Space>
+          }
+        />
+      ) : null}
 
       <Tabs
         activeKey={activeTab}
@@ -2389,7 +2464,7 @@ export default function AdminDashboard() {
                 {getBriefBarberName(selectedBrief)}
               </Descriptions.Item>
               <Descriptions.Item label="Booking status">
-                <Tag>{toTitleCase(selectedBrief.booking.status)}</Tag>
+                {renderAppointmentStatusTag(selectedBrief.booking.status)}
               </Descriptions.Item>
               <Descriptions.Item label="Generated">
                 {formatDateTime(selectedBrief.generatedAt)}

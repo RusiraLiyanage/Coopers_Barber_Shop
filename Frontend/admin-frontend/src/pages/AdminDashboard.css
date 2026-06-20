@@ -18,6 +18,10 @@
   margin: 0;
 }
 
+.admin-fresh-data-alert {
+  margin-bottom: 20px;
+}
+
 .admin-overview-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

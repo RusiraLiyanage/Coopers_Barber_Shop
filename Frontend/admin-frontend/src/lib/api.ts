@@ -83,6 +83,10 @@ export interface AdminLoginResponse extends AuthResponse {
   user?: AccountProfileResponse;
 }
 
+export type AdminDataVersionResponse = {
+  version: string;
+};
+
 export type AdminLoginPayload = {
   email: string;
   password: string;
@@ -712,6 +716,12 @@ export function logout() {
     method: 'POST',
     headers: buildHeaders(),
     body: JSON.stringify({}),
+  });
+}
+
+export function getAdminDataVersion() {
+  return request<AdminDataVersionResponse>('/admin/data-version', {
+    headers: buildHeaders(),
   });
 }
 

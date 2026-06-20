@@ -5,6 +5,7 @@ import {
   ManyToOne,
   CreateDateColumn,
   JoinColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { User } from './user.entity';
 import { Service } from './service.entity';
@@ -45,6 +46,13 @@ export class Appointment {
     default: () => 'CURRENT_TIMESTAMP',
   })
   createdAt: Date;
+
+  @UpdateDateColumn({
+    name: 'updated_at',
+    type: 'timestamptz',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
+  updatedAt: Date;
 
   // many-to-one relationship with staff. - many appointments, one staff member. (is there is an appointment pointing to the staff, the appointment will also be deleted)
   @ManyToOne(() => Staff, { onDelete: 'CASCADE' })
