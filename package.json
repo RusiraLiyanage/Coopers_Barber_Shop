@@ -1,0 +1,15 @@
+{
+  "name": "sa-fullstack-challenge-rusira",
+  "private": true,
+  "packageManager": "pnpm@10.17.1",
+  "scripts": {
+    "hooks:install": "git config core.hooksPath .husky",
+    "frontend:lint": "pnpm --dir Frontend/admin-frontend lint && pnpm --dir Frontend/appointment-booking-frontend lint",
+    "frontend:build": "pnpm --dir Frontend/admin-frontend build && pnpm --dir Frontend/appointment-booking-frontend build",
+    "frontend:check": "pnpm run frontend:lint && pnpm run frontend:build",
+    "precommit:frontend": "node scripts/precommit-frontend.mjs"
+  },
+  "dependencies": {
+    "sa-fullstack-challenge-rusira": "link:"
+  }
+}
