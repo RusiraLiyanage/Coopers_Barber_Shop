@@ -369,7 +369,9 @@ function getCustomerName(brief: AppointmentBriefRecord): string {
 
 function getBriefBarberName(brief: AppointmentBriefRecord): string {
   return (
-    brief.barber?.displayName ?? brief.booking.staff?.displayName ?? 'Unassigned'
+    brief.barber?.displayName ??
+    brief.booking.staff?.displayName ??
+    'Unassigned'
   );
 }
 
@@ -480,9 +482,7 @@ function getServiceSetupTag(
   return <SAStatusTag color="gold">Needs setup</SAStatusTag>;
 }
 
-function createBarberPayload(
-  values: BarberFormValues,
-): CreateBarberPayload {
+function createBarberPayload(values: BarberFormValues): CreateBarberPayload {
   return {
     displayName: values.displayName.trim(),
     email: compactOptionalString(values.email),
@@ -524,9 +524,7 @@ export default function AdminDashboard() {
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
   const [createdInvite, setCreatedInvite] =
     useState<AdminInviteResponse | null>(null);
-  const [editingBarber, setEditingBarber] = useState<BarberRecord | null>(
-    null,
-  );
+  const [editingBarber, setEditingBarber] = useState<BarberRecord | null>(null);
   const [editingService, setEditingService] =
     useState<ServiceAiConfigRecord | null>(null);
   const [editingSafetyRule, setEditingSafetyRule] =
@@ -606,10 +604,7 @@ export default function AdminDashboard() {
   );
 
   const barberCapabilityItems = useMemo(
-    () =>
-      referenceData.filter(
-        (item) => item.type === 'barber_capability',
-      ),
+    () => referenceData.filter((item) => item.type === 'barber_capability'),
     [referenceData],
   );
 
@@ -672,11 +667,8 @@ export default function AdminDashboard() {
     },
     [messageApi],
   );
-  const {
-    hasFreshData,
-    dismissFreshDataNotice,
-    refreshKnownVersion,
-  } = useAdminDataFreshness();
+  const { hasFreshData, dismissFreshDataNotice, refreshKnownVersion } =
+    useAdminDataFreshness();
 
   const configuredServiceConfigs = useMemo(
     () =>
@@ -1306,7 +1298,10 @@ export default function AdminDashboard() {
       key: 'action',
       width: 120,
       render: (_, service) => (
-        <Button icon={<EditOutlined />} onClick={() => showServiceModal(service)}>
+        <Button
+          icon={<EditOutlined />}
+          onClick={() => showServiceModal(service)}
+        >
           {isConfiguredService(service, knownBarberCapabilities)
             ? 'Edit'
             : 'Configure'}
@@ -1569,7 +1564,7 @@ export default function AdminDashboard() {
       {hasFreshData ? (
         <Alert
           className="admin-fresh-data-alert"
-          type="info"
+          type="error"
           showIcon
           message="Updated information available"
           description="Refresh to load the latest admin data."
@@ -1581,6 +1576,7 @@ export default function AdminDashboard() {
               <Button
                 size="small"
                 type="primary"
+                color="red"
                 icon={<ReloadOutlined />}
                 onClick={() => void loadAdminData()}
               >
@@ -1599,7 +1595,11 @@ export default function AdminDashboard() {
             key: 'overview',
             label: 'Overview',
             children: (
-              <Space direction="vertical" size={20} className="admin-full-width">
+              <Space
+                direction="vertical"
+                size={20}
+                className="admin-full-width"
+              >
                 <Alert
                   type="info"
                   showIcon
@@ -1715,7 +1715,9 @@ export default function AdminDashboard() {
                       Service matching rules
                     </Typography.Title>
                     <Typography.Text type="secondary">
-                      Every booking service should have capabilities, complexity, and optional safety triggers before the consultation agent uses it.
+                      Every booking service should have capabilities,
+                      complexity, and optional safety triggers before the
+                      consultation agent uses it.
                     </Typography.Text>
                   </div>
                   <Space wrap>
@@ -1749,7 +1751,8 @@ export default function AdminDashboard() {
                   loading={serviceConfigsLoading}
                   scroll={{ x: 1040 }}
                   pagination={{
-                    current: serviceConfigsPagingMeta?.page ?? servicesPage.page,
+                    current:
+                      serviceConfigsPagingMeta?.page ?? servicesPage.page,
                     pageSize:
                       serviceConfigsPagingMeta?.limit ?? servicesPage.limit,
                     total: serviceConfigsPagingMeta?.totalItem ?? 0,
@@ -1769,7 +1772,11 @@ export default function AdminDashboard() {
             key: 'referenceData',
             label: 'Reference Data',
             children: (
-              <Space direction="vertical" size={20} className="admin-full-width">
+              <Space
+                direction="vertical"
+                size={20}
+                className="admin-full-width"
+              >
                 <Alert
                   type="info"
                   showIcon
@@ -1829,7 +1836,8 @@ export default function AdminDashboard() {
                           Safety triggers
                         </Typography.Title>
                         <Typography.Text type="secondary">
-                          Used by service AI config before safety rules are checked.
+                          Used by service AI config before safety rules are
+                          checked.
                         </Typography.Text>
                       </div>
                       <Button
@@ -1965,7 +1973,9 @@ export default function AdminDashboard() {
                   description="Hair history is cross-visit memory. It helps the AI avoid repeating unsafe recommendations when a client has previous colour, bleach, product, sensitivity, or damage history."
                 />
                 <div className="admin-section-toolbar">
-                  <Typography.Title level={4}>Client hair history</Typography.Title>
+                  <Typography.Title level={4}>
+                    Client hair history
+                  </Typography.Title>
                 </div>
                 {hairHistory.length === 0 && !hairHistoryLoading ? (
                   <Empty description="No hair history recorded yet" />
@@ -2004,7 +2014,9 @@ export default function AdminDashboard() {
                   description="Use invites to onboard trusted admins without sharing the main admin password. Invite acceptance creates an admin account that can manage AI setup data."
                 />
                 <div className="admin-section-toolbar">
-                  <Typography.Title level={4}>Invite administrators</Typography.Title>
+                  <Typography.Title level={4}>
+                    Invite administrators
+                  </Typography.Title>
                 </div>
                 <SACard bodyPadding={24}>
                   <Form<InviteFormValues>
@@ -2052,8 +2064,13 @@ export default function AdminDashboard() {
                       showIcon
                       message={`Invite created for ${createdInvite?.email}`}
                       description={
-                        <Space direction="vertical" className="admin-full-width">
-                          <Typography.Text copyable>{inviteLink}</Typography.Text>
+                        <Space
+                          direction="vertical"
+                          className="admin-full-width"
+                        >
+                          <Typography.Text copyable>
+                            {inviteLink}
+                          </Typography.Text>
                           <Button
                             icon={<CopyOutlined />}
                             onClick={() => void handleCopyInviteLink()}
@@ -2219,7 +2236,11 @@ export default function AdminDashboard() {
               className="admin-service-starter-alert"
               message="Suggested starter setup"
               description={
-                <Space direction="vertical" size={12} className="admin-full-width">
+                <Space
+                  direction="vertical"
+                  size={12}
+                  className="admin-full-width"
+                >
                   <Typography.Text>
                     These starter values fit the current service type and can be
                     adjusted before saving.
@@ -2250,7 +2271,8 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                   <Typography.Text strong>
-                    Suggested complexity: {toTitleCase(selectedServiceStarterConfig.complexity)}
+                    Suggested complexity:{' '}
+                    {toTitleCase(selectedServiceStarterConfig.complexity)}
                   </Typography.Text>
                   <ul className="admin-service-starter-notes">
                     {selectedServiceStarterConfig.notes.map((note) => (
@@ -2373,7 +2395,9 @@ export default function AdminDashboard() {
         width={760}
       >
         <SAModalHeader
-          title={editingSafetyRule ? 'Update Safety Rule' : 'Create Safety Rule'}
+          title={
+            editingSafetyRule ? 'Update Safety Rule' : 'Create Safety Rule'
+          }
           subtitle="Safety messages shown before risky appointment paths."
           className="admin-modal-header"
         />
@@ -2389,7 +2413,9 @@ export default function AdminDashboard() {
           <Form.Item
             name="serviceIds"
             label="Services"
-            rules={[{ required: true, message: 'At least one service is required.' }]}
+            rules={[
+              { required: true, message: 'At least one service is required.' },
+            ]}
             extra="Only configured service AI records are available here."
           >
             <Select
@@ -2492,7 +2518,9 @@ export default function AdminDashboard() {
               }
             />
             <section className="admin-brief-section">
-              <Typography.Title level={5}>What the barber should know</Typography.Title>
+              <Typography.Title level={5}>
+                What the barber should know
+              </Typography.Title>
               <ul className="admin-brief-summary-list">
                 {getBriefSummaryLines(selectedBrief).map((line) => (
                   <li key={line}>{line}</li>

@@ -20,6 +20,8 @@
 
 .admin-fresh-data-alert {
   margin-bottom: 20px;
+  background: #fff1f0;
+  border-color: #ff4d4f;
 }
 
 .admin-overview-grid {
