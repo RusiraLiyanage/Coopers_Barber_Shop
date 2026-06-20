@@ -1,3 +1,4 @@
+import { DEFAULT_ACCESS_TOKEN_TTL_SECONDS } from '@coopers/common';
 import type { AuthTokensResponse } from '@coopers/common';
 
 export const ACCESS_TOKEN_COOKIE = 'tsa';
@@ -9,7 +10,6 @@ export const ADMIN_REMEMBER_ME_COOKIE = 'admin_tsm';
 
 const LEGACY_ACCESS_TOKEN_COOKIE = 'access_token';
 const LEGACY_REFRESH_TOKEN_COOKIE = 'refresh_token';
-const DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 300;
 const DEFAULT_REFRESH_TOKEN_TTL_DAYS = 14;
 
 type AuthCookieNames = {

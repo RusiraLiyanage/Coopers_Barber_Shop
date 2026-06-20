@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { JWT_AUDIENCE, JWT_ISSUER } from '@coopers/common';
 import type { JwtPayload, JwtRequestUser } from '@coopers/common';
 
 // Mirrors the booking-api strategy so auth-api also derives identity from the
@@ -13,6 +14,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: config.getOrThrow<string>('JWT_SECRET'),
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
     });
   }
 

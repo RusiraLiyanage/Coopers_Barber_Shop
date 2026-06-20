@@ -4,7 +4,10 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
+  DEFAULT_ACCESS_TOKEN_TTL_SECONDS,
   EmailModule,
+  JWT_AUDIENCE,
+  JWT_ISSUER,
   JwtTokenService,
   PasswordService,
   SessionService,
@@ -24,12 +27,13 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 
 function getAccessTokenTtlSeconds(config: ConfigService): number {
   const configuredTtl = Number(
-    config.get<string>('ACCESS_TOKEN_TTL_SECONDS') ?? '120',
+    config.get<string>('ACCESS_TOKEN_TTL_SECONDS') ??
+      DEFAULT_ACCESS_TOKEN_TTL_SECONDS,
   );
 
   return Number.isFinite(configuredTtl) && configuredTtl > 0
     ? configuredTtl
-    : 120;
+    : DEFAULT_ACCESS_TOKEN_TTL_SECONDS;
 }
 
 @Module({
@@ -45,6 +49,8 @@ function getAccessTokenTtlSeconds(config: ConfigService): number {
         secret: config.getOrThrow<string>('JWT_SECRET'),
         signOptions: {
           expiresIn: getAccessTokenTtlSeconds(config),
+          issuer: JWT_ISSUER,
+          audience: JWT_AUDIENCE,
         },
       }),
     }),

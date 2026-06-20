@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
+import { JWT_AUDIENCE, JWT_ISSUER } from '@coopers/common';
 import type { JwtPayload, JwtRequestUser } from '../auth.types';
 
 // This is where the JWT based authentication strategy is defined.
@@ -17,6 +18,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         (() => {
           throw new Error('JWT_SECRET is not defined');
         })(),
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
     });
   }
 

@@ -55,11 +55,49 @@ export class SameOriginCsrfGuard implements CanActivate {
       return true;
     }
 
+    // Same-origin requests are not CSRF by definition. The SPAs are served by
+    // this gateway, so their API calls carry the gateway's own origin — trust any
+    // request whose Origin host matches the host it was actually sent to.
+    if (this.isSameOrigin(requestOrigin, request)) {
+      return true;
+    }
+
+    // Otherwise it must be one of the explicitly configured cross-origin
+    // frontends (e.g. a separately hosted SPA).
     if (!this.getAllowedOrigins().has(requestOrigin)) {
       throw new ForbiddenException('Request origin is not allowed.');
     }
 
     return true;
+  }
+
+  private isSameOrigin(requestOrigin: string, request: CsrfRequest): boolean {
+    const targetHost = this.getTargetHost(request);
+
+    if (!targetHost) {
+      return false;
+    }
+
+    return this.getHostFromOrigin(requestOrigin) === targetHost;
+  }
+
+  // The host the browser actually addressed. Behind a proxy the public host is
+  // carried in X-Forwarded-Host; fall back to the Host header otherwise.
+  private getTargetHost(request: CsrfRequest): string | undefined {
+    const forwardedHost = this.getHeaderValue(
+      request.headers['x-forwarded-host'],
+    );
+    const host = forwardedHost ?? this.getHeaderValue(request.headers.host);
+
+    return host ? host.split(',')[0]?.trim().toLowerCase() : undefined;
+  }
+
+  private getHostFromOrigin(origin: string): string | undefined {
+    try {
+      return new URL(origin).host.toLowerCase();
+    } catch {
+      return undefined;
+    }
   }
 
   private getRequestOrigin(request: CsrfRequest): string | undefined {

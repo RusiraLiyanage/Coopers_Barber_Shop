@@ -228,7 +228,7 @@ VALUES (
             'admin@123',
             gen_salt ('bf', 10)
         ),
-        'customer'
+        'admin'
     )
 ON CONFLICT (email) DO NOTHING;
 

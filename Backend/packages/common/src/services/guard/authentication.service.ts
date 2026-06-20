@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UserRole } from '@coopers/entities';
+import { JWT_AUDIENCE, JWT_ISSUER } from '../auth';
 import type { JwtPayload, JwtRequestUser } from '../auth';
 
 export class ExpiredAccessTokenException extends UnauthorizedException {
@@ -39,8 +40,9 @@ export class GuardAuthenticationService {
     const token = this.extractBearerToken(authorizationHeader);
 
     try {
-      const payload =
-        await this.jwtService.verifyAsync<Record<string, unknown>>(token); // check whether the current jwt access token is valid
+      const payload = await this.jwtService.verifyAsync<
+        Record<string, unknown>
+      >(token, { issuer: JWT_ISSUER, audience: JWT_AUDIENCE }); // check whether the current jwt access token is valid (and issued for this audience)
 
       if (!isJwtPayload(payload)) {
         throw new UnauthorizedException('Invalid token payload.'); // the frontend needs to provide a valid token payload
