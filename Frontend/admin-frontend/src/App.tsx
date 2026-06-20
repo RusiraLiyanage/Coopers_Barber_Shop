@@ -283,17 +283,17 @@ function App() {
   const handleContinueAuthSwitch = useCallback(async () => {
     setAuthSwitchLoading(true);
     setSessionTimeoutFlowState('none');
+    setAuthSwitchPromptOpen(false);
+    clearAdminAuthSession();
+    dispatch(resetStore());
+    navigate(authSwitchContinuePath, { replace: true });
 
     try {
       await logoutPreviousAdminSession();
     } catch {
       // Cookie/session state is cleared locally; continue to the requested auth flow.
     } finally {
-      clearAdminAuthSession();
-      dispatch(resetStore());
       setAuthSwitchLoading(false);
-      setAuthSwitchPromptOpen(false);
-      navigate(authSwitchContinuePath, { replace: true });
     }
   }, [authSwitchContinuePath, dispatch, navigate]);
 

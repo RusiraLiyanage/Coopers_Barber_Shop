@@ -622,8 +622,6 @@ export function logoutPreviousClientSession() {
     method: "POST",
     headers: buildHeaders(),
     body: JSON.stringify({}),
-  }).finally(() => {
-    clearClientAuthSession();
   });
 }
 

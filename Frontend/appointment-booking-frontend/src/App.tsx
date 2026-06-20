@@ -512,7 +512,7 @@ function App() {
         title="Active session found"
         open={googleSessionSwitchPrompt !== null}
         okText="End previous session"
-        cancelText="Cancel"
+        cancelText="Keep previous session"
         confirmLoading={authSwitchLoading}
         onOk={() => {
           void handleGoogleSessionSwitchConfirm();

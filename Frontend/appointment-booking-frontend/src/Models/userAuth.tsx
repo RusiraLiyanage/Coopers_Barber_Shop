@@ -1024,14 +1024,17 @@ export default function UserAuthModal({
         title="Active session found"
         open={sessionConflictLoginValues !== null}
         okText="End previous session"
-        cancelText="Cancel"
+        cancelText="Keep previous session"
         confirmLoading={confirmLoading}
         onOk={() => {
           if (sessionConflictLoginValues) {
             void handleLogin(sessionConflictLoginValues, true);
           }
         }}
-        onCancel={() => setSessionConflictLoginValues(null)}
+        onCancel={() => {
+          setSessionConflictLoginValues(null);
+          setConfirmLoading(false);
+        }}
         centered
       >
         <p>This account already has an active session.</p>

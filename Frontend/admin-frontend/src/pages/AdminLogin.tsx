@@ -141,14 +141,17 @@ export default function AdminLogin({ initialError = null }: AdminLoginProps) {
         title="Active session found"
         open={sessionConflictValues !== null}
         okText="End previous session"
-        cancelText="Cancel"
+        cancelText="Keep previous session"
         confirmLoading={submitting}
         onOk={() => {
           if (sessionConflictValues) {
             void handleSubmit(sessionConflictValues, true);
           }
         }}
-        onCancel={() => setSessionConflictValues(null)}
+        onCancel={() => {
+          setSessionConflictValues(null);
+          setSubmitting(false);
+        }}
         centered
       >
         <p>This account already has an active session.</p>

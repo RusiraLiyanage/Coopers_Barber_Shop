@@ -711,8 +711,6 @@ export function logoutPreviousAdminSession() {
     method: 'POST',
     headers: buildHeaders(),
     body: JSON.stringify({}),
-  }).finally(() => {
-    clearAdminAuthSession();
   });
 }
 

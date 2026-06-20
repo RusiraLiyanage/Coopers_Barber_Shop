@@ -138,7 +138,7 @@ export default function GoogleLinkModal({
         title="Active session found"
         open={sessionConflictPassword !== null}
         okText="End previous session"
-        cancelText="Cancel"
+        cancelText="Keep previous session"
         confirmLoading={confirmLoading}
         onOk={() => {
           if (sessionConflictPassword) {
@@ -148,7 +148,10 @@ export default function GoogleLinkModal({
             );
           }
         }}
-        onCancel={() => setSessionConflictPassword(null)}
+        onCancel={() => {
+          setSessionConflictPassword(null);
+          setConfirmLoading(false);
+        }}
         centered
       >
         <p>This account already has an active session.</p>
