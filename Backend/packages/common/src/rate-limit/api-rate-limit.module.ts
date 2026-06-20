@@ -10,9 +10,11 @@ import {
 export const DEFAULT_RATE_LIMIT_TTL_SECONDS = 300;
 export const DEFAULT_RATE_LIMIT_MAX_REQUESTS = 10;
 // Login is brute-force bait, so it gets a tighter bucket than the generic limit:
-// 5 attempts per 5 minutes per client IP by default.
+// 10 attempts per 5 minutes per client IP by default. Account-session conflict
+// retries intentionally submit a second login request, so the bucket needs room
+// for normal recovery while still limiting brute-force loops.
 export const DEFAULT_LOGIN_RATE_LIMIT_TTL_SECONDS = 300;
-export const DEFAULT_LOGIN_RATE_LIMIT_MAX_REQUESTS = 5;
+export const DEFAULT_LOGIN_RATE_LIMIT_MAX_REQUESTS = 10;
 const MILLISECONDS_PER_SECOND = 1000;
 
 // by default, only 10 requests per 300 seconds are allowed.

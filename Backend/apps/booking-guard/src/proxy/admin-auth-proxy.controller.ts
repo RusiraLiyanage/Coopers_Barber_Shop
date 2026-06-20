@@ -5,6 +5,7 @@ import {
   Headers,
   Post,
   Res,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -27,6 +28,20 @@ import { ProxyService } from './proxy.service';
 
 type AuthStatusResponse = {
   authenticated: true;
+};
+
+type AccountProfileResponse = {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  mobile: string | null;
+  suburb: string | null;
+  role: UserRole;
+};
+
+type AdminLoginResponse = AuthStatusResponse & {
+  user: AccountProfileResponse;
 };
 
 type LoginRequestBody = {
@@ -57,6 +72,20 @@ function isAuthTokensResponse(value: unknown): value is AuthTokensResponse {
   return (
     typeof tokens.access_token === 'string' &&
     typeof tokens.refresh_token === 'string'
+  );
+}
+
+function isAccountProfileResponse(value: unknown): value is AccountProfileResponse {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const profile = value as Partial<AccountProfileResponse>;
+
+  return (
+    typeof profile.id === 'string' &&
+    typeof profile.email === 'string' &&
+    profile.role === UserRole.ADMIN
   );
 }
 
@@ -114,6 +143,22 @@ function createLoginAuthApiBody(
   };
 }
 
+async function revokeIssuedTokens(
+  proxyService: ProxyService,
+  tokens: AuthTokensResponse,
+): Promise<void> {
+  await proxyService
+    .forward({
+      target: 'auth',
+      method: 'POST',
+      path: '/auth/logout',
+      body: {
+        refresh_token: tokens.refresh_token,
+      },
+    })
+    .catch(() => undefined);
+}
+
 function getRememberMe(body: { remember?: boolean }): boolean {
   return body.remember === true;
 }
@@ -151,7 +196,39 @@ export class AdminAuthProxyController {
       body: createLoginAuthApiBody(body),
     });
 
-    return writeAdminAuthResponse(response, result, getRememberMe(body));
+    if (!isSuccessStatus(result.statusCode) || !isAuthTokensResponse(result.body)) {
+      return writeAdminAuthResponse(response, result, getRememberMe(body));
+    }
+
+    const profileResult = await this.proxyService.forward({
+      target: 'auth',
+      method: 'GET',
+      path: '/auth/me',
+      headers: {
+        authorization: `Bearer ${result.body.access_token}`,
+      },
+    });
+
+    if (
+      !isSuccessStatus(profileResult.statusCode) ||
+      !isAccountProfileResponse(profileResult.body)
+    ) {
+      await revokeIssuedTokens(this.proxyService, result.body);
+
+      throw new ServiceUnavailableException(
+        'Unable to complete admin login profile check.',
+      );
+    }
+
+    writeStatus(response, result.statusCode);
+    setAdminAuthCookies(response, result.body, {
+      rememberMe: getRememberMe(body),
+    });
+
+    return {
+      authenticated: true,
+      user: profileResult.body,
+    } satisfies AdminLoginResponse;
   }
 
   @ApiOperation({ summary: 'Validate current admin guard cookie session' })

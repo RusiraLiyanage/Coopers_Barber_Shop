@@ -123,7 +123,7 @@ export default function AdminLogin({ initialError = null }: AdminLoginProps) {
           </Form.Item>
 
           <Form.Item name="remember" valuePropName="checked">
-            <Checkbox>Remember this device</Checkbox>
+            <Checkbox>Remember me</Checkbox>
           </Form.Item>
 
           <Button

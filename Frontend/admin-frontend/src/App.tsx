@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Layout, Modal } from 'antd';
-import {
-  Navigate,
-  Route,
-  Routes,
-  useLocation,
-  useNavigate,
-} from 'react-router-dom';
+import { Layout } from 'antd';
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import AdminHeader from './components/AdminHeader';
 import AdminSessionTimeoutModal from './components/AdminSessionTimeoutModal';
 import { SALoadingPanel } from './components/common';
@@ -18,10 +12,10 @@ import {
   getAdminSessionTimeoutDeadlines,
   SESSION_EXPIRED_EVENT,
   SESSION_IDLE_EXPIRED_EVENT,
+  shouldClearStaleAdminAuthSession,
   shouldShowAdminLoginAfterExpiry,
   isSessionExpiredError,
   isSessionIdleExpiredError,
-  logoutPreviousAdminSession,
 } from './lib/api';
 import {
   ADMIN_SESSION_EXPIRED_MESSAGE,
@@ -60,7 +54,6 @@ function isExpectedSignedOutError(error: unknown): boolean {
 
 function App() {
   const dispatch = useAppDispatch();
-  const location = useLocation();
   const navigate = useNavigate();
   const authSession = useAppSelector(selectAuthSession);
   const [authResolved, setAuthResolved] = useState(false);
@@ -69,10 +62,6 @@ function App() {
     useState<SessionTimeoutFlowState>('none');
   const [extendLoading, setExtendLoading] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
-  const [authSwitchPromptOpen, setAuthSwitchPromptOpen] = useState(false);
-  const [authSwitchContinuePath, setAuthSwitchContinuePath] =
-    useState('/login');
-  const [authSwitchLoading, setAuthSwitchLoading] = useState(false);
 
   const isAuthenticated = Boolean(authSession?.authenticated);
   const isSessionTimeoutPromptOpen = sessionTimeoutFlowState === 'extend_prompt';
@@ -91,19 +80,6 @@ function App() {
     setAuthResolved(true);
     navigate('/login', { replace: true });
   }, [dispatch, navigate]);
-
-  useEffect(() => {
-    if (
-      !authResolved ||
-      !isAuthenticated ||
-      (location.pathname !== '/login' && location.pathname !== '/accept-invite')
-    ) {
-      return;
-    }
-
-    setAuthSwitchContinuePath(location.pathname);
-    setAuthSwitchPromptOpen(true);
-  }, [authResolved, isAuthenticated, location.pathname]);
 
   useEffect(() => {
     if (!authResolved) {
@@ -167,6 +143,21 @@ function App() {
 
     if (shouldShowAdminLoginAfterExpiry()) {
       showSessionExpiredNotice();
+
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    if (!canRestoreAdminAuthSession()) {
+      if (shouldClearStaleAdminAuthSession()) {
+        void dispatch(logoutAction())
+          .unwrap()
+          .catch(() => undefined);
+      }
+
+      dispatch(resetStore());
+      setAuthResolved(true);
 
       return () => {
         isMounted = false;
@@ -275,28 +266,6 @@ function App() {
     }
   }, [dispatch, navigate]);
 
-  const handleCancelAuthSwitch = useCallback(() => {
-    setAuthSwitchPromptOpen(false);
-    navigate('/', { replace: true });
-  }, [navigate]);
-
-  const handleContinueAuthSwitch = useCallback(async () => {
-    setAuthSwitchLoading(true);
-    setSessionTimeoutFlowState('none');
-    setAuthSwitchPromptOpen(false);
-    clearAdminAuthSession();
-    dispatch(resetStore());
-    navigate(authSwitchContinuePath, { replace: true });
-
-    try {
-      await logoutPreviousAdminSession();
-    } catch {
-      // Cookie/session state is cleared locally; continue to the requested auth flow.
-    } finally {
-      setAuthSwitchLoading(false);
-    }
-  }, [authSwitchContinuePath, dispatch, navigate]);
-
   const sessionTimeoutModal = (
     <AdminSessionTimeoutModal
       open={isSessionTimeoutPromptOpen}
@@ -307,31 +276,6 @@ function App() {
     />
   );
 
-  const authSwitchModal = (
-    <Modal
-      title="Already signed in"
-      open={authSwitchPromptOpen}
-      okText="End previous session"
-      cancelText="Keep current session"
-      confirmLoading={authSwitchLoading}
-      onOk={() => {
-        void handleContinueAuthSwitch();
-      }}
-      onCancel={handleCancelAuthSwitch}
-      centered
-    >
-      <p>
-        You are already signed in
-        {authSession?.user.email ? ` as ${authSession.user.email}` : ''}.
-      </p>
-      <p>
-        Continuing will end the previous session on this browser before you sign
-        in again.
-      </p>
-      <p>Do you want to continue?</p>
-    </Modal>
-  );
-
   if (!authResolved) {
     return (
       <Layout className="admin-app-shell">
@@ -340,7 +284,6 @@ function App() {
           <SALoadingPanel />
         </Content>
         {sessionTimeoutModal}
-        {authSwitchModal}
       </Layout>
     );
   }
@@ -373,7 +316,6 @@ function App() {
           </Routes>
         </Content>
         {sessionTimeoutModal}
-        {authSwitchModal}
       </Layout>
     );
   }
@@ -390,7 +332,6 @@ function App() {
         </Routes>
       </Content>
       {sessionTimeoutModal}
-      {authSwitchModal}
     </Layout>
   );
 }

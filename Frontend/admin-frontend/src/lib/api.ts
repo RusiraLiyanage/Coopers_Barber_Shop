@@ -78,6 +78,11 @@ export interface AccountProfileResponse {
   role: UserRole;
 }
 
+export interface AdminLoginResponse extends AuthResponse {
+  authenticated: true;
+  user?: AccountProfileResponse;
+}
+
 export type AdminLoginPayload = {
   email: string;
   password: string;
@@ -455,6 +460,10 @@ function hasTrackedAdminSession(): boolean {
   return getLocalStorageValue(ADMIN_HAD_SESSION_KEY) === 'true';
 }
 
+export function shouldClearStaleAdminAuthSession(): boolean {
+  return !canRestoreAdminAuthSession() && hasTrackedAdminSession();
+}
+
 export function clearAdminAuthSession(): void {
   removeSessionStorageValue(ADMIN_BROWSER_SESSION_KEY);
   removeLocalStorageValue(ADMIN_REMEMBERED_SESSION_KEY);
@@ -658,7 +667,7 @@ export function getCurrentSession() {
 }
 
 export function loginAdmin(payload: AdminLoginPayload) {
-  return request<AuthResponse>('/admin-auth/login', {
+  return request<AdminLoginResponse>('/admin-auth/login', {
     method: 'POST',
     headers: buildHeaders(),
     body: JSON.stringify(payload),
@@ -699,14 +708,6 @@ export function getAccountProfile() {
 export function logout() {
   clearAdminAuthSession();
 
-  return request<{ success: boolean }>('/admin-auth/logout', {
-    method: 'POST',
-    headers: buildHeaders(),
-    body: JSON.stringify({}),
-  });
-}
-
-export function logoutPreviousAdminSession() {
   return request<{ success: boolean }>('/admin-auth/logout', {
     method: 'POST',
     headers: buildHeaders(),

@@ -6,6 +6,7 @@ import {
   loginAdmin,
   logout,
   type AdminLoginPayload,
+  type AccountProfileResponse,
 } from '../../lib/api';
 import type { AuthSession } from './types';
 
@@ -14,8 +15,13 @@ const SLICE_NAME = 'auth';
 async function createAdminSession(): Promise<AuthSession> {
   const profile = await getAccountProfile();
 
+  return createAdminSessionFromProfile(profile);
+}
+
+function createAdminSessionFromProfile(
+  profile: AccountProfileResponse,
+): AuthSession {
   if (profile.role !== 'admin') {
-    await logout().catch(() => undefined);
     throw new Error('Admin access required.');
   }
 
@@ -48,7 +54,9 @@ export const loginAdminAction = createAppAsyncThunk<
     throw new Error('Authentication failed');
   }
 
-  return createAdminSession();
+  return response.user
+    ? createAdminSessionFromProfile(response.user)
+    : createAdminSession();
 });
 
 export const extendAdminSessionAction = createAppAsyncThunk<AuthSession>(
