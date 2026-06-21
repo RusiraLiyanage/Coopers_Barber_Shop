@@ -1,13 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { Layout, Modal } from 'antd';
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import HeaderNav from './components/HeaderNav';
 import Home from './pages/HomePage';
-import MyAppointments from './pages/MyAppointments';
-import MyAccount from './pages/MyAccount';
+import { SALoadingPanel } from './components/common';
 import UserAuthModal from './Models/userAuth';
 import GoogleLinkModal from './Models/googleLink';
-import MakeAppointmentModal from './Models/makeAppointment';
 import {
   clearClientAuthSession,
   clearGoogleLinkPromptFromUrl,
@@ -40,6 +38,9 @@ import './App.css';
 
 const { Content, Footer } = Layout;
 const LEGACY_AUTH_TOKEN_KEY = 'booking_auth_token';
+const MakeAppointmentModal = lazy(() => import('./Models/makeAppointment'));
+const MyAccount = lazy(() => import('./pages/MyAccount'));
+const MyAppointments = lazy(() => import('./pages/MyAppointments'));
 const SESSION_RESTORE_ROUTES = new Set([
   '/appointments',
   '/account',
@@ -444,20 +445,28 @@ function App() {
           />
         </Routes>
 
-        <MyAppointments
-          open={location.pathname === '/appointments'}
-          authSession={authSession}
-          refreshKey={appointmentsRefreshKey}
-          onClose={() => navigate('/')}
-          onMakeAppointment={openBookingFlow}
-          onUpdateAppointment={openUpdateAppointmentFlow}
-        />
+        {location.pathname === '/appointments' ? (
+          <Suspense fallback={<SALoadingPanel />}>
+            <MyAppointments
+              open
+              authSession={authSession}
+              refreshKey={appointmentsRefreshKey}
+              onClose={() => navigate('/')}
+              onMakeAppointment={openBookingFlow}
+              onUpdateAppointment={openUpdateAppointmentFlow}
+            />
+          </Suspense>
+        ) : null}
 
-        <MyAccount
-          open={location.pathname === '/account'}
-          authSession={authSession}
-          onClose={() => navigate('/')}
-        />
+        {location.pathname === '/account' ? (
+          <Suspense fallback={<SALoadingPanel />}>
+            <MyAccount
+              open
+              authSession={authSession}
+              onClose={() => navigate('/')}
+            />
+          </Suspense>
+        ) : null}
       </Content>
 
       <UserAuthModal
@@ -489,24 +498,28 @@ function App() {
         }}
       />
 
-      <MakeAppointmentModal
-        open={isAppointmentModalOpen}
-        authSession={authSession}
-        editingAppointment={editingAppointment}
-        onClose={() => {
-          setOpenAppointmentModal(false);
-          setEditingAppointment(null);
-          if (isNewAppointmentRoute) {
-            navigate('/');
-          }
-        }}
-        onBooked={() => {
-          setOpenAppointmentModal(false);
-          setEditingAppointment(null);
-          setAppointmentsRefreshKey((current) => current + 1);
-          navigate('/appointments');
-        }}
-      />
+      {isAppointmentModalOpen ? (
+        <Suspense fallback={null}>
+          <MakeAppointmentModal
+            open
+            authSession={authSession}
+            editingAppointment={editingAppointment}
+            onClose={() => {
+              setOpenAppointmentModal(false);
+              setEditingAppointment(null);
+              if (isNewAppointmentRoute) {
+                navigate('/');
+              }
+            }}
+            onBooked={() => {
+              setOpenAppointmentModal(false);
+              setEditingAppointment(null);
+              setAppointmentsRefreshKey((current) => current + 1);
+              navigate('/appointments');
+            }}
+          />
+        </Suspense>
+      ) : null}
 
       <Modal
         title="Active session found"

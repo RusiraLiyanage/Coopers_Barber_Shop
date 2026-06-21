@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { Layout } from 'antd';
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import AdminHeader from './components/AdminHeader';
@@ -22,7 +22,6 @@ import {
   getUserFriendlyErrorMessage,
 } from './lib/errors';
 import AcceptInvite from './pages/AcceptInvite';
-import AdminDashboard from './pages/AdminDashboard';
 import AdminLogin from './pages/AdminLogin';
 import { resetStore } from './store';
 import {
@@ -36,6 +35,7 @@ import './App.css';
 
 const { Content } = Layout;
 type SessionTimeoutFlowState = 'none' | 'extend_prompt';
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 
 function isExpectedSignedOutError(error: unknown): boolean {
   if (error instanceof Error && error.message === 'Authentication failed') {
@@ -338,12 +338,14 @@ function App() {
     <Layout className="admin-app-shell">
       <AdminHeader isAuthenticated={isAuthenticated} onLogout={handleLogout} />
       <Content className="admin-app-content">
-        <Routes>
-          <Route path="/" element={<AdminDashboard />} />
-          <Route path="/login" element={<AdminDashboard />} />
-          <Route path="/accept-invite" element={<AdminDashboard />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <Suspense fallback={<SALoadingPanel />}>
+          <Routes>
+            <Route path="/" element={<AdminDashboard />} />
+            <Route path="/login" element={<AdminDashboard />} />
+            <Route path="/accept-invite" element={<AdminDashboard />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </Content>
       {sessionTimeoutModal}
     </Layout>
