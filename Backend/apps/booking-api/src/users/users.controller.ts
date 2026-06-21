@@ -7,6 +7,7 @@ import {
   Post,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { PasswordService } from '@coopers/common';
 import { UsersService } from './users.service';
 import { User, UserRole } from '@coopers/entities';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -16,7 +17,10 @@ import { CreateUserDto } from './dto/create-user.dto';
 @ApiTags('users')
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly passwordService: PasswordService,
+  ) {}
 
   // Fetch all users.
   @ApiOperation({ summary: 'Get all users' })
@@ -39,12 +43,7 @@ export class UsersController {
     const existing = await this.usersService.findByEmail(dto.email);
     if (existing) throw new BadRequestException('Email already registered');
 
-    const crypto = await import('crypto');
-    // Hash the password using SHA-256
-    const passwordHash = crypto
-      .createHash('sha256')
-      .update(dto.password)
-      .digest('hex');
+    const passwordHash = await this.passwordService.hash(dto.password);
 
     // Create the user with a default role of CUSTOMER.
     return this.usersService.create({
