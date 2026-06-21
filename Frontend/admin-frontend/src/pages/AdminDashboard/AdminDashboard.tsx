@@ -4,7 +4,6 @@ import {
   Button,
   Descriptions,
   Drawer,
-  Empty,
   Form,
   Input,
   InputNumber,
@@ -13,7 +12,6 @@ import {
   Select,
   Space,
   Switch,
-  Table,
   Tabs,
   Tag,
   Typography,
@@ -24,83 +22,80 @@ import {
   CopyOutlined,
   DeleteOutlined,
   EditOutlined,
-  PlusOutlined,
   ReloadOutlined,
 } from '@ant-design/icons';
-import { format } from 'date-fns';
-import { SACard, SAModalHeader, SAStatusTag } from '../components/common';
-import { useAdminDataFreshness } from '../hooks/useAdminDataFreshness';
-import { getServiceAiStarterConfig } from '../lib/adminOptions';
-import { createAdminInvite } from '../lib/api';
+
+import { SAModalHeader } from '../../components/common';
+import { useAdminDataFreshness } from '../../hooks/useAdminDataFreshness';
+import { getServiceAiStarterConfig } from '../../lib/adminOptions';
+import { createAdminInvite } from '../../lib/api';
 import {
   getUserFriendlyErrorMessage,
   isSessionExpiredError,
-} from '../lib/errors';
+} from '../../lib/errors';
 import {
   createBarberAction,
   deleteBarberAction,
   getBarbersAction,
   updateBarberAction,
-} from '../store/barbers/action';
+} from '../../store/barbers/action';
 import {
   selectBarbers,
   selectBarbersLoading,
   selectBarbersPagingMeta,
   selectBarbersSaving,
-} from '../store/barbers/selector';
-import { getAppointmentBriefsAction } from '../store/briefs/action';
+} from '../../store/barbers/selector';
+import { getAppointmentBriefsAction } from '../../store/briefs/action';
 import {
   selectAppointmentBriefs,
   selectAppointmentBriefsLoading,
   selectAppointmentBriefsPagingMeta,
-} from '../store/briefs/selector';
-import { getHairHistoryAction } from '../store/hairHistory/action';
+} from '../../store/briefs/selector';
+import { getHairHistoryAction } from '../../store/hairHistory/action';
 import {
   selectHairHistory,
   selectHairHistoryLoading,
   selectHairHistoryPagingMeta,
-} from '../store/hairHistory/selector';
-import { useAppDispatch, useAppSelector } from '../store/hooks';
+} from '../../store/hairHistory/selector';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import {
   createReferenceDataItemAction,
   deleteReferenceDataItemAction,
   getReferenceDataAction,
   updateReferenceDataItemAction,
-} from '../store/referenceData/action';
+} from '../../store/referenceData/action';
 import {
   selectReferenceData,
   selectReferenceDataLoading,
   selectReferenceDataPagingMetaByType,
   selectReferenceDataSaving,
-} from '../store/referenceData/selector';
+} from '../../store/referenceData/selector';
 import {
   createSafetyRuleAction,
   getSafetyRulesAction,
   updateSafetyRuleAction,
-} from '../store/safetyRules/action';
+} from '../../store/safetyRules/action';
 import {
   selectSafetyRules,
   selectSafetyRulesLoading,
   selectSafetyRulesPagingMeta,
   selectSafetyRulesSaving,
-} from '../store/safetyRules/selector';
+} from '../../store/safetyRules/selector';
 import {
   createServiceConfigAction,
   getServiceConfigsAction,
   updateServiceConfigAction,
-} from '../store/serviceConfigs/action';
+} from '../../store/serviceConfigs/action';
 import {
   selectServiceConfigs,
   selectServiceConfigsLoading,
   selectServiceConfigsPagingMeta,
   selectServiceConfigsSaving,
-} from '../store/serviceConfigs/selector';
+} from '../../store/serviceConfigs/selector';
 import type {
   AppointmentBriefRecord,
   AdminInviteResponse,
   BarberRecord,
-  CreateBarberPayload,
-  CreateSafetyRulePayload,
   HairHistoryRecord,
   ReferenceDataItemRecord,
   ReferenceDataType,
@@ -109,404 +104,61 @@ import type {
   ServiceComplexity,
   StaffGender,
   StaffRole,
-} from '../lib/api';
+} from '../../lib/api';
+import {
+  buildPrepBriefText,
+  cleanBriefText,
+  getBriefBarberName,
+  getBriefGoalPhotoSrc,
+  getBriefSafetyLines,
+  getBriefSummaryLines,
+  getCustomerName,
+  renderBriefGenerationTag,
+} from './briefUtils';
+import {
+  COMPLEXITY_OPTIONS,
+  DEFAULT_TABLE_PAGE_SIZE,
+  REFERENCE_TABLE_PAGE_SIZE,
+  SEVERITY_OPTIONS,
+  STAFF_GENDER_OPTIONS,
+  STAFF_ROLE_OPTIONS,
+} from './constants';
+import {
+  compactStringArray,
+  filterSelectOption,
+  formatDate,
+  formatDateTime,
+  formatStaffGender,
+  getServiceSetupTag,
+  getStatusTag,
+  isAdminVisibleBarber,
+  isConfiguredService,
+  renderAppointmentStatusTag,
+  renderMappedTags,
+  renderTags,
+  toTitleCase,
+} from './formatters';
+import { createBarberPayload, createSafetyPayload } from './payloads';
+import type {
+  AdminTabKey,
+  BarberFormValues,
+  InviteFormValues,
+  ReferenceDataFormValues,
+  SafetyRuleFormValues,
+  ServiceConfigFormValues,
+  TablePage,
+} from './types';
+import {
+  AdminInvitesTab,
+  AppointmentBriefsTab,
+  BarbersTab,
+  HairHistoryTab,
+  OverviewTab,
+  ReferenceDataTab,
+  SafetyRulesTab,
+  ServiceAiConfigTab,
+} from './tabs';
 import './AdminDashboard.css';
-
-type AdminTabKey =
-  | 'overview'
-  | 'barbers'
-  | 'services'
-  | 'referenceData'
-  | 'safety'
-  | 'briefs'
-  | 'hairHistory'
-  | 'invites';
-
-type BarberFormValues = {
-  displayName: string;
-  email?: string;
-  gender: StaffGender;
-  role: StaffRole;
-  timezone: string;
-  skills: string[];
-  rating: number;
-  available: boolean;
-  active: boolean;
-};
-
-type ServiceConfigFormValues = {
-  name: string;
-  durationMinutes: number;
-  requiredSkills: string[];
-  safetyTriggers: string[];
-  complexity: ServiceComplexity;
-  isActive: boolean;
-};
-
-type SafetyRuleFormValues = {
-  condition: string;
-  serviceIds: string[];
-  message: string;
-  severity: 'low' | 'medium' | 'high';
-  active: boolean;
-};
-
-type InviteFormValues = {
-  email: string;
-  expiresInDays: number;
-};
-
-type ReferenceDataFormValues = {
-  label: string;
-};
-
-const STAFF_ROLE_OPTIONS = [
-  { label: 'Junior', value: 'junior' },
-  { label: 'Senior', value: 'senior' },
-  { label: 'Owner', value: 'owner' },
-];
-
-const STAFF_GENDER_OPTIONS = [
-  { label: 'Not specified', value: 'unspecified' },
-  { label: 'Female', value: 'female' },
-  { label: 'Male', value: 'male' },
-  { label: 'Non-binary', value: 'non_binary' },
-];
-
-const COMPLEXITY_OPTIONS = [
-  { label: 'Low', value: 'low' },
-  { label: 'Medium', value: 'medium' },
-  { label: 'High', value: 'high' },
-];
-
-const SEVERITY_OPTIONS = [
-  { label: 'Low', value: 'low' },
-  { label: 'Medium', value: 'medium' },
-  { label: 'High', value: 'high' },
-];
-
-const BOOTSTRAP_STAFF_ID = '11111111-1111-1111-1111-111111111111';
-const BOOTSTRAP_STAFF_NAME = 'Main Staff';
-const DEFAULT_TABLE_PAGE_SIZE = 8;
-const REFERENCE_TABLE_PAGE_SIZE = 6;
-
-type TablePage = {
-  page: number;
-  limit: number;
-};
-
-function toTitleCase(value: string | null | undefined): string {
-  if (!value) {
-    return 'Unknown';
-  }
-
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
-function formatStaffGender(gender: StaffGender | null | undefined): string {
-  switch (gender) {
-    case 'female':
-      return 'Female';
-    case 'male':
-      return 'Male';
-    case 'non_binary':
-      return 'Non-binary';
-    case 'unspecified':
-    default:
-      return 'Not specified';
-  }
-}
-
-function formatDateTime(value: string): string {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return format(date, 'd MMM yyyy, h:mm a');
-}
-
-function compactStringArray(values: string[] | undefined): string[] {
-  return (values ?? [])
-    .map((value) => value.trim())
-    .filter((value, index, collection) => {
-      return value.length > 0 && collection.indexOf(value) === index;
-    });
-}
-
-function compactOptionalString(value: string | undefined): string | undefined {
-  const trimmedValue = value?.trim();
-
-  return trimmedValue ? trimmedValue : undefined;
-}
-
-function decodeEscapedUnicode(value: string) {
-  return value.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex: string) =>
-    String.fromCharCode(Number.parseInt(hex, 16)),
-  );
-}
-
-function cleanBriefText(value: string) {
-  return decodeEscapedUnicode(value)
-    .replace(/\u2014/g, ' - ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function filterSelectOption(
-  inputValue: string,
-  option?: { label?: unknown; value?: unknown },
-): boolean {
-  const normalizedInput = inputValue.trim().toLowerCase();
-
-  if (!normalizedInput) {
-    return true;
-  }
-
-  const label = String(option?.label ?? '').toLowerCase();
-  const value = String(option?.value ?? '').toLowerCase();
-
-  return label.includes(normalizedInput) || value.includes(normalizedInput);
-}
-
-function renderTags(values: string[] | undefined, emptyText = 'None') {
-  const tags = compactStringArray(values);
-
-  if (tags.length === 0) {
-    return <Typography.Text type="secondary">{emptyText}</Typography.Text>;
-  }
-
-  return (
-    <Space size={[4, 4]} wrap>
-      {tags.map((value) => (
-        <Tag key={value}>{value}</Tag>
-      ))}
-    </Space>
-  );
-}
-
-function renderMappedTags(
-  values: string[] | undefined,
-  labelByValue: Map<string, string>,
-  emptyText = 'None',
-) {
-  const tags = compactStringArray(values);
-
-  if (tags.length === 0) {
-    return <Typography.Text type="secondary">{emptyText}</Typography.Text>;
-  }
-
-  return (
-    <Space size={[4, 4]} wrap>
-      {tags.map((value) => (
-        <Tag key={value}>{labelByValue.get(value) ?? value}</Tag>
-      ))}
-    </Space>
-  );
-}
-
-function getStatusTag(active: boolean, available?: boolean) {
-  if (!active) {
-    return <SAStatusTag color="default">Inactive</SAStatusTag>;
-  }
-
-  if (available === false) {
-    return <SAStatusTag color="gold">Unavailable</SAStatusTag>;
-  }
-
-  return <SAStatusTag color="green">Active</SAStatusTag>;
-}
-
-function getAppointmentStatusCategory(status: string) {
-  switch (status) {
-    case 'cancelled':
-    case 'cancelled_by_client':
-      return 'cancelledClient';
-    case 'cancelled_by_barber':
-      return 'cancelledBarber';
-    default:
-      return 'scheduled';
-  }
-}
-
-function getAppointmentStatusLabel(status: string) {
-  switch (getAppointmentStatusCategory(status)) {
-    case 'cancelledClient':
-      return 'Cancelled by client';
-    case 'cancelledBarber':
-      return 'Cancelled by barber';
-    default:
-      return 'Booked';
-  }
-}
-
-function getAppointmentStatusTagColor(status: string) {
-  switch (getAppointmentStatusCategory(status)) {
-    case 'cancelledClient':
-      return 'red';
-    case 'cancelledBarber':
-      return 'gold';
-    default:
-      return 'green';
-  }
-}
-
-function renderAppointmentStatusTag(status: string) {
-  return (
-    <Tag color={getAppointmentStatusTagColor(status)}>
-      {getAppointmentStatusLabel(status)}
-    </Tag>
-  );
-}
-
-function getCustomerName(brief: AppointmentBriefRecord): string {
-  const { firstName, lastName, email } = brief.booking.customer;
-  const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
-
-  return fullName || email;
-}
-
-function getBriefBarberName(brief: AppointmentBriefRecord): string {
-  return (
-    brief.barber?.displayName ??
-    brief.booking.staff?.displayName ??
-    'Unassigned'
-  );
-}
-
-function getBriefSafetyLines(brief: AppointmentBriefRecord): string[] {
-  return (brief.safetyNotes ?? '')
-    .split('\n')
-    .map(cleanBriefText)
-    .filter(Boolean);
-}
-
-function formatBriefLabel(value: string): string {
-  return value
-    .split('-')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
-}
-
-function getBriefSummaryLines(brief: AppointmentBriefRecord): string[] {
-  return cleanBriefText(brief.clientSummary)
-    .split(/\s+\|\s+|(?<=\.)\s+(?=[A-Z][a-z]+(?:\s+[a-z]+)?:)/)
-    .map((line) =>
-      line.replace(/^([a-z][a-z0-9-]*):/i, (_, label: string) => {
-        return `${formatBriefLabel(label)}:`;
-      }),
-    )
-    .map((line) => line.trim())
-    .filter(Boolean);
-}
-
-function buildPrepBriefText(brief: AppointmentBriefRecord): string {
-  const safetyLines = getBriefSafetyLines(brief);
-  const summaryLines = getBriefSummaryLines(brief);
-  const generationText =
-    brief.generationSource === 'claude'
-      ? `Claude${brief.generationModel ? ` (${brief.generationModel})` : ''}`
-      : 'Deterministic fallback';
-
-  return [
-    `Customer: ${getCustomerName(brief)}`,
-    `Service: ${brief.booking.service.name}`,
-    `Appointment: ${formatDateTime(brief.booking.startAt)}`,
-    `Barber: ${getBriefBarberName(brief)}`,
-    `Generated by: ${generationText}`,
-    '',
-    'Client summary:',
-    summaryLines.length > 0
-      ? summaryLines.map((line) => `- ${line}`).join('\n')
-      : 'Not recorded',
-    '',
-    'Hair state:',
-    compactStringArray(brief.hairState).map(cleanBriefText).join(', ') ||
-      'None recorded',
-    '',
-    'Desired look:',
-    brief.desiredLook ? cleanBriefText(brief.desiredLook) : 'Not provided',
-    '',
-    'Safety notes:',
-    safetyLines.length > 0 ? safetyLines.join('\n') : 'No safety notes',
-  ].join('\n');
-}
-
-function renderBriefGenerationTag(brief: AppointmentBriefRecord) {
-  if (brief.generationSource === 'claude') {
-    return <Tag color="green">{brief.generationModel ?? 'Claude'}</Tag>;
-  }
-
-  return <Tag color="gold">Fallback</Tag>;
-}
-
-function getBriefGoalPhotoSrc(brief: AppointmentBriefRecord): string | null {
-  if (!brief.goalPhoto) {
-    return null;
-  }
-
-  return `data:${brief.goalPhoto.mediaType};base64,${brief.goalPhoto.data}`;
-}
-
-function isAdminVisibleBarber(barber: BarberRecord): boolean {
-  const isBootstrapId = barber.id === BOOTSTRAP_STAFF_ID;
-  const isDefaultBookingStaff =
-    barber.displayName === BOOTSTRAP_STAFF_NAME &&
-    barber.email === null &&
-    compactStringArray(barber.skills).length === 0;
-
-  return !isBootstrapId && !isDefaultBookingStaff;
-}
-
-function isConfiguredService(
-  service: ServiceAiConfigRecord,
-  knownCapabilityValues: Set<string>,
-): boolean {
-  const requiredSkills = compactStringArray(service.requiredSkills);
-
-  return (
-    requiredSkills.length > 0 &&
-    requiredSkills.every((skill) => knownCapabilityValues.has(skill))
-  );
-}
-
-function getServiceSetupTag(
-  service: ServiceAiConfigRecord,
-  knownCapabilityValues: Set<string>,
-) {
-  if (isConfiguredService(service, knownCapabilityValues)) {
-    return <SAStatusTag color="green">Ready</SAStatusTag>;
-  }
-
-  return <SAStatusTag color="gold">Needs setup</SAStatusTag>;
-}
-
-function createBarberPayload(values: BarberFormValues): CreateBarberPayload {
-  return {
-    displayName: values.displayName.trim(),
-    email: compactOptionalString(values.email),
-    gender: values.gender,
-    role: values.role,
-    timezone: values.timezone.trim(),
-    skills: compactStringArray(values.skills),
-    rating: values.rating,
-    available: values.available,
-    active: values.active,
-  };
-}
-
-function createSafetyPayload(
-  values: SafetyRuleFormValues,
-): CreateSafetyRulePayload {
-  return {
-    condition: values.condition.trim(),
-    serviceIds: compactStringArray(values.serviceIds),
-    message: values.message.trim(),
-    severity: values.severity,
-    active: values.active,
-  };
-}
 
 export default function AdminDashboard() {
   const dispatch = useAppDispatch();
@@ -1496,7 +1148,7 @@ export default function AdminDashboard() {
       dataIndex: 'visitDate',
       key: 'visitDate',
       width: 150,
-      render: (visitDate: string) => format(new Date(visitDate), 'd MMM yyyy'),
+      render: (visitDate: string) => formatDate(visitDate),
     },
     {
       title: 'Client',
@@ -1595,494 +1247,120 @@ export default function AdminDashboard() {
             key: 'overview',
             label: 'Overview',
             children: (
-              <Space
-                direction="vertical"
-                size={20}
-                className="admin-full-width"
-              >
-                <Alert
-                  type="info"
-                  showIcon
-                  message="Admin setup order"
-                  description="Keep barber profiles, service matching rules, and safety rules current. New client consultations create appointment briefs here so staff can prepare before the visit."
-                />
-                <div className="admin-overview-grid">
-                  {overviewStats.map((stat) => (
-                    <SACard key={stat.label} bodyPadding={20}>
-                      <div className="admin-stat-card">
-                        <Typography.Text type="secondary">
-                          {stat.label}
-                        </Typography.Text>
-                        <Typography.Title level={2}>
-                          {stat.value}
-                        </Typography.Title>
-                      </div>
-                    </SACard>
-                  ))}
-                </div>
-                <div className="admin-quality-panel">
-                  {servicesMissingSkills.length > 0 ? (
-                    <Alert
-                      type="warning"
-                      showIcon
-                      message="Services needing AI setup"
-                      description={servicesMissingSkills
-                        .map((service) => service.name)
-                        .join(', ')}
-                    />
-                  ) : null}
-                  {barbersMissingSkills.length > 0 ? (
-                    <Alert
-                      type="warning"
-                      showIcon
-                      message="Barbers missing capabilities"
-                      description={barbersMissingSkills
-                        .map((barber) => barber.displayName)
-                        .join(', ')}
-                    />
-                  ) : null}
-                  {servicesMissingSkills.length === 0 &&
-                  barbersMissingSkills.length === 0 ? (
-                    <Alert
-                      type="success"
-                      showIcon
-                      message="AI-critical service and barber metadata is complete."
-                    />
-                  ) : null}
-                </div>
-              </Space>
+              <OverviewTab
+                overviewStats={overviewStats}
+                servicesMissingSkills={servicesMissingSkills}
+                barbersMissingSkills={barbersMissingSkills}
+              />
             ),
           },
           {
             key: 'barbers',
             label: 'Barbers',
             children: (
-              <div className="admin-table-section">
-                <Alert
-                  type="info"
-                  showIcon
-                  className="admin-section-guide"
-                  message="Why barber profiles matter"
-                  description="The AI consultation will use each barber's capabilities, role, availability, and rating to recommend the right person for a client request. Add only barbers that should participate in AI matching."
-                />
-                <div className="admin-section-toolbar">
-                  <Typography.Title level={4}>Barber profiles</Typography.Title>
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    onClick={showCreateBarberModal}
-                  >
-                    Add barber
-                  </Button>
-                </div>
-                <Table
-                  rowKey="id"
-                  columns={barberColumns}
-                  dataSource={visibleBarbers}
-                  loading={barbersLoading}
-                  scroll={{ x: 980 }}
-                  pagination={{
-                    current: barbersPagingMeta?.page ?? barbersPage.page,
-                    pageSize: barbersPagingMeta?.limit ?? barbersPage.limit,
-                    total: barbersPagingMeta?.totalItem ?? 0,
-                    showSizeChanger: false,
-                    onChange: (page, limit) => setBarbersPage({ page, limit }),
-                  }}
-                  locale={{
-                    emptyText: (
-                      <Empty description="No AI-ready barbers yet. Add barber profiles manually to start matching clients." />
-                    ),
-                  }}
-                />
-              </div>
+              <BarbersTab
+                columns={barberColumns}
+                data={visibleBarbers}
+                loading={barbersLoading}
+                pagingMeta={barbersPagingMeta}
+                page={barbersPage}
+                onPageChange={setBarbersPage}
+                onCreate={showCreateBarberModal}
+              />
             ),
           },
           {
             key: 'services',
             label: 'Service AI Config',
             children: (
-              <div className="admin-table-section">
-                <Alert
-                  type="info"
-                  showIcon
-                  className="admin-section-guide"
-                  message="Why service AI config matters"
-                  description="Required skills tell the AI who can perform a service. Safety triggers are keywords or situations that should make the AI check safety rules before recommending a path."
-                />
-                <div className="admin-section-toolbar">
-                  <div>
-                    <Typography.Title level={4}>
-                      Service matching rules
-                    </Typography.Title>
-                    <Typography.Text type="secondary">
-                      Every booking service should have capabilities,
-                      complexity, and optional safety triggers before the
-                      consultation agent uses it.
-                    </Typography.Text>
-                  </div>
-                  <Space wrap>
-                    <Select
-                      className="admin-toolbar-select"
-                      placeholder="Jump to a service that needs setup"
-                      options={unconfiguredServiceOptions}
-                      onSelect={handleSelectServiceToConfigure}
-                      showSearch
-                      filterOption={filterSelectOption}
-                      optionFilterProp="label"
-                      disabled={
-                        serviceConfigsLoading ||
-                        unconfiguredServiceOptions.length === 0
-                      }
-                      allowClear
-                    />
-                    <Button
-                      type="primary"
-                      icon={<PlusOutlined />}
-                      onClick={showCreateServiceModal}
-                    >
-                      Add service
-                    </Button>
-                  </Space>
-                </div>
-                <Table
-                  rowKey="id"
-                  columns={serviceColumns}
-                  dataSource={sortedServiceConfigs}
-                  loading={serviceConfigsLoading}
-                  scroll={{ x: 1040 }}
-                  pagination={{
-                    current:
-                      serviceConfigsPagingMeta?.page ?? servicesPage.page,
-                    pageSize:
-                      serviceConfigsPagingMeta?.limit ?? servicesPage.limit,
-                    total: serviceConfigsPagingMeta?.totalItem ?? 0,
-                    showSizeChanger: false,
-                    onChange: (page, limit) => setServicesPage({ page, limit }),
-                  }}
-                  locale={{
-                    emptyText: (
-                      <Empty description="No booking services available yet." />
-                    ),
-                  }}
-                />
-              </div>
+              <ServiceAiConfigTab
+                columns={serviceColumns}
+                data={sortedServiceConfigs}
+                loading={serviceConfigsLoading}
+                pagingMeta={serviceConfigsPagingMeta}
+                page={servicesPage}
+                unconfiguredServiceOptions={unconfiguredServiceOptions}
+                onPageChange={setServicesPage}
+                onCreate={showCreateServiceModal}
+                onSelectServiceToConfigure={handleSelectServiceToConfigure}
+                filterSelectOption={filterSelectOption}
+              />
             ),
           },
           {
             key: 'referenceData',
             label: 'Reference Data',
             children: (
-              <Space
-                direction="vertical"
-                size={20}
-                className="admin-full-width"
-              >
-                <Alert
-                  type="info"
-                  showIcon
-                  className="admin-section-guide"
-                  message="Why reference data matters"
-                  description="Capabilities and safety triggers are the canonical vocabulary for AI matching. Admins should maintain these here so barber profiles and services both use the same controlled terms."
-                />
-                <div className="admin-reference-grid">
-                  <SACard bodyPadding={24}>
-                    <div className="admin-section-toolbar">
-                      <div>
-                        <Typography.Title level={4}>
-                          Barber capabilities
-                        </Typography.Title>
-                        <Typography.Text type="secondary">
-                          Used by barber profiles and service matching rules.
-                        </Typography.Text>
-                      </div>
-                      <Button
-                        type="primary"
-                        icon={<PlusOutlined />}
-                        onClick={() =>
-                          showCreateReferenceDataModal('barber_capability')
-                        }
-                      >
-                        Add capability
-                      </Button>
-                    </div>
-                    <Table
-                      rowKey="id"
-                      columns={referenceDataColumns}
-                      dataSource={barberCapabilityItems}
-                      loading={referenceDataLoading}
-                      pagination={{
-                        current:
-                          barberCapabilityPagingMeta?.page ??
-                          barberCapabilityPage.page,
-                        pageSize:
-                          barberCapabilityPagingMeta?.limit ??
-                          barberCapabilityPage.limit,
-                        total: barberCapabilityPagingMeta?.totalItem ?? 0,
-                        showSizeChanger: false,
-                        onChange: (page, limit) =>
-                          setBarberCapabilityPage({ page, limit }),
-                      }}
-                      locale={{
-                        emptyText: (
-                          <Empty description="No barber capabilities added yet." />
-                        ),
-                      }}
-                    />
-                  </SACard>
-                  <SACard bodyPadding={24}>
-                    <div className="admin-section-toolbar">
-                      <div>
-                        <Typography.Title level={4}>
-                          Safety triggers
-                        </Typography.Title>
-                        <Typography.Text type="secondary">
-                          Used by service AI config before safety rules are
-                          checked.
-                        </Typography.Text>
-                      </div>
-                      <Button
-                        type="primary"
-                        icon={<PlusOutlined />}
-                        onClick={() =>
-                          showCreateReferenceDataModal('safety_trigger')
-                        }
-                      >
-                        Add trigger
-                      </Button>
-                    </div>
-                    <Table
-                      rowKey="id"
-                      columns={referenceDataColumns}
-                      dataSource={safetyTriggerItems}
-                      loading={referenceDataLoading}
-                      pagination={{
-                        current:
-                          safetyTriggerPagingMeta?.page ??
-                          safetyTriggerPage.page,
-                        pageSize:
-                          safetyTriggerPagingMeta?.limit ??
-                          safetyTriggerPage.limit,
-                        total: safetyTriggerPagingMeta?.totalItem ?? 0,
-                        showSizeChanger: false,
-                        onChange: (page, limit) =>
-                          setSafetyTriggerPage({ page, limit }),
-                      }}
-                      locale={{
-                        emptyText: (
-                          <Empty description="No safety triggers added yet." />
-                        ),
-                      }}
-                    />
-                  </SACard>
-                </div>
-              </Space>
+              <ReferenceDataTab
+                columns={referenceDataColumns}
+                barberCapabilityItems={barberCapabilityItems}
+                safetyTriggerItems={safetyTriggerItems}
+                loading={referenceDataLoading}
+                barberCapabilityPagingMeta={barberCapabilityPagingMeta}
+                safetyTriggerPagingMeta={safetyTriggerPagingMeta}
+                barberCapabilityPage={barberCapabilityPage}
+                safetyTriggerPage={safetyTriggerPage}
+                onBarberCapabilityPageChange={setBarberCapabilityPage}
+                onSafetyTriggerPageChange={setSafetyTriggerPage}
+                onCreate={showCreateReferenceDataModal}
+              />
             ),
           },
           {
             key: 'safety',
             label: 'Safety Rules',
             children: (
-              <div className="admin-table-section">
-                <Alert
-                  type="info"
-                  showIcon
-                  className="admin-section-guide"
-                  message="Why safety rules matter"
-                  description="Safety rules are the policy layer for risky requests such as scalp sensitivity, allergies, bleach damage, box dye, or formal styling requirements. The AI should use them before creating a recommendation."
-                />
-                <div className="admin-section-toolbar">
-                  <Typography.Title level={4}>Safety rules</Typography.Title>
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    onClick={showCreateSafetyRuleModal}
-                  >
-                    Add rule
-                  </Button>
-                </div>
-                <Table
-                  rowKey="id"
-                  columns={safetyColumns}
-                  dataSource={safetyRules}
-                  loading={safetyRulesLoading}
-                  scroll={{ x: 900 }}
-                  pagination={{
-                    current: safetyRulesPagingMeta?.page ?? safetyPage.page,
-                    pageSize: safetyRulesPagingMeta?.limit ?? safetyPage.limit,
-                    total: safetyRulesPagingMeta?.totalItem ?? 0,
-                    showSizeChanger: false,
-                    onChange: (page, limit) => setSafetyPage({ page, limit }),
-                  }}
-                  locale={{
-                    emptyText: (
-                      <Empty description="No safety rules yet. Add rules after configuring the services they apply to." />
-                    ),
-                  }}
-                />
-              </div>
+              <SafetyRulesTab
+                columns={safetyColumns}
+                data={safetyRules}
+                loading={safetyRulesLoading}
+                pagingMeta={safetyRulesPagingMeta}
+                page={safetyPage}
+                onPageChange={setSafetyPage}
+                onCreate={showCreateSafetyRuleModal}
+              />
             ),
           },
           {
             key: 'briefs',
             label: 'Appointment Briefs',
             children: (
-              <div className="admin-table-section">
-                <Alert
-                  type="info"
-                  showIcon
-                  className="admin-section-guide"
-                  message="Appointment prep queue"
-                  description="Briefs are generated from the client consultation at booking time. Open a brief to review the customer's request, hair state, desired look, and safety notes before the appointment."
-                />
-                <div className="admin-section-toolbar">
-                  <Typography.Title level={4}>
-                    Upcoming appointment briefs
-                  </Typography.Title>
-                </div>
-                {appointmentBriefs.length === 0 && !briefsLoading ? (
-                  <Empty description="No briefs generated yet" />
-                ) : (
-                  <Table
-                    rowKey="id"
-                    columns={briefColumns}
-                    dataSource={appointmentBriefs}
-                    loading={briefsLoading}
-                    scroll={{ x: 980 }}
-                    pagination={{
-                      current: briefsPagingMeta?.page ?? briefsPage.page,
-                      pageSize: briefsPagingMeta?.limit ?? briefsPage.limit,
-                      total: briefsPagingMeta?.totalItem ?? 0,
-                      showSizeChanger: false,
-                      onChange: (page, limit) => setBriefsPage({ page, limit }),
-                    }}
-                  />
-                )}
-              </div>
+              <AppointmentBriefsTab
+                columns={briefColumns}
+                data={appointmentBriefs}
+                loading={briefsLoading}
+                pagingMeta={briefsPagingMeta}
+                page={briefsPage}
+                onPageChange={setBriefsPage}
+              />
             ),
           },
           {
             key: 'hairHistory',
             label: 'Hair History',
             children: (
-              <div className="admin-table-section">
-                <Alert
-                  type="info"
-                  showIcon
-                  className="admin-section-guide"
-                  message="Why hair history matters"
-                  description="Hair history is cross-visit memory. It helps the AI avoid repeating unsafe recommendations when a client has previous colour, bleach, product, sensitivity, or damage history."
-                />
-                <div className="admin-section-toolbar">
-                  <Typography.Title level={4}>
-                    Client hair history
-                  </Typography.Title>
-                </div>
-                {hairHistory.length === 0 && !hairHistoryLoading ? (
-                  <Empty description="No hair history recorded yet" />
-                ) : (
-                  <Table
-                    rowKey="id"
-                    columns={hairHistoryColumns}
-                    dataSource={hairHistory}
-                    loading={hairHistoryLoading}
-                    scroll={{ x: 1100 }}
-                    pagination={{
-                      current:
-                        hairHistoryPagingMeta?.page ?? hairHistoryPage.page,
-                      pageSize:
-                        hairHistoryPagingMeta?.limit ?? hairHistoryPage.limit,
-                      total: hairHistoryPagingMeta?.totalItem ?? 0,
-                      showSizeChanger: false,
-                      onChange: (page, limit) =>
-                        setHairHistoryPage({ page, limit }),
-                    }}
-                  />
-                )}
-              </div>
+              <HairHistoryTab
+                columns={hairHistoryColumns}
+                data={hairHistory}
+                loading={hairHistoryLoading}
+                pagingMeta={hairHistoryPagingMeta}
+                page={hairHistoryPage}
+                onPageChange={setHairHistoryPage}
+              />
             ),
           },
           {
             key: 'invites',
             label: 'Admin Invites',
             children: (
-              <div className="admin-table-section">
-                <Alert
-                  type="info"
-                  showIcon
-                  className="admin-section-guide"
-                  message="Why admin invites matter"
-                  description="Use invites to onboard trusted admins without sharing the main admin password. Invite acceptance creates an admin account that can manage AI setup data."
-                />
-                <div className="admin-section-toolbar">
-                  <Typography.Title level={4}>
-                    Invite administrators
-                  </Typography.Title>
-                </div>
-                <SACard bodyPadding={24}>
-                  <Form<InviteFormValues>
-                    form={inviteForm}
-                    layout="vertical"
-                    initialValues={{ expiresInDays: 7 }}
-                    onFinish={() => void handleCreateInvite()}
-                  >
-                    <div className="admin-form-grid">
-                      <Form.Item
-                        name="email"
-                        label="Admin email"
-                        rules={[
-                          { required: true, message: 'Email is required.' },
-                          { type: 'email', message: 'Enter a valid email.' },
-                        ]}
-                      >
-                        <Input placeholder="admin@coopers.local" />
-                      </Form.Item>
-                      <Form.Item
-                        name="expiresInDays"
-                        label="Expires in days"
-                        rules={[{ required: true }]}
-                      >
-                        <InputNumber
-                          min={1}
-                          max={30}
-                          className="admin-full-width"
-                        />
-                      </Form.Item>
-                    </div>
-                    <Button
-                      type="primary"
-                      htmlType="submit"
-                      loading={inviteSubmitting}
-                    >
-                      Create invite
-                    </Button>
-                  </Form>
-
-                  {inviteLink ? (
-                    <Alert
-                      className="admin-invite-result"
-                      type="success"
-                      showIcon
-                      message={`Invite created for ${createdInvite?.email}`}
-                      description={
-                        <Space
-                          direction="vertical"
-                          className="admin-full-width"
-                        >
-                          <Typography.Text copyable>
-                            {inviteLink}
-                          </Typography.Text>
-                          <Button
-                            icon={<CopyOutlined />}
-                            onClick={() => void handleCopyInviteLink()}
-                          >
-                            Copy invite link
-                          </Button>
-                        </Space>
-                      }
-                    />
-                  ) : null}
-                </SACard>
-              </div>
+              <AdminInvitesTab
+                form={inviteForm}
+                inviteSubmitting={inviteSubmitting}
+                inviteLink={inviteLink}
+                createdInvite={createdInvite}
+                onCreateInvite={() => void handleCreateInvite()}
+                onCopyInviteLink={() => void handleCopyInviteLink()}
+              />
             ),
           },
         ]}
