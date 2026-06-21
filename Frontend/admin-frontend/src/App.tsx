@@ -149,6 +149,20 @@ function App() {
       };
     }
 
+    const deadlines = getAdminSessionTimeoutDeadlines();
+
+    if (deadlines && Date.now() >= deadlines.promptAt) {
+      if (Date.now() >= deadlines.graceExpiresAt) {
+        showSessionExpiredNotice();
+      } else {
+        showSessionExtensionPrompt();
+      }
+
+      return () => {
+        isMounted = false;
+      };
+    }
+
     if (!canRestoreAdminAuthSession()) {
       if (shouldClearStaleAdminAuthSession()) {
         void dispatch(logoutAction())
