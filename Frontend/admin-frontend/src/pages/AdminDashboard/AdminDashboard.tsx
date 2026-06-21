@@ -28,7 +28,7 @@ import {
 import { SAModalHeader } from '../../components/common';
 import { useAdminDataFreshness } from '../../hooks/useAdminDataFreshness';
 import { getServiceAiStarterConfig } from '../../lib/adminOptions';
-import { createAdminInvite } from '../../lib/api';
+import { createAdminInvite, createHairHistoryFromBrief } from '../../lib/api';
 import {
   getUserFriendlyErrorMessage,
   isSessionExpiredError,
@@ -142,6 +142,7 @@ import { createBarberPayload, createSafetyPayload } from './payloads';
 import type {
   AdminTabKey,
   BarberFormValues,
+  HairHistoryFromBriefFormValues,
   InviteFormValues,
   ReferenceDataFormValues,
   SafetyRuleFormValues,
@@ -169,11 +170,14 @@ export default function AdminDashboard() {
   const [safetyRuleForm] = Form.useForm<SafetyRuleFormValues>();
   const [inviteForm] = Form.useForm<InviteFormValues>();
   const [referenceDataForm] = Form.useForm<ReferenceDataFormValues>();
+  const [hairHistoryFromBriefForm] =
+    Form.useForm<HairHistoryFromBriefFormValues>();
   const [barberModalOpen, setBarberModalOpen] = useState(false);
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
   const [safetyModalOpen, setSafetyModalOpen] = useState(false);
   const [referenceDataModalOpen, setReferenceDataModalOpen] = useState(false);
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
+  const [hairHistorySaving, setHairHistorySaving] = useState(false);
   const [createdInvite, setCreatedInvite] =
     useState<AdminInviteResponse | null>(null);
   const [editingBarber, setEditingBarber] = useState<BarberRecord | null>(null);
@@ -423,6 +427,23 @@ export default function AdminDashboard() {
   useEffect(() => {
     void loadAdminData();
   }, [loadAdminData]);
+
+  useEffect(() => {
+    if (!selectedBrief) {
+      hairHistoryFromBriefForm.resetFields();
+      return;
+    }
+
+    const startAt = new Date(selectedBrief.booking.startAt);
+
+    hairHistoryFromBriefForm.setFieldsValue({
+      visitDate: Number.isNaN(startAt.getTime())
+        ? undefined
+        : startAt.toISOString().slice(0, 10),
+      productsUsed: '',
+      barberNotes: '',
+    });
+  }, [hairHistoryFromBriefForm, selectedBrief]);
 
   const overviewStats = useMemo(
     () => [
@@ -794,6 +815,30 @@ export default function AdminDashboard() {
   const handleCopyPrepBrief = async (brief: AppointmentBriefRecord) => {
     await navigator.clipboard.writeText(buildPrepBriefText(brief));
     messageApi.success('Appointment prep brief copied.');
+  };
+
+  const handleSaveHairHistoryFromBrief = async () => {
+    if (!selectedBrief) {
+      return;
+    }
+
+    const values = await hairHistoryFromBriefForm.validateFields();
+    setHairHistorySaving(true);
+
+    try {
+      await createHairHistoryFromBrief(selectedBrief.id, {
+        visitDate: values.visitDate,
+        productsUsed: values.productsUsed?.trim() || undefined,
+        barberNotes: values.barberNotes?.trim() || undefined,
+      });
+      await dispatch(getHairHistoryAction(hairHistoryPage)).unwrap();
+      messageApi.success('Hair history saved for future consultations.');
+      hairHistoryFromBriefForm.resetFields();
+    } catch (error) {
+      showRequestError(error);
+    } finally {
+      setHairHistorySaving(false);
+    }
   };
 
   const barberColumns: ColumnsType<BarberRecord> = [
@@ -1831,6 +1876,52 @@ export default function AdminDashboard() {
               ) : (
                 <Typography.Text type="secondary">Not provided</Typography.Text>
               )}
+            </section>
+            <section className="admin-brief-section">
+              <Typography.Title level={5}>Save to hair history</Typography.Title>
+              <Typography.Paragraph type="secondary">
+                Add final visit details after the appointment so future AI
+                consultations can use the confirmed hair history.
+              </Typography.Paragraph>
+              <Form
+                form={hairHistoryFromBriefForm}
+                layout="vertical"
+                requiredMark={false}
+              >
+                <Form.Item
+                  name="visitDate"
+                  label="Visit date"
+                  rules={[
+                    { required: true, message: 'Visit date is required.' },
+                  ]}
+                >
+                  <Input type="date" />
+                </Form.Item>
+                <Form.Item
+                  name="productsUsed"
+                  label="Products or treatments used"
+                >
+                  <Input.TextArea
+                    rows={3}
+                    maxLength={1000}
+                    placeholder="Bond repair treatment, toner, styling product..."
+                  />
+                </Form.Item>
+                <Form.Item name="barberNotes" label="Barber notes">
+                  <Input.TextArea
+                    rows={4}
+                    maxLength={2000}
+                    placeholder="What should the next barber know before recommending a service?"
+                  />
+                </Form.Item>
+                <Button
+                  type="primary"
+                  loading={hairHistorySaving}
+                  onClick={() => void handleSaveHairHistoryFromBrief()}
+                >
+                  Save to hair history
+                </Button>
+              </Form>
             </section>
           </Space>
         ) : null}

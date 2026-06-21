@@ -53,6 +53,12 @@ export type ReferenceDataFormValues = {
   label: string;
 };
 
+export type HairHistoryFromBriefFormValues = {
+  productsUsed?: string;
+  barberNotes?: string;
+  visitDate?: string;
+};
+
 export type ReferenceDataTableType = ReferenceDataType;
 
 export type TablePage = {

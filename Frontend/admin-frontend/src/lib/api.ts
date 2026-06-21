@@ -199,6 +199,12 @@ export interface HairHistoryRecord {
   createdAt: string;
 }
 
+export type CreateHairHistoryFromBriefPayload = {
+  productsUsed?: string;
+  barberNotes?: string;
+  visitDate?: string;
+};
+
 export type CreateBarberPayload = {
   displayName: string;
   email?: string;
@@ -944,6 +950,21 @@ export function getHairHistory(pagination: PaginationRequest = {}) {
       headers: buildHeaders(),
     },
   ).then((response) => {
+    recordAdminSessionActivity();
+
+    return response;
+  });
+}
+
+export function createHairHistoryFromBrief(
+  briefId: string,
+  payload: CreateHairHistoryFromBriefPayload,
+) {
+  return request<HairHistoryRecord>(`/admin/briefs/${briefId}/hair-history`, {
+    method: 'POST',
+    headers: buildHeaders(),
+    body: JSON.stringify(payload),
+  }).then((response) => {
     recordAdminSessionActivity();
 
     return response;

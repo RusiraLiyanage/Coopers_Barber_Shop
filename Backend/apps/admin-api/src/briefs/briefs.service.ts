@@ -1,10 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Appointment, AppointmentBrief, Staff } from '@coopers/entities';
+import {
+  Appointment,
+  AppointmentBrief,
+  HairHistory,
+  Staff,
+} from '@coopers/entities';
 import { PaginatedResult, PagingMetaDto } from '../common/pagination.dto';
 import { BriefsQueryDto } from './dto/briefs-query.dto';
 import { CreateBriefDto } from './dto/create-brief.dto';
+import { CreateHairHistoryFromBriefDto } from './dto/create-hair-history-from-brief.dto';
 
 interface BriefUserResponse {
   id: string;
@@ -68,6 +74,8 @@ export class BriefsService {
     private readonly appointmentRepository: Repository<Appointment>,
     @InjectRepository(Staff)
     private readonly staffRepository: Repository<Staff>,
+    @InjectRepository(HairHistory)
+    private readonly hairHistoryRepository: Repository<HairHistory>,
   ) {}
 
   private toBriefResponse(brief: AppointmentBrief): AppointmentBriefResponse {
@@ -172,6 +180,50 @@ export class BriefsService {
     }
 
     return this.toBriefResponse(appointmentBrief);
+  }
+
+  async createHairHistoryFromBrief(
+    id: string,
+    dto: CreateHairHistoryFromBriefDto,
+  ): Promise<HairHistory> {
+    const appointmentBrief = await this.appointmentBriefRepository.findOne({
+      where: { id },
+      relations: {
+        booking: {
+          customer: true,
+          service: true,
+          staff: true,
+        },
+        barber: true,
+      },
+    });
+
+    if (!appointmentBrief) {
+      throw new NotFoundException('Appointment brief not found.');
+    }
+
+    const visitDate =
+      dto.visitDate ??
+      appointmentBrief.booking.startAt.toISOString().slice(0, 10);
+    const hairHistory = this.hairHistoryRepository.create({
+      client: appointmentBrief.booking.customer,
+      barber: appointmentBrief.barber ?? appointmentBrief.booking.staff,
+      service: appointmentBrief.booking.service.name,
+      hairState: normalizeStringArray(appointmentBrief.hairState),
+      productsUsed: dto.productsUsed?.trim() || null,
+      barberNotes: dto.barberNotes?.trim() || null,
+      visitDate,
+    });
+
+    const savedHistory = await this.hairHistoryRepository.save(hairHistory);
+
+    return this.hairHistoryRepository.findOneOrFail({
+      where: { id: savedHistory.id },
+      relations: {
+        client: true,
+        barber: true,
+      },
+    });
   }
 
   async create(

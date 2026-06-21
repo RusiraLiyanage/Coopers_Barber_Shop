@@ -14,12 +14,14 @@ import {
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
+import { HairHistory } from '@coopers/entities';
 import { AdminRoleGuard } from '../auth/guards/admin-role.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PaginatedResult } from '../common/pagination.dto';
 import { AppointmentBriefResponse, BriefsService } from './briefs.service';
 import { BriefsQueryDto } from './dto/briefs-query.dto';
 import { CreateBriefDto } from './dto/create-brief.dto';
+import { CreateHairHistoryFromBriefDto } from './dto/create-hair-history-from-brief.dto';
 
 @ApiTags('briefs')
 @ApiBearerAuth('access-token')
@@ -42,6 +44,20 @@ export class BriefsController {
   @Get(':id')
   findOne(@Param('id') id: string): Promise<AppointmentBriefResponse> {
     return this.briefsService.findOne(id);
+  }
+
+  @ApiOperation({
+    summary: 'Save a completed appointment brief to hair history',
+  })
+  @ApiParam({ name: 'id' })
+  @ApiBody({ type: CreateHairHistoryFromBriefDto })
+  @UseGuards(JwtAuthGuard, AdminRoleGuard)
+  @Post(':id/hair-history')
+  createHairHistoryFromBrief(
+    @Param('id') id: string,
+    @Body() dto: CreateHairHistoryFromBriefDto,
+  ): Promise<HairHistory> {
+    return this.briefsService.createHairHistoryFromBrief(id, dto);
   }
 
   @ApiOperation({
