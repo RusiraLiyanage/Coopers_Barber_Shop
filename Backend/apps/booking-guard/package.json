@@ -8,7 +8,8 @@
     "start": "nest start",
     "start:prod": "node dist/main",
     "lint": "eslint \"src/**/*.ts\"",
-    "lint:fix": "eslint \"src/**/*.ts\" --fix"
+    "lint:fix": "eslint \"src/**/*.ts\" --fix",
+    "test": "echo \"No tests configured for @coopers/booking.guard\""
   },
   "dependencies": {
     "@coopers/common": "workspace:*",

@@ -5,5 +5,8 @@
   "exports": {
     "./base.json": "./base.json",
     "./nestjs.json": "./nestjs.json"
+  },
+  "scripts": {
+    "test": "echo \"No tests configured for @coopers/tsconfig\""
   }
 }

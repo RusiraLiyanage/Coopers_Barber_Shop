@@ -15,7 +15,8 @@
     "pre": "pnpm build",
     "build": "tsc -p tsconfig.json",
     "lint": "eslint \"src/**/*.ts\"",
-    "lint:fix": "eslint \"src/**/*.ts\" --fix"
+    "lint:fix": "eslint \"src/**/*.ts\" --fix",
+    "test": "echo \"No tests configured for @coopers/common\""
   },
   "dependencies": {
     "@coopers/entities": "workspace:*",

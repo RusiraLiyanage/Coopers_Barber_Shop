@@ -12,6 +12,8 @@
     "//format": "auto-formats all ts, js, json, md, and yaml files in place using Prettier",
     "format:check": "prettier --check \"**/*.{ts,js,json,md,yml,yaml}\"",
     "//format:check": "checks for unformatted code and returns a non-zero exit code — used in CI",
+    "test:cov": "pnpm --filter @coopers/booking.api test:cov",
+    "test:e2e": "pnpm --filter @coopers/booking.api test:e2e",
     "pre": "turbo run build",
     "booking:api": "turbo dev --filter @coopers/booking.api",
     "booking:guard": "turbo dev --filter @coopers/booking.guard",
