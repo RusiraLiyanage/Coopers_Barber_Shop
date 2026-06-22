@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import {
   Appointment,
   AppointmentBrief,
+  HairHistory,
   Service,
   Staff,
 } from '@coopers/entities';
@@ -20,6 +21,11 @@ const mockAppointmentsRepo = {
 };
 
 const mockAppointmentBriefsRepo = {
+  create: jest.fn(),
+  save: jest.fn(),
+};
+
+const mockHairHistoryRepo = {
   create: jest.fn(),
   save: jest.fn(),
 };
@@ -85,6 +91,10 @@ describe('AppointmentsService', () => {
         {
           provide: getRepositoryToken(AppointmentBrief),
           useValue: mockAppointmentBriefsRepo,
+        },
+        {
+          provide: getRepositoryToken(HairHistory),
+          useValue: mockHairHistoryRepo,
         },
         { provide: getRepositoryToken(Service), useValue: mockServicesRepo },
         { provide: getRepositoryToken(Staff), useValue: mockStaffRepo },
@@ -349,6 +359,7 @@ describe('AppointmentsService', () => {
       },
     });
     expect(mockStaffService.getDefaultStaff).not.toHaveBeenCalled();
+    expect(mockHairHistoryRepo.create).not.toHaveBeenCalled();
     expect(mockAppointmentsRepo.create).toHaveBeenCalledWith(
       expect.objectContaining({
         staff: selectedStaff,
@@ -392,6 +403,8 @@ describe('AppointmentsService', () => {
     mockAppointmentsRepo.save.mockResolvedValue(savedAppointment);
     mockAppointmentBriefsRepo.create.mockReturnValue(savedBrief);
     mockAppointmentBriefsRepo.save.mockResolvedValue(savedBrief);
+    mockHairHistoryRepo.create.mockReturnValue({ id: 'history-1' });
+    mockHairHistoryRepo.save.mockResolvedValue({ id: 'history-1' });
 
     await service.book(
       { userId: 'user-1' },
@@ -424,6 +437,21 @@ describe('AppointmentsService', () => {
       generationModel: 'claude-opus-4-8',
     });
     expect(mockAppointmentBriefsRepo.save).toHaveBeenCalledWith(savedBrief);
+    expect(mockHairHistoryRepo.create).toHaveBeenCalledWith({
+      client: { id: 'user-1' },
+      barber: selectedStaff,
+      service: 'Hair Coloring',
+      hairState: ['dry hair', 'recent bleach'],
+      productsUsed: null,
+      barberNotes: [
+        'Auto-created from pre-appointment consultation. Customer-reported information; barber should confirm before treatment.',
+        'Desired look: Natural brown colour.',
+        'Consultation summary: Client wants a natural brown colour and mentioned dry ends.',
+        'Safety/preparation notes: Confirm recent bleach before applying colour.',
+      ].join('\n'),
+      visitDate: '2025-09-24',
+    });
+    expect(mockHairHistoryRepo.save).toHaveBeenCalledWith({ id: 'history-1' });
   });
 
   it('should update an appointment onto the selected date when the slot is available', async () => {

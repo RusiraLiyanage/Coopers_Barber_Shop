@@ -10,6 +10,7 @@ import { DeepPartial, Repository } from 'typeorm';
 import {
   Appointment,
   AppointmentBrief,
+  HairHistory,
   Service,
   Staff,
 } from '@coopers/entities';
@@ -90,6 +91,8 @@ export class AppointmentsService {
     private appointmentsRepo: Repository<Appointment>,
     @Inject(getRepositoryToken(AppointmentBrief as EntityClassOrSchema))
     private appointmentBriefsRepo: Repository<AppointmentBrief>,
+    @Inject(getRepositoryToken(HairHistory as EntityClassOrSchema))
+    private hairHistoryRepo: Repository<HairHistory>,
     @Inject(getRepositoryToken(Service as EntityClassOrSchema))
     private servicesRepo: Repository<Service>,
     private staffService: StaffService,
@@ -300,6 +303,7 @@ export class AppointmentsService {
   private async createAppointmentBrief(
     appointment: Appointment,
     staff: Staff,
+    user: BookingUser,
     dto: CreateAppointmentDto,
   ): Promise<void> {
     if (!this.hasConsultationSummary(dto)) {
@@ -322,6 +326,45 @@ export class AppointmentsService {
     });
 
     await this.appointmentBriefsRepo.save(appointmentBrief);
+
+    const hairHistory = this.hairHistoryRepo.create({
+      client: { id: user.userId },
+      barber: staff,
+      service: appointment.service.name,
+      hairState: this.normalizeStringArray(dto.hairState),
+      productsUsed: null,
+      barberNotes: this.buildCustomerReportedHairHistoryNotes(dto),
+      visitDate: dto.date,
+    });
+
+    await this.hairHistoryRepo.save(hairHistory);
+  }
+
+  private buildCustomerReportedHairHistoryNotes(
+    dto: CreateAppointmentDto,
+  ): string {
+    const notes = [
+      'Auto-created from pre-appointment consultation. Customer-reported information; barber should confirm before treatment.',
+    ];
+    const desiredLook = this.normalizeOptionalText(dto.desiredLook);
+    const consultationSummary = this.normalizeOptionalText(
+      dto.consultationSummary,
+    );
+    const safetyNotes = this.normalizeOptionalText(dto.safetyNotes);
+
+    if (desiredLook) {
+      notes.push(`Desired look: ${desiredLook}`);
+    }
+
+    if (consultationSummary) {
+      notes.push(`Consultation summary: ${consultationSummary}`);
+    }
+
+    if (safetyNotes) {
+      notes.push(`Safety/preparation notes: ${safetyNotes}`);
+    }
+
+    return notes.join('\n');
   }
 
   private toAppointmentResponse(
@@ -529,7 +572,7 @@ export class AppointmentsService {
       this.appointmentsRepo.create(appointmentInput);
     const saved: Appointment = await this.appointmentsRepo.save(appointment);
 
-    await this.createAppointmentBrief(saved, staff, dto);
+    await this.createAppointmentBrief(saved, staff, user, dto);
 
     return this.toAppointmentResponse(saved, staff.timezone);
   }
