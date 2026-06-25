@@ -5,6 +5,7 @@ export * from './health';
 export * from './middlewares';
 export * from './pipes';
 export * from './rate-limit';
+export * from './redis';
 export * from './services';
 export * from './swagger';
 
