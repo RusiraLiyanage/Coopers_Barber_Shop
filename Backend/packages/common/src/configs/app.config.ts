@@ -5,6 +5,7 @@ export const APP_ENVIRONMENTS = ['develop', 'staging', 'production'] as const;
 export type AppEnvironment = (typeof APP_ENVIRONMENTS)[number]; // Whatever values exist inside APP_ENVIRONMENTS, use those as the allowed environment type.
 
 const REQUIRED_ENV_KEYS = [
+  'ENV',
   'DB_HOST',
   'DB_PORT',
   'DB_USERNAME',
@@ -20,7 +21,11 @@ const REQUIRED_ENV_KEYS = [
 ] as const;
 
 export const getAppEnvironment = (): AppEnvironment => {
-  const env = process.env.ENV ?? 'develop';
+  const env = process.env.ENV;
+
+  if (!env) {
+    throw new Error('Missing env variable: ENV');
+  }
 
   if (!APP_ENVIRONMENTS.includes(env as AppEnvironment)) {
     throw new Error(`Invalid ENV value: ${env}`);

@@ -2,6 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
+import {
+  getRequiredConfigString,
+  parseRequiredBoolean,
+} from '../../configs/env.util';
 import { renderForgotPasswordEmailTemplate } from './templates/forgot-password-email.template';
 import type {
   SendEmailInput,
@@ -46,8 +50,7 @@ export class EmailService {
   }
 
   sendForgotPasswordEmail(input: SendForgotPasswordEmailInput): Promise<void> {
-    const appName =
-      this.configService.get<string>('APP_NAME') ?? "Cooper's Barbershop";
+    const appName = getRequiredConfigString(this.configService, 'APP_NAME');
     const firstName = input.firstName?.trim() || 'there';
     const renderedEmail = renderForgotPasswordEmailTemplate({
       appName,
@@ -104,7 +107,10 @@ export class EmailService {
       host,
       port,
       from,
-      secure: this.configService.get<string>('SMTP_SECURE') === 'true',
+      secure: parseRequiredBoolean(
+        getRequiredConfigString(this.configService, 'SMTP_SECURE'),
+        'SMTP_SECURE',
+      ),
       auth:
         username && password
           ? {
@@ -126,8 +132,7 @@ export class EmailService {
   }
 
   private isDevelopEnvironment(): boolean {
-    const env =
-      this.configService.get<string>('ENV') ?? process.env.ENV ?? 'develop';
+    const env = getRequiredConfigString(this.configService, 'ENV');
 
     return env === 'develop' || env === 'dev' || env === 'development';
   }

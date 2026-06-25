@@ -5,9 +5,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SessionService } from '@coopers/common';
-
-const DEFAULT_SESSION_CLEANUP_INTERVAL_SECONDS = 60;
+import { getRequiredConfigInteger, SessionService } from '@coopers/common';
 
 @Injectable()
 export class AuthSessionCleanupService
@@ -51,16 +49,11 @@ export class AuthSessionCleanupService
   }
 
   private getCleanupIntervalMs(): number {
-    const configuredIntervalSeconds = Number(
-      this.configService.get<string>('SESSION_CLEANUP_INTERVAL_SECONDS') ??
-        DEFAULT_SESSION_CLEANUP_INTERVAL_SECONDS,
+    return (
+      getRequiredConfigInteger(
+        this.configService,
+        'SESSION_CLEANUP_INTERVAL_SECONDS',
+      ) * 1000
     );
-    const intervalSeconds =
-      Number.isFinite(configuredIntervalSeconds) &&
-      configuredIntervalSeconds > 0
-        ? configuredIntervalSeconds
-        : DEFAULT_SESSION_CLEANUP_INTERVAL_SECONDS;
-
-    return Math.floor(intervalSeconds) * 1000;
   }
 }

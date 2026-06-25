@@ -3,6 +3,7 @@ import {
   configureApiSecurity,
   configureSwagger,
   ensureNodeCryptoGlobal,
+  getRequiredConfigInteger,
 } from '@coopers/common';
 
 ensureNodeCryptoGlobal(); // UUID needs crypto
@@ -16,10 +17,6 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
 
-  const rawAuthApiPort = config.get<number>('AUTH_API_PORT');
-  const authApiPort: number =
-    typeof rawAuthApiPort === 'number' ? rawAuthApiPort : 7312;
-
   // No CORS: auth-api is reached only by the booking-guard (server-to-server),
   // never directly by the browser.
   configureApiSecurity(app);
@@ -31,7 +28,7 @@ async function bootstrap() {
     bearerAuth: false,
   });
 
-  await app.listen(authApiPort);
+  await app.listen(getRequiredConfigInteger(config, 'AUTH_API_PORT'));
 }
 
 void bootstrap();

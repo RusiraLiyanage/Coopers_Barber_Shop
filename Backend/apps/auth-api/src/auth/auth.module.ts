@@ -4,8 +4,8 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
-  DEFAULT_ACCESS_TOKEN_TTL_SECONDS,
   EmailModule,
+  getRequiredConfigInteger,
   JWT_AUDIENCE,
   JWT_ISSUER,
   JwtTokenService,
@@ -26,14 +26,7 @@ import { LocalStrategy } from './strategies/local.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 function getAccessTokenTtlSeconds(config: ConfigService): number {
-  const configuredTtl = Number(
-    config.get<string>('ACCESS_TOKEN_TTL_SECONDS') ??
-      DEFAULT_ACCESS_TOKEN_TTL_SECONDS,
-  );
-
-  return Number.isFinite(configuredTtl) && configuredTtl > 0
-    ? configuredTtl
-    : DEFAULT_ACCESS_TOKEN_TTL_SECONDS;
+  return getRequiredConfigInteger(config, 'ACCESS_TOKEN_TTL_SECONDS');
 }
 
 @Module({

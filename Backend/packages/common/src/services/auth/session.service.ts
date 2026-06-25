@@ -4,14 +4,13 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { AuthSession } from '@coopers/entities';
 import type { Repository } from 'typeorm';
+import { getRequiredConfigInteger } from '../../configs/env.util';
 import {
   SESSION_EXPIRED_CODE,
   SESSION_IDLE_EXPIRED_CODE,
   type SessionValidationResponse,
 } from './auth.types';
 
-const DEFAULT_SESSION_IDLE_TIMEOUT_SECONDS = 10 * 60;
-const DEFAULT_SESSION_EXTENSION_GRACE_SECONDS = 5 * 60;
 const SESSION_EXPIRED_MESSAGE = 'Session expired. Please login again.';
 const SESSION_IDLE_EXPIRED_MESSAGE = 'Session expired due to inactivity';
 
@@ -230,7 +229,10 @@ export class SessionService {
       .execute();
   }
 
-  async hasActiveUserSession(userId: string, now = new Date()): Promise<boolean> {
+  async hasActiveUserSession(
+    userId: string,
+    now = new Date(),
+  ): Promise<boolean> {
     const idleCutoff = new Date(
       now.getTime() -
         (this.getSessionIdleTimeoutMs() + this.getSessionExtensionGraceMs()),
@@ -240,9 +242,12 @@ export class SessionService {
       .where('session.user_id = :userId', { userId })
       .andWhere('session.revoked_at IS NULL')
       .andWhere('session.expires_at > :now', { now })
-      .andWhere('COALESCE(session.last_used_at, session.created_at) > :idleCutoff', {
-        idleCutoff,
-      })
+      .andWhere(
+        'COALESCE(session.last_used_at, session.created_at) > :idleCutoff',
+        {
+          idleCutoff,
+        },
+      )
       .getCount();
 
     return count > 0;
@@ -360,37 +365,28 @@ export class SessionService {
   }
 
   private getSessionIdleTimeoutMs(): number {
-    const configuredTimeoutSeconds = Number(
-      this.configService.get<string>('SESSION_IDLE_TIMEOUT_SECONDS') ??
-        DEFAULT_SESSION_IDLE_TIMEOUT_SECONDS,
+    return (
+      getRequiredConfigInteger(
+        this.configService,
+        'SESSION_IDLE_TIMEOUT_SECONDS',
+      ) * 1000
     );
-
-    const timeoutSeconds =
-      Number.isFinite(configuredTimeoutSeconds) && configuredTimeoutSeconds > 0
-        ? configuredTimeoutSeconds
-        : DEFAULT_SESSION_IDLE_TIMEOUT_SECONDS;
-
-    return Math.floor(timeoutSeconds) * 1000;
   }
 
   private getSessionExtensionGraceMs(): number {
-    const configuredGraceSeconds = Number(
-      this.configService.get<string>('SESSION_EXTENSION_GRACE_SECONDS') ??
-        DEFAULT_SESSION_EXTENSION_GRACE_SECONDS,
+    return (
+      getRequiredConfigInteger(
+        this.configService,
+        'SESSION_EXTENSION_GRACE_SECONDS',
+      ) * 1000
     );
-
-    const graceSeconds =
-      Number.isFinite(configuredGraceSeconds) && configuredGraceSeconds > 0
-        ? configuredGraceSeconds
-        : DEFAULT_SESSION_EXTENSION_GRACE_SECONDS;
-
-    return Math.floor(graceSeconds) * 1000;
   }
 
   private createRefreshTokenExpiresAt(): Date {
-    const configuredTtlDays =
-      this.configService.get<string>('REFRESH_TOKEN_TTL_DAYS') ?? '14'; // based on the environment of the primary service.
-    const ttlDays = Number(configuredTtlDays);
+    const ttlDays = getRequiredConfigInteger(
+      this.configService,
+      'REFRESH_TOKEN_TTL_DAYS',
+    );
     const expiresAt = new Date();
 
     expiresAt.setDate(expiresAt.getDate() + ttlDays); // adding the number of days to the date from current

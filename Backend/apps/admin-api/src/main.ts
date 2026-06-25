@@ -3,20 +3,10 @@ import {
   configureApiSecurity,
   configureSwagger,
   ensureNodeCryptoGlobal,
+  getRequiredConfigInteger,
 } from '@coopers/common';
 
 ensureNodeCryptoGlobal(); // UUID needs crypto
-
-function getOptionalPort(
-  config: ConfigService,
-  key: string,
-  fallback: number,
-): number {
-  const value = config.get<string | number>(key);
-  const port = typeof value === 'number' ? value : Number(value);
-
-  return Number.isFinite(port) && port > 0 ? port : fallback;
-}
 
 async function bootstrap() {
   const [{ NestFactory }, { AppModule }] = await Promise.all([
@@ -37,7 +27,7 @@ async function bootstrap() {
     tags: ['health', 'barbers', 'safety-rules', 'admin-services', 'briefs'],
   });
 
-  await app.listen(getOptionalPort(config, 'ADMIN_API_PORT', 7313));
+  await app.listen(getRequiredConfigInteger(config, 'ADMIN_API_PORT'));
 }
 
 void bootstrap();

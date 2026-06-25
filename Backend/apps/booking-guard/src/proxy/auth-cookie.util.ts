@@ -1,4 +1,4 @@
-import { DEFAULT_ACCESS_TOKEN_TTL_SECONDS } from '@coopers/common';
+import { getRequiredEnvInteger } from '@coopers/common';
 import type { AuthTokensResponse } from '@coopers/common';
 
 export const ACCESS_TOKEN_COOKIE = 'tsa';
@@ -10,7 +10,6 @@ export const ADMIN_REMEMBER_ME_COOKIE = 'admin_tsm';
 
 const LEGACY_ACCESS_TOKEN_COOKIE = 'access_token';
 const LEGACY_REFRESH_TOKEN_COOKIE = 'refresh_token';
-const DEFAULT_REFRESH_TOKEN_TTL_DAYS = 14;
 
 type AuthCookieNames = {
   accessToken: string;
@@ -55,27 +54,11 @@ type SetAuthCookieOptions = {
 };
 
 function getRefreshTokenMaxAgeMs(): number {
-  const configuredTtlDays = Number(
-    process.env.REFRESH_TOKEN_TTL_DAYS ?? DEFAULT_REFRESH_TOKEN_TTL_DAYS,
-  );
-  const ttlDays =
-    Number.isFinite(configuredTtlDays) && configuredTtlDays > 0
-      ? configuredTtlDays
-      : DEFAULT_REFRESH_TOKEN_TTL_DAYS;
-
-  return ttlDays * 24 * 60 * 60 * 1000;
+  return getRequiredEnvInteger('REFRESH_TOKEN_TTL_DAYS') * 24 * 60 * 60 * 1000;
 }
 
 function getAccessTokenMaxAgeMs(): number {
-  const configuredTtlSeconds = Number(
-    process.env.ACCESS_TOKEN_TTL_SECONDS ?? DEFAULT_ACCESS_TOKEN_TTL_SECONDS,
-  );
-  const ttlSeconds =
-    Number.isFinite(configuredTtlSeconds) && configuredTtlSeconds > 0
-      ? Math.floor(configuredTtlSeconds)
-      : DEFAULT_ACCESS_TOKEN_TTL_SECONDS;
-
-  return ttlSeconds * 1000;
+  return getRequiredEnvInteger('ACCESS_TOKEN_TTL_SECONDS') * 1000;
 }
 
 function createCookieOptions(maxAge?: number): AuthCookieOptions {

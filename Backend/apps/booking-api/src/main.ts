@@ -3,6 +3,7 @@ import {
   configureApiSecurity,
   configureSwagger,
   ensureNodeCryptoGlobal,
+  getRequiredConfigInteger,
 } from '@coopers/common';
 
 ensureNodeCryptoGlobal(); // uuid needs crypto
@@ -32,6 +33,6 @@ async function bootstrap() {
     ],
   });
 
-  await app.listen(config.get<number>('API_PORT', 7310));
+  await app.listen(getRequiredConfigInteger(config, 'API_PORT'));
 }
 void bootstrap();

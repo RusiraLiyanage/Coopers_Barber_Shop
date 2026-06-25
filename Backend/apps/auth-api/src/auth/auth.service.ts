@@ -23,6 +23,7 @@ import {
   AuthTokensResponse,
   ACTIVE_ACCOUNT_SESSION_EXISTS_CODE,
   EmailService,
+  getRequiredConfigInteger,
   JwtTokenService,
   LogoutResponse,
   PasswordService,
@@ -68,9 +69,6 @@ export type GoogleOAuthCompletionResult =
   | { status: 'authenticated'; tokens: AuthTokensResponse }
   | { status: 'link_required'; linkTicket: string }
   | { status: 'session_switch_required'; linkTicket: string; email: string };
-
-const DEFAULT_PASSWORD_RESET_TTL_MINUTES = 10;
-const DEFAULT_PASSWORD_RESET_MAX_ATTEMPTS = 5;
 
 type CreateSessionOptions = {
   endExistingSessions?: boolean;
@@ -615,25 +613,17 @@ export class AuthService {
   }
 
   private getPasswordResetTtlMinutes(): number {
-    const ttl = Number(
-      this.configService.get<string>('PASSWORD_RESET_TTL_MINUTES') ??
-        DEFAULT_PASSWORD_RESET_TTL_MINUTES,
+    return getRequiredConfigInteger(
+      this.configService,
+      'PASSWORD_RESET_TTL_MINUTES',
     );
-
-    return Number.isFinite(ttl) && ttl > 0
-      ? ttl
-      : DEFAULT_PASSWORD_RESET_TTL_MINUTES;
   }
 
   private getPasswordResetMaxAttempts(): number {
-    const maxAttempts = Number(
-      this.configService.get<string>('PASSWORD_RESET_MAX_ATTEMPTS') ??
-        DEFAULT_PASSWORD_RESET_MAX_ATTEMPTS,
+    return getRequiredConfigInteger(
+      this.configService,
+      'PASSWORD_RESET_MAX_ATTEMPTS',
     );
-
-    return Number.isInteger(maxAttempts) && maxAttempts > 0
-      ? maxAttempts
-      : DEFAULT_PASSWORD_RESET_MAX_ATTEMPTS;
   }
 
   private normalizeEmail(email: string): string {
