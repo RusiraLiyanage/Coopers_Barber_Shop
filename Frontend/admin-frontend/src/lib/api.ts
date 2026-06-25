@@ -4,6 +4,8 @@ const ADMIN_REMEMBERED_SESSION_KEY = 'coopers_admin_auth_remembered_session';
 const ADMIN_HAD_SESSION_KEY = 'coopers_admin_auth_had_session';
 const ADMIN_IDLE_PROMPT_AT_KEY = 'coopers_admin_idle_prompt_at';
 const ADMIN_GRACE_EXPIRES_AT_KEY = 'coopers_admin_grace_expires_at';
+export const ADMIN_SESSION_REPLACED_SIGNAL_KEY =
+  'coopers_admin_auth_session_replaced';
 const DEFAULT_SESSION_IDLE_TIMEOUT_SECONDS = 300;
 const DEFAULT_SESSION_EXTENSION_GRACE_SECONDS = 300;
 export const SESSION_EXPIRED_CODE = 'SESSION_EXPIRED';
@@ -484,6 +486,19 @@ export function clearAdminAuthSession(): void {
   removeLocalStorageValue(ADMIN_GRACE_EXPIRES_AT_KEY);
 }
 
+export function clearCurrentAdminTabAuthSession(): void {
+  removeSessionStorageValue(ADMIN_BROWSER_SESSION_KEY);
+  removeSessionStorageValue(ADMIN_IDLE_PROMPT_AT_KEY);
+  removeSessionStorageValue(ADMIN_GRACE_EXPIRES_AT_KEY);
+}
+
+function broadcastAdminSessionReplacement(): void {
+  setLocalStorageValue(
+    ADMIN_SESSION_REPLACED_SIGNAL_KEY,
+    `${Date.now()}:${Math.random()}`,
+  );
+}
+
 export function hasAdminSessionTimeoutState(): boolean {
   return (
     canRestoreAdminAuthSession() &&
@@ -685,6 +700,10 @@ export function loginAdmin(payload: AdminLoginPayload) {
     if (response.authenticated) {
       rememberAdminAuthSession(payload.remember === true);
       recordAdminSessionActivity();
+
+      if (payload.endExistingSessions === true) {
+        broadcastAdminSessionReplacement();
+      }
     }
 
     return response;

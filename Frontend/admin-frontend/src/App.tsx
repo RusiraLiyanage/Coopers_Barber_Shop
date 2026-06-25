@@ -5,14 +5,15 @@ import AdminHeader from './components/AdminHeader';
 import AdminSessionTimeoutModal from './components/AdminSessionTimeoutModal';
 import { SALoadingPanel } from './components/common';
 import {
+  ADMIN_SESSION_REPLACED_SIGNAL_KEY,
   ApiRequestError,
   canRestoreAdminAuthSession,
   clearAdminAuthSession,
+  clearCurrentAdminTabAuthSession,
   clearAdminSessionTimeoutTracking,
   getAdminSessionTimeoutDeadlines,
   SESSION_EXPIRED_EVENT,
   SESSION_IDLE_EXPIRED_EVENT,
-  shouldClearStaleAdminAuthSession,
   shouldShowAdminLoginAfterExpiry,
   isSessionExpiredError,
   isSessionIdleExpiredError,
@@ -36,6 +37,8 @@ import './App.css';
 const { Content } = Layout;
 type SessionTimeoutFlowState = 'none' | 'extend_prompt';
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const ADMIN_SESSION_REPLACED_MESSAGE =
+  'Your previous admin session was ended because this account signed in elsewhere.';
 
 function isExpectedSignedOutError(error: unknown): boolean {
   if (error instanceof Error && error.message === 'Authentication failed') {
@@ -164,12 +167,6 @@ function App() {
     }
 
     if (!canRestoreAdminAuthSession()) {
-      if (shouldClearStaleAdminAuthSession()) {
-        void dispatch(logoutAction())
-          .unwrap()
-          .catch(() => undefined);
-      }
-
       dispatch(resetStore());
       setAuthResolved(true);
 
@@ -237,6 +234,30 @@ function App() {
       window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
     };
   }, [showSessionExpiredNotice, showSessionExtensionPrompt]);
+
+  useEffect(() => {
+    const handleAdminSessionReplaced = (event: StorageEvent) => {
+      if (
+        event.key !== ADMIN_SESSION_REPLACED_SIGNAL_KEY ||
+        event.newValue === null
+      ) {
+        return;
+      }
+
+      clearCurrentAdminTabAuthSession();
+      dispatch(resetStore());
+      setAuthError(ADMIN_SESSION_REPLACED_MESSAGE);
+      setSessionTimeoutFlowState('none');
+      setAuthResolved(true);
+      navigate('/login', { replace: true });
+    };
+
+    window.addEventListener('storage', handleAdminSessionReplaced);
+
+    return () => {
+      window.removeEventListener('storage', handleAdminSessionReplaced);
+    };
+  }, [dispatch, navigate]);
 
   const handleLogout = useCallback(() => {
     setSessionTimeoutFlowState('none');

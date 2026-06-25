@@ -7,7 +7,9 @@ import { SALoadingPanel } from './components/common';
 import UserAuthModal from './Models/userAuth';
 import GoogleLinkModal from './Models/googleLink';
 import {
+  AUTH_SESSION_REPLACED_SIGNAL_KEY,
   clearClientAuthSession,
+  clearCurrentClientTabAuthSession,
   clearGoogleLinkPromptFromUrl,
   completeGoogleSessionSwitch,
   canRestoreClientAuthSession,
@@ -18,7 +20,6 @@ import {
   readGoogleSessionSwitchPrompt,
   SESSION_EXPIRED_EVENT,
   SESSION_IDLE_EXPIRED_EVENT,
-  shouldClearStaleClientAuthSession,
   toAuthSession,
   type AppointmentRecord,
   type AuthSession,
@@ -77,9 +78,15 @@ function App() {
 
   const isAuthenticated = Boolean(authSession?.authenticated);
   const isSessionTimeoutPromptOpen = sessionTimeoutFlowState !== 'none';
+  const isSessionSwitchPromptOpen =
+    authSwitchPromptOpen || googleSessionSwitchPrompt !== null;
+  const effectiveSessionTimeoutState = isSessionSwitchPromptOpen
+    ? 'none'
+    : sessionTimeoutFlowState;
   const isNewAppointmentRoute = location.pathname === '/new-appointment';
   const isAppointmentModalOpen =
-    openAppointmentModal || (isNewAppointmentRoute && isAuthenticated);
+    !isSessionSwitchPromptOpen &&
+    (openAppointmentModal || (isNewAppointmentRoute && isAuthenticated));
 
   const setAuthSession = useCallback(
     (session: AuthSession | null) => {
@@ -114,12 +121,6 @@ function App() {
       shouldRestoreSessionForRoute(location.pathname);
 
     if (!shouldRestoreSession) {
-      if (shouldClearStaleClientAuthSession()) {
-        void dispatch(logoutAction())
-          .unwrap()
-          .catch(() => undefined);
-      }
-
       setAuthSession(null);
       setAuthSessionResolved(true);
 
@@ -200,9 +201,17 @@ function App() {
 
   useEffect(() => {
     const handleSessionIdleExpired = () => {
+      if (isSessionSwitchPromptOpen) {
+        return;
+      }
+
       showSessionExtensionPrompt();
     };
     const handleSessionExpired = () => {
+      if (isSessionSwitchPromptOpen) {
+        return;
+      }
+
       showSessionExpiredNotice();
     };
 
@@ -219,7 +228,51 @@ function App() {
       );
       window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
     };
-  }, [showSessionExpiredNotice, showSessionExtensionPrompt]);
+  }, [
+    isSessionSwitchPromptOpen,
+    showSessionExpiredNotice,
+    showSessionExtensionPrompt,
+  ]);
+
+  useEffect(() => {
+    if (!isSessionSwitchPromptOpen) {
+      return;
+    }
+
+    setOpenAuthModal(false);
+    setOpenAppointmentModal(false);
+    setEditingAppointment(null);
+    setSessionTimeoutFlowState('none');
+  }, [isSessionSwitchPromptOpen]);
+
+  useEffect(() => {
+    const handleClientSessionReplaced = (event: StorageEvent) => {
+      if (
+        event.key !== AUTH_SESSION_REPLACED_SIGNAL_KEY ||
+        event.newValue === null
+      ) {
+        return;
+      }
+
+      clearCurrentClientTabAuthSession();
+      setAuthSession(null);
+      setEditingAppointment(null);
+      setOpenAppointmentModal(false);
+      setGoogleLinkPrompt(null);
+      setGoogleSessionSwitchPrompt(null);
+      setAuthSwitchPromptOpen(false);
+      dispatch(resetStore());
+      navigate('/');
+      setOpenAuthModal(true);
+      setSessionTimeoutFlowState('expired_notice');
+    };
+
+    window.addEventListener('storage', handleClientSessionReplaced);
+
+    return () => {
+      window.removeEventListener('storage', handleClientSessionReplaced);
+    };
+  }, [dispatch, navigate, setAuthSession]);
 
   useEffect(() => {
     if (
@@ -445,7 +498,7 @@ function App() {
           />
         </Routes>
 
-        {location.pathname === '/appointments' ? (
+        {!isSessionSwitchPromptOpen && location.pathname === '/appointments' ? (
           <Suspense fallback={<SALoadingPanel />}>
             <MyAppointments
               open
@@ -458,7 +511,7 @@ function App() {
           </Suspense>
         ) : null}
 
-        {location.pathname === '/account' ? (
+        {!isSessionSwitchPromptOpen && location.pathname === '/account' ? (
           <Suspense fallback={<SALoadingPanel />}>
             <MyAccount
               open
@@ -471,7 +524,7 @@ function App() {
 
       <UserAuthModal
         open={openAuthModal}
-        sessionTimeoutState={sessionTimeoutFlowState}
+        sessionTimeoutState={effectiveSessionTimeoutState}
         onClose={() => setOpenAuthModal(false)}
         onExtendSession={handleExtendSession}
         onSessionLogout={handleSessionTimeoutLogout}

@@ -2,6 +2,8 @@ const API_BASE_URL = import.meta.env.VITE_API_URL ?? "";
 const AUTH_BROWSER_SESSION_KEY = "coopers_auth_browser_session";
 const AUTH_REMEMBERED_SESSION_KEY = "coopers_auth_remembered_session";
 const AUTH_HAD_SESSION_KEY = "coopers_auth_had_session";
+export const AUTH_SESSION_REPLACED_SIGNAL_KEY =
+  "coopers_auth_session_replaced";
 export const SESSION_IDLE_EXPIRED_CODE = "SESSION_IDLE_EXPIRED";
 export const SESSION_EXPIRED_CODE = "SESSION_EXPIRED";
 export const ACTIVE_ACCOUNT_SESSION_EXISTS_CODE =
@@ -315,6 +317,17 @@ export function clearClientAuthSession(): void {
   removeLocalStorageValue(AUTH_HAD_SESSION_KEY);
 }
 
+export function clearCurrentClientTabAuthSession(): void {
+  removeSessionStorageValue(AUTH_BROWSER_SESSION_KEY);
+}
+
+function broadcastClientSessionReplacement(): void {
+  setLocalStorageValue(
+    AUTH_SESSION_REPLACED_SIGNAL_KEY,
+    `${Date.now()}:${Math.random()}`,
+  );
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
@@ -496,6 +509,10 @@ export async function login(
 
   if (response.authenticated) {
     rememberClientAuthSession(remember);
+
+    if (options.endExistingSessions === true) {
+      broadcastClientSessionReplacement();
+    }
   }
 
   return response;
@@ -574,6 +591,10 @@ export async function linkGoogleAccount(
 
   if (response.authenticated) {
     rememberClientAuthSession(true);
+
+    if (options.endExistingSessions === true) {
+      broadcastClientSessionReplacement();
+    }
   }
 
   return response;
@@ -588,6 +609,7 @@ export async function completeGoogleSessionSwitch() {
 
   if (response.authenticated) {
     rememberClientAuthSession(true);
+    broadcastClientSessionReplacement();
   }
 
   return response;
@@ -622,6 +644,10 @@ export function logoutPreviousClientSession() {
     method: "POST",
     headers: buildHeaders(),
     body: JSON.stringify({}),
+  }).then((response) => {
+    broadcastClientSessionReplacement();
+
+    return response;
   });
 }
 
