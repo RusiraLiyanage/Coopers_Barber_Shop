@@ -6,6 +6,13 @@ import {
   REDIS_CLUSTER,
 } from './redis.constants';
 
+export type CacheHealth = {
+  enabled: boolean;
+  latencyMs?: number;
+  status: 'disabled' | 'ok' | 'unavailable';
+  error?: string;
+};
+
 @Injectable()
 export class CacheService {
   private readonly logger = new Logger(CacheService.name);
@@ -127,6 +134,33 @@ export class CacheService {
       } while (cursor !== '0');
     } catch (error) {
       this.logRedisFailure('delete pattern', pattern, error);
+    }
+  }
+
+  public async checkHealth(): Promise<CacheHealth> {
+    if (!this.isCacheEnabled()) {
+      return {
+        enabled: false,
+        status: 'disabled',
+      };
+    }
+
+    const startedAt = Date.now();
+
+    try {
+      await Promise.all([this.redisPrimary.ping(), this.redisReader.ping()]);
+
+      return {
+        enabled: true,
+        latencyMs: Date.now() - startedAt,
+        status: 'ok',
+      };
+    } catch (error) {
+      return {
+        enabled: true,
+        status: 'unavailable',
+        error: this.formatErrorMessage(error),
+      };
     }
   }
 

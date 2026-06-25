@@ -56,9 +56,26 @@ pnpm redis:down
 
 1. Start Redis with `pnpm redis:up`.
 2. Start the backend apps.
-3. Run a consultation flow once.
-4. Run the same consultation flow again.
-5. Check booking API logs for `Redis cache hit` messages from `CacheService`.
+3. Open the booking/admin health endpoints and confirm the `redis` check is `ok`.
+4. Run a consultation flow once.
+5. Run the same consultation flow again.
+6. Check booking API logs for `Redis cache hit` messages from `CacheService`.
+
+Example health response:
+
+```json
+{
+  "service": "booking-api",
+  "status": "ok",
+  "checks": {
+    "redis": {
+      "enabled": true,
+      "latencyMs": 2,
+      "status": "ok"
+    }
+  }
+}
+```
 
 You can also inspect keys:
 

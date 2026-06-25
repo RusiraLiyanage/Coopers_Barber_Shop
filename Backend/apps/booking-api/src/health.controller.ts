@@ -1,15 +1,23 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { createHealthResponse, SkipInternalServiceAuth } from '@coopers/common';
+import {
+  CacheService,
+  createHealthResponse,
+  SkipInternalServiceAuth,
+} from '@coopers/common';
 import type { HealthResponse } from '@coopers/common';
 
 @ApiTags('health')
 @Controller('health')
 export class HealthController {
+  constructor(private readonly cacheService: CacheService) {}
+
   @ApiOperation({ summary: 'Check booking-api health' })
   @SkipInternalServiceAuth()
   @Get()
-  check(): HealthResponse {
-    return createHealthResponse('booking-api');
+  async check(): Promise<HealthResponse> {
+    return createHealthResponse('booking-api', {
+      redis: await this.cacheService.checkHealth(),
+    });
   }
 }
