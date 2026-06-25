@@ -6,8 +6,11 @@ import { REDIS_CLUSTER } from './redis.constants';
 
 type RedisProviderConfig = {
   hostEnv: string;
+  passwordEnv: string;
   portEnv: string;
+  tlsEnabledEnv: string;
   token: string;
+  usernameEnv: string;
 };
 
 const redisProviderConfigs: RedisProviderConfig[] = [
@@ -15,11 +18,17 @@ const redisProviderConfigs: RedisProviderConfig[] = [
     token: REDIS_CLUSTER.PRIMARY,
     hostEnv: 'REDIS_PRIMARY_HOST',
     portEnv: 'REDIS_PRIMARY_PORT',
+    usernameEnv: 'REDIS_PRIMARY_USERNAME',
+    passwordEnv: 'REDIS_PRIMARY_PASSWORD',
+    tlsEnabledEnv: 'REDIS_PRIMARY_TLS_ENABLED',
   },
   {
     token: REDIS_CLUSTER.READER,
     hostEnv: 'REDIS_READER_HOST',
     portEnv: 'REDIS_READER_PORT',
+    usernameEnv: 'REDIS_READER_USERNAME',
+    passwordEnv: 'REDIS_READER_PASSWORD',
+    tlsEnabledEnv: 'REDIS_READER_TLS_ENABLED',
   },
 ];
 
@@ -42,10 +51,19 @@ export class RedisModule {
   }
 
   private static createRedisClient(config: RedisProviderConfig): Redis {
-    const clientConfig = getRedisClientConfig(config.hostEnv, config.portEnv);
+    const clientConfig = getRedisClientConfig(
+      config.hostEnv,
+      config.portEnv,
+      config.usernameEnv,
+      config.passwordEnv,
+      config.tlsEnabledEnv,
+    );
     const client = new Redis({
       host: clientConfig.host,
+      password: clientConfig.password,
       port: clientConfig.port,
+      tls: clientConfig.tlsEnabled ? {} : undefined,
+      username: clientConfig.username,
       lazyConnect: true,
       maxRetriesPerRequest: 1,
       enableOfflineQueue: false,

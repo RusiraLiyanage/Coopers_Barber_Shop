@@ -59,10 +59,41 @@ describe('Redis config', () => {
     process.env.REDIS_PRIMARY_PORT = '6379';
 
     expect(
-      getRedisClientConfig('REDIS_PRIMARY_HOST', 'REDIS_PRIMARY_PORT'),
+      getRedisClientConfig(
+        'REDIS_PRIMARY_HOST',
+        'REDIS_PRIMARY_PORT',
+        'REDIS_PRIMARY_USERNAME',
+        'REDIS_PRIMARY_PASSWORD',
+        'REDIS_PRIMARY_TLS_ENABLED',
+      ),
     ).toEqual({
       host: 'localhost',
       port: 6379,
+      tlsEnabled: false,
+    });
+  });
+
+  it('parses optional Redis auth and TLS values', () => {
+    process.env.REDIS_PRIMARY_HOST = 'redis.example.internal';
+    process.env.REDIS_PRIMARY_PORT = '6380';
+    process.env.REDIS_PRIMARY_USERNAME = 'default';
+    process.env.REDIS_PRIMARY_PASSWORD = 'redis-secret';
+    process.env.REDIS_PRIMARY_TLS_ENABLED = 'true';
+
+    expect(
+      getRedisClientConfig(
+        'REDIS_PRIMARY_HOST',
+        'REDIS_PRIMARY_PORT',
+        'REDIS_PRIMARY_USERNAME',
+        'REDIS_PRIMARY_PASSWORD',
+        'REDIS_PRIMARY_TLS_ENABLED',
+      ),
+    ).toEqual({
+      host: 'redis.example.internal',
+      password: 'redis-secret',
+      port: 6380,
+      tlsEnabled: true,
+      username: 'default',
     });
   });
 
@@ -71,7 +102,13 @@ describe('Redis config', () => {
     process.env.REDIS_PRIMARY_PORT = '6379';
 
     expect(() =>
-      getRedisClientConfig('REDIS_PRIMARY_HOST', 'REDIS_PRIMARY_PORT'),
+      getRedisClientConfig(
+        'REDIS_PRIMARY_HOST',
+        'REDIS_PRIMARY_PORT',
+        'REDIS_PRIMARY_USERNAME',
+        'REDIS_PRIMARY_PASSWORD',
+        'REDIS_PRIMARY_TLS_ENABLED',
+      ),
     ).toThrow('REDIS_PRIMARY_HOST is not configured');
   });
 
@@ -80,7 +117,29 @@ describe('Redis config', () => {
     process.env.REDIS_PRIMARY_PORT = '0';
 
     expect(() =>
-      getRedisClientConfig('REDIS_PRIMARY_HOST', 'REDIS_PRIMARY_PORT'),
+      getRedisClientConfig(
+        'REDIS_PRIMARY_HOST',
+        'REDIS_PRIMARY_PORT',
+        'REDIS_PRIMARY_USERNAME',
+        'REDIS_PRIMARY_PASSWORD',
+        'REDIS_PRIMARY_TLS_ENABLED',
+      ),
     ).toThrow('REDIS_PRIMARY_PORT must be a positive integer');
+  });
+
+  it('requires Redis TLS values to be true or false when configured', () => {
+    process.env.REDIS_PRIMARY_HOST = 'localhost';
+    process.env.REDIS_PRIMARY_PORT = '6379';
+    process.env.REDIS_PRIMARY_TLS_ENABLED = 'yes';
+
+    expect(() =>
+      getRedisClientConfig(
+        'REDIS_PRIMARY_HOST',
+        'REDIS_PRIMARY_PORT',
+        'REDIS_PRIMARY_USERNAME',
+        'REDIS_PRIMARY_PASSWORD',
+        'REDIS_PRIMARY_TLS_ENABLED',
+      ),
+    ).toThrow('REDIS_PRIMARY_TLS_ENABLED must be true or false');
   });
 });

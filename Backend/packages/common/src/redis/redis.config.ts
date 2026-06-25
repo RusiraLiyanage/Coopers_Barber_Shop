@@ -10,7 +10,10 @@ export type RedisCacheRuntimeConfig = {
 
 export type RedisClientConfig = {
   host: string;
+  password?: string;
   port: number;
+  tlsEnabled: boolean;
+  username?: string;
 };
 
 export function getRedisCacheRuntimeConfig(): RedisCacheRuntimeConfig {
@@ -27,10 +30,16 @@ export function getRedisCacheRuntimeConfig(): RedisCacheRuntimeConfig {
 export function getRedisClientConfig(
   hostEnv: string,
   portEnv: string,
+  usernameEnv: string,
+  passwordEnv: string,
+  tlsEnabledEnv: string,
 ): RedisClientConfig {
   return {
     host: getRequiredEnv(hostEnv),
+    password: getOptionalEnv(passwordEnv),
     port: getRequiredPositiveInteger(portEnv),
+    tlsEnabled: getOptionalBoolean(tlsEnabledEnv),
+    username: getOptionalEnv(usernameEnv),
   };
 }
 
@@ -41,11 +50,35 @@ function isRedisCacheEnabled(): boolean {
 function getRequiredEnv(envName: string): string {
   const value = process.env[envName];
 
-  if (value === undefined) {
+  if (value === undefined || value.trim().length === 0) {
     throw new Error(`${envName} is not configured`);
   }
 
   return value;
+}
+
+function getOptionalEnv(envName: string): string | undefined {
+  const value = process.env[envName]?.trim();
+
+  return value && value.length > 0 ? value : undefined;
+}
+
+function getOptionalBoolean(envName: string): boolean {
+  const value = process.env[envName]?.trim().toLowerCase();
+
+  if (value === undefined || value.length === 0) {
+    return false;
+  }
+
+  if (value === 'true') {
+    return true;
+  }
+
+  if (value === 'false') {
+    return false;
+  }
+
+  throw new Error(`${envName} must be true or false`);
 }
 
 function getRequiredPositiveInteger(envName: string): number {

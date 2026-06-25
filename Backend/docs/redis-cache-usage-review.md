@@ -4,12 +4,12 @@ Redis is a short-lived performance layer. PostgreSQL remains the source of truth
 
 ## Current Cache Scope
 
-| Cache key | Cached data | Main read path | Invalidation path |
-| --- | --- | --- | --- |
-| `consultation:active-service:{serviceId}` | Active service configuration used by consultation and AI matching | Booking consultation fallback and Claude tool flow | Admin service create/update/AI-config update |
-| `consultation:active-safety-rules` | Active safety rules used to interpret consultation answers | Booking consultation fallback and Claude tool flow | Admin safety rule create/update, service update/AI-config update |
-| `consultation:available-barbers` | Active and available barber capability profiles | Booking consultation fallback and Claude tool flow | Admin barber create/update/delete |
-| `consultation:client-hair-history:{userId}` | Recent customer hair history for consultation context | Booking consultation fallback and Claude tool flow | Booking appointment creation, admin hair-history creation, admin brief-to-history creation |
+| Cache key                                   | Cached data                                                       | Main read path                                     | Invalidation path                                                                          |
+| ------------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `consultation:active-service:{serviceId}`   | Active service configuration used by consultation and AI matching | Booking consultation fallback and Claude tool flow | Admin service create/update/AI-config update                                               |
+| `consultation:active-safety-rules`          | Active safety rules used to interpret consultation answers        | Booking consultation fallback and Claude tool flow | Admin safety rule create/update, service update/AI-config update                           |
+| `consultation:available-barbers`            | Active and available barber capability profiles                   | Booking consultation fallback and Claude tool flow | Admin barber create/update/delete                                                          |
+| `consultation:client-hair-history:{userId}` | Recent customer hair history for consultation context             | Booking consultation fallback and Claude tool flow | Booking appointment creation, admin hair-history creation, admin brief-to-history creation |
 
 ## Why These Reads Are Safe To Cache
 
@@ -58,3 +58,5 @@ Invalidation tests now cover the mutation paths that change service, barber, saf
 - Booking appointment creation, admin hair-history creation, and admin brief-to-history creation clear customer hair-history consultation cache.
 
 Future cache additions should include matching invalidation tests in the same change.
+
+Production deployment notes are documented in `redis-cache-production-readiness.md`.

@@ -20,8 +20,14 @@ REDIS_CACHE_ENABLED=true
 REDIS_CACHE_DEFAULT_TTL_SECONDS=300
 REDIS_PRIMARY_HOST=localhost
 REDIS_PRIMARY_PORT=6379
+REDIS_PRIMARY_USERNAME=
+REDIS_PRIMARY_PASSWORD=
+REDIS_PRIMARY_TLS_ENABLED=false
 REDIS_READER_HOST=localhost
 REDIS_READER_PORT=6379
+REDIS_READER_USERNAME=
+REDIS_READER_PASSWORD=
+REDIS_READER_TLS_ENABLED=false
 ```
 
 For local development, primary and reader point to the same Redis instance. In production they can point to separate writer/reader endpoints if the infrastructure provides them.
