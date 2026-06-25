@@ -4,6 +4,7 @@ import type { ServicesState } from './types';
 
 const initialState: ServicesState = {
   items: [],
+  loaded: false,
   loading: false,
 };
 
@@ -18,9 +19,11 @@ const servicesSlice = createSlice({
       })
       .addCase(getServicesAction.fulfilled, (state, action) => {
         state.items = action.payload;
+        state.loaded = true;
         state.loading = false;
       })
       .addCase(getServicesAction.rejected, (state) => {
+        state.loaded = true;
         state.loading = false;
       });
   },

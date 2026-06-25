@@ -29,7 +29,12 @@ const rootReducer = (
   action: UnknownAction,
 ) => {
   if (action.type === resetStore.type) {
-    return combinedReducer(undefined, action);
+    const resetState = combinedReducer(undefined, action);
+
+    return {
+      ...resetState,
+      services: state?.services ?? resetState.services,
+    };
   }
 
   return combinedReducer(state, action);

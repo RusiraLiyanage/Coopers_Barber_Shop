@@ -138,8 +138,11 @@ export default function GoogleLinkModal({
         title="Active session found"
         open={sessionConflictPassword !== null}
         okText="End previous session"
-        cancelText="Keep previous session"
+        cancelButtonProps={{ style: { display: 'none' } }}
         confirmLoading={confirmLoading}
+        closable={false}
+        keyboard={false}
+        maskClosable={false}
         onOk={() => {
           if (sessionConflictPassword) {
             void handleSubmit(

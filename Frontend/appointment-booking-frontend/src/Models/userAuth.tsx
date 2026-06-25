@@ -1033,8 +1033,11 @@ export default function UserAuthModal({
         title="Active session found"
         open={sessionConflictLoginValues !== null}
         okText="End previous session"
-        cancelText="Keep previous session"
+        cancelButtonProps={{ style: { display: 'none' } }}
         confirmLoading={confirmLoading}
+        closable={false}
+        keyboard={false}
+        maskClosable={false}
         onOk={() => {
           if (sessionConflictLoginValues) {
             void handleLogin(sessionConflictLoginValues, true);

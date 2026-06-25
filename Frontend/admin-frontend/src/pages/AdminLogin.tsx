@@ -141,8 +141,11 @@ export default function AdminLogin({ initialError = null }: AdminLoginProps) {
         title="Active session found"
         open={sessionConflictValues !== null}
         okText="End previous session"
-        cancelText="Keep previous session"
+        cancelButtonProps={{ style: { display: 'none' } }}
         confirmLoading={submitting}
+        closable={false}
+        keyboard={false}
+        maskClosable={false}
         onOk={() => {
           if (sessionConflictValues) {
             void handleSubmit(sessionConflictValues, true);

@@ -11,3 +11,5 @@ export const selectActiveServices = createSelector([selectServices], (services) 
 
 export const selectServicesLoading = (state: RootState) =>
   state.services.loading;
+
+export const selectServicesLoaded = (state: RootState) => state.services.loaded;

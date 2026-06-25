@@ -114,6 +114,20 @@ function App() {
     setSessionTimeoutFlowState('expired_notice');
   }, [navigate, setAuthSession]);
 
+  const restoreCurrentSessionFromCookie =
+    useCallback(async (): Promise<AuthSession | null> => {
+      try {
+        const session = await dispatch(getCurrentSessionAction()).unwrap();
+        const restoredSession = toAuthSession(session);
+
+        setAuthSession(restoredSession);
+
+        return restoredSession;
+      } catch {
+        return null;
+      }
+    }, [dispatch, setAuthSession]);
+
   useEffect(() => {
     let isMounted = true;
     const shouldRestoreSession =
@@ -304,8 +318,15 @@ function App() {
       .catch(() => undefined);
   };
 
-  const requestAuthModal = () => {
+  const requestAuthModal = async () => {
     if (isAuthenticated) {
+      setAuthSwitchPromptOpen(true);
+      return;
+    }
+
+    const restoredSession = await restoreCurrentSessionFromCookie();
+
+    if (restoredSession) {
       setAuthSwitchPromptOpen(true);
       return;
     }
@@ -396,6 +417,13 @@ function App() {
       }
 
       if (!isAuthenticated) {
+        const restoredSession = await restoreCurrentSessionFromCookie();
+
+        if (restoredSession) {
+          action();
+          return;
+        }
+
         setOpenAuthModal(true);
         return;
       }
@@ -428,6 +456,7 @@ function App() {
       isSessionTimeoutPromptOpen,
       dispatch,
       navigate,
+      restoreCurrentSessionFromCookie,
       setAuthSession,
       showSessionExpiredNotice,
       showSessionExtensionPrompt,
@@ -472,7 +501,9 @@ function App() {
       <HeaderNav
         isAuthenticated={isAuthenticated}
         onLogout={handleLogout}
-        onOpenAuthModal={requestAuthModal}
+        onOpenAuthModal={() => {
+          void requestAuthModal();
+        }}
         onOpenMyAccount={openMyAccountFlow}
         onOpenMyAppointments={openMyAppointmentsFlow}
         onOpenAppointmentModal={openBookingFlow}
@@ -578,8 +609,11 @@ function App() {
         title="Active session found"
         open={googleSessionSwitchPrompt !== null}
         okText="End previous session"
-        cancelText="Keep previous session"
+        cancelButtonProps={{ style: { display: 'none' } }}
         confirmLoading={authSwitchLoading}
+        closable={false}
+        keyboard={false}
+        maskClosable={false}
         onOk={() => {
           void handleGoogleSessionSwitchConfirm();
         }}
@@ -602,8 +636,11 @@ function App() {
         title="Already signed in"
         open={authSwitchPromptOpen}
         okText="End previous session"
-        cancelText="Keep current session"
+        cancelButtonProps={{ style: { display: 'none' } }}
         confirmLoading={authSwitchLoading}
+        closable={false}
+        keyboard={false}
+        maskClosable={false}
         onOk={() => {
           void handleContinueAuthSwitch();
         }}

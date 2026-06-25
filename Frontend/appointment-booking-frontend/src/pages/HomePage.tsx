@@ -6,6 +6,7 @@ import { getServicesAction } from '../store/services/action';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
   selectActiveServices,
+  selectServicesLoaded,
   selectServicesLoading,
 } from '../store/services/selector';
 import './HomePage.css';
@@ -59,6 +60,7 @@ const HomePage: React.FC<HomePageProps> = ({ onMakeAppointment }) => {
   const dispatch = useAppDispatch();
   const [messageApi, contextHolder] = message.useMessage();
   const services = useAppSelector(selectActiveServices);
+  const servicesLoaded = useAppSelector(selectServicesLoaded);
   const servicesLoading = useAppSelector(selectServicesLoading);
 
   useEffect(() => {
@@ -102,11 +104,11 @@ const HomePage: React.FC<HomePageProps> = ({ onMakeAppointment }) => {
                     </li>
                   ))}
                 </ul>
-              ) : (
+              ) : servicesLoaded && !servicesLoading ? (
                 <Typography.Text type="secondary">
                   Services will appear here once they are active.
                 </Typography.Text>
-              )}
+              ) : null}
             </Spin>
           </SACard>
         </div>
