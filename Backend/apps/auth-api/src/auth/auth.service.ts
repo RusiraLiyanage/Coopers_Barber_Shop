@@ -463,23 +463,37 @@ export class AuthService {
     user: AuthenticatedUser,
     options: CreateSessionOptions = {},
   ): Promise<AuthTokensResponse> {
-    if (await this.sessionService.hasActiveUserSession(user.id)) {
-      if (!options.endExistingSessions) {
-        throw new ConflictException({
-          code: ACTIVE_ACCOUNT_SESSION_EXISTS_CODE,
-          message: 'This account already has an active session.',
-        });
-      }
+    const hasActiveSession = await this.sessionService.hasActiveUserSession(
+      user.id,
+    );
 
-      await this.sessionService.revokeUserSessions(user.id);
+    if (hasActiveSession && !options.endExistingSessions) {
+      throw new ConflictException({
+        code: ACTIVE_ACCOUNT_SESSION_EXISTS_CODE,
+        message: 'This account already has an active session.',
+      });
     }
 
     const refreshToken = this.jwtTokenService.generateRefreshToken();
-
-    const session = await this.sessionService.createSession({
+    const createSessionInput = {
       userId: user.id,
       refreshToken: refreshToken.refresh_token,
-    });
+    };
+
+    const session =
+      hasActiveSession && options.endExistingSessions
+        ? await this.dataSource.transaction(async (manager) => {
+            await this.sessionService.revokeUserSessions(
+              user.id,
+              manager as never,
+            );
+
+            return this.sessionService.createSession(
+              createSessionInput,
+              manager as never,
+            );
+          })
+        : await this.sessionService.createSession(createSessionInput);
 
     return {
       ...this.jwtTokenService.signAccessToken(user, session.id),

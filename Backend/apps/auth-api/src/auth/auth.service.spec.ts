@@ -57,9 +57,11 @@ describe('AuthService', () => {
     hasActiveUserSession: jest.MockedFunction<
       (userId: string) => Promise<boolean>
     >;
-    revokeUserSessions: jest.MockedFunction<(userId: string) => Promise<void>>;
+    revokeUserSessions: jest.MockedFunction<
+      (userId: string, manager?: unknown) => Promise<void>
+    >;
     createSession: jest.MockedFunction<
-      (payload: unknown) => Promise<{ id: string }>
+      (payload: unknown, manager?: unknown) => Promise<{ id: string }>
     >;
   };
   let passwordResetTokensRepo: {
@@ -282,11 +284,18 @@ describe('AuthService', () => {
       refresh_token: 'refresh-token',
     });
 
-    expect(sessionService.revokeUserSessions).toHaveBeenCalledWith(user.id);
-    expect(sessionService.createSession).toHaveBeenCalledWith({
-      userId: user.id,
-      refreshToken: 'refresh-token',
-    });
+    expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+    expect(sessionService.revokeUserSessions).toHaveBeenCalledWith(
+      user.id,
+      transactionManager,
+    );
+    expect(sessionService.createSession).toHaveBeenCalledWith(
+      {
+        userId: user.id,
+        refreshToken: 'refresh-token',
+      },
+      transactionManager,
+    );
     expect(jwtTokenService.signAccessToken).toHaveBeenCalledWith(
       authenticatedUser,
       'session-2',

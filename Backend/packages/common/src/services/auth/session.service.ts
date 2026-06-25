@@ -3,7 +3,7 @@ import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { AuthSession } from '@coopers/entities';
-import type { Repository } from 'typeorm';
+import type { EntityManager, Repository } from 'typeorm';
 import { getRequiredConfigInteger } from '../../configs/env.util';
 import {
   SESSION_EXPIRED_CODE,
@@ -40,9 +40,14 @@ export class SessionService {
     private readonly configService: ConfigService,
   ) {}
 
-  async createSession(input: CreateAuthSessionInput): Promise<AuthSession> {
+  async createSession(
+    input: CreateAuthSessionInput,
+    manager?: EntityManager,
+  ): Promise<AuthSession> {
+    const sessionsRepo =
+      manager?.getRepository(AuthSession) ?? this.sessionsRepo;
     const now = new Date();
-    const session = this.sessionsRepo.create({
+    const session = sessionsRepo.create({
       user: { id: input.userId },
       refreshTokenHash: this.hashRefreshToken(input.refreshToken),
       tokenFamilyId: input.tokenFamilyId ?? randomUUID(), // new login starts a new family; rotation reuses it
@@ -51,7 +56,7 @@ export class SessionService {
       lastUsedAt: now,
     });
 
-    return this.sessionsRepo.save(session);
+    return sessionsRepo.save(session);
   }
 
   async findActiveSession(refreshToken: string): Promise<AuthSession> {
@@ -217,8 +222,14 @@ export class SessionService {
     this.logger.log(`Revoked auth session ${session.id} by logout.`);
   }
 
-  async revokeUserSessions(userId: string): Promise<void> {
-    await this.sessionsRepo
+  async revokeUserSessions(
+    userId: string,
+    manager?: EntityManager,
+  ): Promise<void> {
+    const sessionsRepo =
+      manager?.getRepository(AuthSession) ?? this.sessionsRepo;
+
+    await sessionsRepo
       .createQueryBuilder()
       .update(AuthSession)
       .set({
