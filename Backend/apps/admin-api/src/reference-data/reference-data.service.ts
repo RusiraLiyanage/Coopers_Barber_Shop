@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ReferenceDataItem, ReferenceDataType } from '@coopers/entities';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { PaginatedResult, PagingMetaDto } from '../common/pagination.dto';
 import { CreateReferenceDataItemDto } from './dto/create-reference-data-item.dto';
 import { ReferenceDataQueryDto } from './dto/reference-data-query.dto';
@@ -91,31 +91,35 @@ export class ReferenceDataService {
   }
 
   async delete(id: string): Promise<DeleteReferenceDataItemResponse> {
-    const item = await this.referenceDataRepository.findOne({ where: { id } });
+    await this.dataSource.transaction(async (manager) => {
+      const referenceDataRepository = manager.getRepository(ReferenceDataItem);
+      const item = await referenceDataRepository.findOne({ where: { id } });
 
-    if (!item) {
-      throw new NotFoundException('Reference item not found.');
-    }
+      if (!item) {
+        throw new NotFoundException('Reference item not found.');
+      }
 
-    await this.removeReferences(item.type, item.value);
-    await this.referenceDataRepository.remove(item);
+      await this.removeReferences(manager, item.type, item.value);
+      await referenceDataRepository.remove(item);
+    });
 
     return { success: true };
   }
 
   private async removeReferences(
+    manager: EntityManager,
     type: ReferenceDataType,
     value: string,
   ): Promise<void> {
     if (type === ReferenceDataType.BARBER_CAPABILITY) {
-      await this.dataSource.query(
+      await manager.query(
         `UPDATE staff
          SET skills = array_remove(skills, $1),
              updated_at = CURRENT_TIMESTAMP
          WHERE $1 = ANY(skills)`,
         [value],
       );
-      await this.dataSource.query(
+      await manager.query(
         `UPDATE services
          SET required_skills = array_remove(required_skills, $1),
              updated_at = CURRENT_TIMESTAMP
@@ -126,7 +130,7 @@ export class ReferenceDataService {
       return;
     }
 
-    await this.dataSource.query(
+    await manager.query(
       `UPDATE services
        SET safety_triggers = array_remove(safety_triggers, $1),
            updated_at = CURRENT_TIMESTAMP
