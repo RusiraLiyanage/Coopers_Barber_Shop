@@ -4,8 +4,10 @@ import {
   configureSwagger,
   ensureNodeCryptoGlobal,
   getRequiredConfigInteger,
+  loadAppEnvFile,
 } from '@coopers/common';
 
+loadAppEnvFile();
 ensureNodeCryptoGlobal(); // UUID needs crypto
 
 async function bootstrap() {

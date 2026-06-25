@@ -5,8 +5,10 @@ import {
   createFrontendCorsOptions,
   ensureNodeCryptoGlobal,
   GuardConfigService,
+  loadAppEnvFile,
 } from '@coopers/common';
 
+loadAppEnvFile();
 ensureNodeCryptoGlobal(); // UUID needs crypto
 
 async function bootstrap() {
