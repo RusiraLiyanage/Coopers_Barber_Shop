@@ -10,6 +10,7 @@ import {
 } from '@coopers/entities';
 import { StaffService } from '../staff/staff.service';
 import { ConflictException } from '@nestjs/common';
+import { CacheService, REDIS_CACHE_KEYS } from '@coopers/common';
 
 // Mock repositories
 const mockAppointmentsRepo = {
@@ -58,6 +59,10 @@ const mockStaffService = {
   getBufferMinutes: jest.fn().mockResolvedValue(15),
 };
 
+const mockCacheService = {
+  deleteKey: jest.fn(),
+};
+
 describe('AppointmentsService', () => {
   let service: AppointmentsService;
 
@@ -99,6 +104,7 @@ describe('AppointmentsService', () => {
         { provide: getRepositoryToken(Service), useValue: mockServicesRepo },
         { provide: getRepositoryToken(Staff), useValue: mockStaffRepo },
         { provide: StaffService, useValue: mockStaffService },
+        { provide: CacheService, useValue: mockCacheService },
       ],
     }).compile();
 
@@ -452,6 +458,9 @@ describe('AppointmentsService', () => {
       visitDate: '2025-09-24',
     });
     expect(mockHairHistoryRepo.save).toHaveBeenCalledWith({ id: 'history-1' });
+    expect(mockCacheService.deleteKey).toHaveBeenCalledWith(
+      REDIS_CACHE_KEYS.consultation.clientHairHistory('user-1'),
+    );
   });
 
   it('should update an appointment onto the selected date when the slot is available', async () => {

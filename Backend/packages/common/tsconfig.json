@@ -3,7 +3,8 @@
   "compilerOptions": {
     "ignoreDeprecations": "6.0",
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    "types": ["node", "jest"]
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]
