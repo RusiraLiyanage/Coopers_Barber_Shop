@@ -29,4 +29,11 @@ Redis is a short-lived performance layer. PostgreSQL remains the source of truth
 
 The current Redis usage is correctly focused on AI consultation context and barber matching performance. It should reduce repeated PostgreSQL reads during the Claude tool loop without making booking correctness depend on Redis.
 
-The next hardening step is to keep expanding invalidation tests around every mutation that changes service, barber, safety-rule, or hair-history data.
+Invalidation tests now cover the mutation paths that change service, barber, safety-rule, and hair-history data:
+
+- Service create/update/AI-config update clears service and safety-rule consultation cache.
+- Barber create/update/delete clears available-barber consultation cache.
+- Safety rule create/update clears active safety-rule consultation cache.
+- Booking appointment creation, admin hair-history creation, and admin brief-to-history creation clear customer hair-history consultation cache.
+
+Future cache additions should include matching invalidation tests in the same change.

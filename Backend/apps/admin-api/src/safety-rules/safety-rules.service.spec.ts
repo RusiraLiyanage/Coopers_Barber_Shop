@@ -7,6 +7,7 @@ import { SafetyRulesService } from './safety-rules.service';
 describe('SafetyRulesService Redis invalidation', () => {
   const safetyRuleRepository = {
     create: jest.fn(),
+    preload: jest.fn(),
     save: jest.fn(),
   };
   const cacheService = {
@@ -38,6 +39,31 @@ describe('SafetyRulesService Redis invalidation', () => {
       serviceIds: ['service-1'],
       message: 'Review colour history.',
       severity: SafetyRuleSeverity.HIGH,
+    });
+
+    expect(cacheService.deleteKey.mock.calls).toContainEqual([
+      REDIS_CACHE_KEYS.consultation.activeSafetyRules,
+    ]);
+  });
+
+  it('clears active safety-rule cache after updating a safety rule', async () => {
+    const service = new SafetyRulesService(
+      safetyRuleRepository as never,
+      cacheService as unknown as CacheService,
+    );
+    const safetyRule = {
+      id: 'rule-1',
+      condition: 'box dye',
+      serviceIds: ['service-1'],
+      message: 'Review colour history before chemical service.',
+      severity: SafetyRuleSeverity.HIGH,
+    };
+
+    safetyRuleRepository.preload.mockResolvedValue(safetyRule);
+    safetyRuleRepository.save.mockResolvedValue(safetyRule);
+
+    await service.update('rule-1', {
+      message: 'Review colour history before chemical service.',
     });
 
     expect(cacheService.deleteKey.mock.calls).toContainEqual([
