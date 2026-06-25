@@ -29,6 +29,15 @@ Redis is a short-lived performance layer. PostgreSQL remains the source of truth
 
 The current Redis usage is correctly focused on AI consultation context and barber matching performance. It should reduce repeated PostgreSQL reads during the Claude tool loop without making booking correctness depend on Redis.
 
+## Failure Behavior
+
+Redis failures must not fail booking, consultation, or admin writes.
+
+- Read failures return a cache miss so the application can load from PostgreSQL.
+- Write failures are logged and the request continues with the PostgreSQL result.
+- Delete failures are logged and the mutation still succeeds; stale Redis data is bounded by the configured TTL.
+- Health checks report Redis as `unavailable` when primary or reader pings fail.
+
 Invalidation tests now cover the mutation paths that change service, barber, safety-rule, and hair-history data:
 
 - Service create/update/AI-config update clears service and safety-rule consultation cache.

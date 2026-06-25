@@ -65,6 +65,16 @@ describe('CacheService', () => {
     await expect(service.getJson('key-1')).resolves.toBeNull();
   });
 
+  it('returns null when Redis read fails', async () => {
+    redisReader.get.mockRejectedValue(new Error('reader unavailable'));
+    const service = new CacheService(
+      redisPrimary as unknown as Redis,
+      redisReader as unknown as Redis,
+    );
+
+    await expect(service.getJson('key-1')).resolves.toBeNull();
+  });
+
   it('writes JSON with the env default TTL', async () => {
     const service = new CacheService(
       redisPrimary as unknown as Redis,
@@ -76,6 +86,40 @@ describe('CacheService', () => {
     expect(redisPrimary.setex.mock.calls).toEqual([
       ['key-1', 300, JSON.stringify({ id: 'service-1' })],
     ]);
+  });
+
+  it('does not throw when Redis write fails', async () => {
+    redisPrimary.setex.mockRejectedValue(new Error('primary unavailable'));
+    const service = new CacheService(
+      redisPrimary as unknown as Redis,
+      redisReader as unknown as Redis,
+    );
+
+    await expect(
+      service.setJson('key-1', { id: 'service-1' }),
+    ).resolves.toBeUndefined();
+  });
+
+  it('does not throw when Redis delete fails', async () => {
+    redisPrimary.del.mockRejectedValue(new Error('primary unavailable'));
+    const service = new CacheService(
+      redisPrimary as unknown as Redis,
+      redisReader as unknown as Redis,
+    );
+
+    await expect(service.deleteKey('key-1')).resolves.toBeUndefined();
+  });
+
+  it('does not throw when Redis pattern deletion fails', async () => {
+    redisPrimary.scan.mockRejectedValue(new Error('primary unavailable'));
+    const service = new CacheService(
+      redisPrimary as unknown as Redis,
+      redisReader as unknown as Redis,
+    );
+
+    await expect(
+      service.deleteByPattern('consultation:*'),
+    ).resolves.toBeUndefined();
   });
 
   it('reports disabled health when Redis caching is off', async () => {
