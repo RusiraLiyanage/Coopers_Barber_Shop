@@ -5,12 +5,8 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import {
-  Appointment,
-  Staff,
-  StaffGender,
-  StaffRole,
-} from '@coopers/entities';
+import { Appointment, Staff, StaffGender, StaffRole } from '@coopers/entities';
+import { CacheService, REDIS_CACHE_KEYS } from '@coopers/common';
 import {
   PaginatedResult,
   PagingMetaDto,
@@ -76,6 +72,7 @@ export class BarbersService {
     private readonly staffRepository: Repository<Staff>,
     @InjectRepository(Appointment)
     private readonly appointmentRepository: Repository<Appointment>,
+    private readonly cacheService: CacheService,
   ) {}
 
   async findAll(
@@ -120,6 +117,7 @@ export class BarbersService {
     });
 
     const savedStaff = await this.staffRepository.save(staff);
+    await this.invalidateAvailableBarbersCache();
 
     return normalizeStaffResponse(savedStaff);
   }
@@ -142,6 +140,7 @@ export class BarbersService {
     }
 
     const savedStaff = await this.staffRepository.save(staff);
+    await this.invalidateAvailableBarbersCache();
 
     return normalizeStaffResponse(savedStaff);
   }
@@ -170,7 +169,14 @@ export class BarbersService {
     }
 
     await this.staffRepository.remove(staff);
+    await this.invalidateAvailableBarbersCache();
 
     return { success: true };
+  }
+
+  private invalidateAvailableBarbersCache(): Promise<void> {
+    return this.cacheService.deleteKey(
+      REDIS_CACHE_KEYS.consultation.availableBarbers,
+    );
   }
 }

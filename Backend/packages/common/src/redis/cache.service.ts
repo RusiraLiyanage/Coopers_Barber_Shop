@@ -9,13 +9,21 @@ import {
 @Injectable()
 export class CacheService {
   private readonly logger = new Logger(CacheService.name);
+  private readonly cacheEnabled: boolean;
+  private readonly defaultTtlSeconds: number;
 
   public constructor(
     @Inject(REDIS_CLUSTER.PRIMARY)
     private readonly redisPrimary: Redis,
     @Inject(REDIS_CLUSTER.READER)
     private readonly redisReader: Redis,
-  ) {}
+  ) {
+    this.cacheEnabled =
+      process.env[REDIS_CACHE_ENABLED_ENV]?.toLowerCase() === 'true';
+    this.defaultTtlSeconds = this.cacheEnabled
+      ? this.getDefaultCacheTtlSeconds()
+      : 0;
+  }
 
   public async getCachedData(key: string): Promise<string | null> {
     if (!this.isCacheEnabled()) {
@@ -61,7 +69,7 @@ export class CacheService {
     }
 
     try {
-      const resolvedTtlSeconds = ttlSeconds ?? this.getDefaultCacheTtlSeconds();
+      const resolvedTtlSeconds = ttlSeconds ?? this.defaultTtlSeconds;
 
       if (resolvedTtlSeconds > 0) {
         await this.redisPrimary.setex(key, resolvedTtlSeconds, value);
@@ -123,7 +131,7 @@ export class CacheService {
   }
 
   private isCacheEnabled(): boolean {
-    return process.env[REDIS_CACHE_ENABLED_ENV]?.toLowerCase() === 'true';
+    return this.cacheEnabled;
   }
 
   private getDefaultCacheTtlSeconds(): number {

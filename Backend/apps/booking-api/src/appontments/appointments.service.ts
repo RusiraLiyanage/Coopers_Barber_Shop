@@ -4,6 +4,7 @@ import {
   BadRequestException,
   NotFoundException,
   ConflictException,
+  Optional,
 } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DeepPartial, Repository } from 'typeorm';
@@ -14,6 +15,7 @@ import {
   Service,
   Staff,
 } from '@coopers/entities';
+import { CacheService, REDIS_CACHE_KEYS } from '@coopers/common';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { StaffService } from '../staff/staff.service';
@@ -98,6 +100,8 @@ export class AppointmentsService {
     private staffService: StaffService,
     @Inject(getRepositoryToken(Staff as EntityClassOrSchema))
     private staffRepo: Repository<Staff>,
+    @Optional()
+    private readonly cacheService?: CacheService,
   ) {}
 
   private addMinutes(date: Date, minutes: number): Date {
@@ -338,6 +342,9 @@ export class AppointmentsService {
     });
 
     await this.hairHistoryRepo.save(hairHistory);
+    await this.cacheService?.deleteKey(
+      REDIS_CACHE_KEYS.consultation.clientHairHistory(user.userId),
+    );
   }
 
   private buildCustomerReportedHairHistoryNotes(

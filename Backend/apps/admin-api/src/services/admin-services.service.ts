@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Service } from '@coopers/entities';
+import { CacheService, REDIS_CACHE_KEYS } from '@coopers/common';
 import {
   PaginatedResult,
   PagingMetaDto,
@@ -40,6 +41,7 @@ export class AdminServicesService {
   constructor(
     @InjectRepository(Service)
     private readonly servicesRepository: Repository<Service>,
+    private readonly cacheService: CacheService,
   ) {}
 
   async create(createServiceDto: CreateServiceDto): Promise<Service> {
@@ -59,7 +61,10 @@ export class AdminServicesService {
       isActive: createServiceDto.isActive ?? true,
     });
 
-    return this.servicesRepository.save(service);
+    const savedService = await this.servicesRepository.save(service);
+    await this.invalidateServiceCache(savedService.id);
+
+    return savedService;
   }
 
   async findAll(
@@ -118,7 +123,10 @@ export class AdminServicesService {
       throw new NotFoundException('Service not found.');
     }
 
-    return this.servicesRepository.save(service);
+    const savedService = await this.servicesRepository.save(service);
+    await this.invalidateServiceCache(id);
+
+    return savedService;
   }
 
   async updateAiConfig(
@@ -140,7 +148,10 @@ export class AdminServicesService {
       throw new NotFoundException('Service not found.');
     }
 
-    return this.servicesRepository.save(service);
+    const savedService = await this.servicesRepository.save(service);
+    await this.invalidateServiceCache(id);
+
+    return savedService;
   }
 
   private findByName(name: string): Promise<Service | null> {
@@ -149,5 +160,16 @@ export class AdminServicesService {
         name,
       },
     });
+  }
+
+  private async invalidateServiceCache(serviceId: string): Promise<void> {
+    await Promise.all([
+      this.cacheService.deleteKey(
+        REDIS_CACHE_KEYS.consultation.activeService(serviceId),
+      ),
+      this.cacheService.deleteKey(
+        REDIS_CACHE_KEYS.consultation.activeSafetyRules,
+      ),
+    ]);
   }
 }

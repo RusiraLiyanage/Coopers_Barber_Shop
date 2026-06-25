@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SafetyRule } from '@coopers/entities';
+import { CacheService, REDIS_CACHE_KEYS } from '@coopers/common';
 import {
   PaginatedResult,
   PagingMetaDto,
@@ -27,6 +28,7 @@ export class SafetyRulesService {
   constructor(
     @InjectRepository(SafetyRule)
     private readonly safetyRuleRepository: Repository<SafetyRule>,
+    private readonly cacheService: CacheService,
   ) {}
 
   async findAll(
@@ -66,7 +68,10 @@ export class SafetyRulesService {
       message: normalizeText(createSafetyRuleDto.message),
     });
 
-    return this.safetyRuleRepository.save(safetyRule);
+    const savedSafetyRule = await this.safetyRuleRepository.save(safetyRule);
+    await this.invalidateSafetyRulesCache();
+
+    return savedSafetyRule;
   }
 
   async update(
@@ -94,6 +99,15 @@ export class SafetyRulesService {
       throw new NotFoundException('Safety rule not found.');
     }
 
-    return this.safetyRuleRepository.save(safetyRule);
+    const savedSafetyRule = await this.safetyRuleRepository.save(safetyRule);
+    await this.invalidateSafetyRulesCache();
+
+    return savedSafetyRule;
+  }
+
+  private invalidateSafetyRulesCache(): Promise<void> {
+    return this.cacheService.deleteKey(
+      REDIS_CACHE_KEYS.consultation.activeSafetyRules,
+    );
   }
 }

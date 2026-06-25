@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { HairHistory, Staff, User } from '@coopers/entities';
+import { CacheService, REDIS_CACHE_KEYS } from '@coopers/common';
 import { PaginatedResult, PagingMetaDto } from '../common/pagination.dto';
 import { CreateHairHistoryDto } from './dto/create-hair-history.dto';
 import { HairHistoryQueryDto } from './dto/hair-history-query.dto';
@@ -23,6 +24,7 @@ export class HairHistoryService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Staff)
     private readonly staffRepository: Repository<Staff>,
+    private readonly cacheService: CacheService,
   ) {}
 
   async findAll(
@@ -109,6 +111,7 @@ export class HairHistoryService {
     });
 
     const savedHistory = await this.hairHistoryRepository.save(hairHistory);
+    await this.invalidateClientHairHistoryCache(createHairHistoryDto.clientId);
 
     return this.hairHistoryRepository.findOneOrFail({
       where: { id: savedHistory.id },
@@ -117,5 +120,11 @@ export class HairHistoryService {
         barber: true,
       },
     });
+  }
+
+  private invalidateClientHairHistoryCache(userId: string): Promise<void> {
+    return this.cacheService.deleteKey(
+      REDIS_CACHE_KEYS.consultation.clientHairHistory(userId),
+    );
   }
 }

@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import {
   createAppConfigOptions,
   InternalServiceAuthModule,
+  RedisModule,
   XssProtectionMiddleware,
 } from '@coopers/common';
 import { UsersModule } from './users/users.module';
@@ -22,6 +23,7 @@ import { HealthController } from './health.controller';
     // client IP is known. This internal API only ever sees the guard's IP, so a
     // per-IP limit here would be a global cap, not per-user protection.
     InternalServiceAuthModule, // only the booking-guard (which holds the shared secret) may reach this API
+    RedisModule.forRoot(),
     DatabaseModule.forRoot(),
     UsersModule,
     AuthModule,

@@ -7,6 +7,7 @@ import {
   HairHistory,
   Staff,
 } from '@coopers/entities';
+import { CacheService, REDIS_CACHE_KEYS } from '@coopers/common';
 import { PaginatedResult, PagingMetaDto } from '../common/pagination.dto';
 import { BriefsQueryDto } from './dto/briefs-query.dto';
 import { CreateBriefDto } from './dto/create-brief.dto';
@@ -76,6 +77,7 @@ export class BriefsService {
     private readonly staffRepository: Repository<Staff>,
     @InjectRepository(HairHistory)
     private readonly hairHistoryRepository: Repository<HairHistory>,
+    private readonly cacheService: CacheService,
   ) {}
 
   private toBriefResponse(brief: AppointmentBrief): AppointmentBriefResponse {
@@ -216,6 +218,9 @@ export class BriefsService {
     });
 
     const savedHistory = await this.hairHistoryRepository.save(hairHistory);
+    await this.invalidateClientHairHistoryCache(
+      appointmentBrief.booking.customer.id,
+    );
 
     return this.hairHistoryRepository.findOneOrFail({
       where: { id: savedHistory.id },
@@ -224,6 +229,12 @@ export class BriefsService {
         barber: true,
       },
     });
+  }
+
+  private invalidateClientHairHistoryCache(userId: string): Promise<void> {
+    return this.cacheService.deleteKey(
+      REDIS_CACHE_KEYS.consultation.clientHairHistory(userId),
+    );
   }
 
   async create(

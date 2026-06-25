@@ -3,6 +3,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -16,6 +17,7 @@ import {
   StaffGender,
   StaffRole,
 } from '@coopers/entities';
+import { CacheService, REDIS_CACHE_KEYS } from '@coopers/common';
 import type { Repository } from 'typeorm';
 import { ConsultationAnswerDto } from './dto/consultation-answer.dto';
 import { HairPhotoDto } from './dto/hair-photo.dto';
@@ -206,6 +208,8 @@ export class ConsultationAiService {
     private readonly safetyRuleRepository: Repository<SafetyRule>,
     @InjectRepository(HairHistory)
     private readonly hairHistoryRepository: Repository<HairHistory>,
+    @Optional()
+    private readonly cacheService?: CacheService,
   ) {
     const apiKey = this.configService.get<string>('ANTHROPIC_API_KEY');
     this.model =
@@ -735,10 +739,7 @@ export class ConsultationAiService {
     const [service, previousHairHistory, staff] = await Promise.all([
       this.getActiveService(serviceId),
       this.getClientHairHistory(userId),
-      this.staffRepository.find({
-        where: { active: true, available: true },
-        order: { displayName: 'ASC' },
-      }),
+      this.getAvailableBarbers(),
     ]);
 
     if (staff.length === 0) {
@@ -753,6 +754,13 @@ export class ConsultationAiService {
   }
 
   private async getActiveService(serviceId: string): Promise<Service> {
+    const cacheKey = REDIS_CACHE_KEYS.consultation.activeService(serviceId);
+    const cachedService = await this.cacheService?.getJson<Service>(cacheKey);
+
+    if (cachedService) {
+      return this.hydrateService(cachedService);
+    }
+
     const service = await this.servicesRepository.findOne({
       where: { id: serviceId, isActive: true },
     });
@@ -761,11 +769,21 @@ export class ConsultationAiService {
       throw new NotFoundException('Service not found.');
     }
 
+    await this.cacheService?.setJson(cacheKey, service);
+
     return service;
   }
 
-  private getClientHairHistory(userId: string): Promise<HairHistory[]> {
-    return this.hairHistoryRepository
+  private async getClientHairHistory(userId: string): Promise<HairHistory[]> {
+    const cacheKey = REDIS_CACHE_KEYS.consultation.clientHairHistory(userId);
+    const cachedHistory =
+      await this.cacheService?.getJson<HairHistory[]>(cacheKey);
+
+    if (cachedHistory) {
+      return cachedHistory.map((history) => this.hydrateHairHistory(history));
+    }
+
+    const history = await this.hairHistoryRepository
       .createQueryBuilder('history')
       .leftJoinAndSelect('history.barber', 'barber')
       .innerJoin('history.client', 'client')
@@ -774,6 +792,10 @@ export class ConsultationAiService {
       .addOrderBy('history.createdAt', 'DESC')
       .take(MAX_HISTORY_ITEMS)
       .getMany();
+
+    await this.cacheService?.setJson(cacheKey, history);
+
+    return history;
   }
 
   private buildSystemPrompt(): ClaudeTextBlockParam[] {
@@ -987,10 +1009,7 @@ export class ConsultationAiService {
   }
 
   private async listAvailableBarbersToolResult(): Promise<SafeStaffContext[]> {
-    const staff = await this.staffRepository.find({
-      where: { active: true, available: true },
-      order: { displayName: 'ASC' },
-    });
+    const staff = await this.getAvailableBarbers();
 
     return staff.map(toSafeStaffContext);
   }
@@ -1005,10 +1024,7 @@ export class ConsultationAiService {
     }>
   > {
     const serviceId = this.getToolServiceId(input);
-    const safetyRules = await this.safetyRuleRepository.find({
-      where: { active: true },
-      order: { createdAt: 'DESC' },
-    });
+    const safetyRules = await this.getActiveSafetyRules();
 
     return this.toSafeSafetyRules(
       safetyRules.filter((rule) => rule.serviceIds.includes(serviceId)),
@@ -1417,6 +1433,78 @@ export class ConsultationAiService {
       message: rule.message,
       severity: rule.severity,
     }));
+  }
+
+  private async getAvailableBarbers(): Promise<Staff[]> {
+    const cacheKey = REDIS_CACHE_KEYS.consultation.availableBarbers;
+    const cachedStaff = await this.cacheService?.getJson<Staff[]>(cacheKey);
+
+    if (cachedStaff) {
+      return cachedStaff.map((staff) => this.hydrateStaff(staff));
+    }
+
+    const staff = await this.staffRepository.find({
+      where: { active: true, available: true },
+      order: { displayName: 'ASC' },
+    });
+
+    await this.cacheService?.setJson(cacheKey, staff);
+
+    return staff;
+  }
+
+  private async getActiveSafetyRules(): Promise<SafetyRule[]> {
+    const cacheKey = REDIS_CACHE_KEYS.consultation.activeSafetyRules;
+    const cachedRules =
+      await this.cacheService?.getJson<SafetyRule[]>(cacheKey);
+
+    if (cachedRules) {
+      return cachedRules.map((rule) => this.hydrateSafetyRule(rule));
+    }
+
+    const safetyRules = await this.safetyRuleRepository.find({
+      where: { active: true },
+      order: { createdAt: 'DESC' },
+    });
+
+    await this.cacheService?.setJson(cacheKey, safetyRules);
+
+    return safetyRules;
+  }
+
+  private hydrateService(service: Service): Service {
+    return {
+      ...service,
+      createdAt: this.toDate(service.createdAt),
+      updatedAt: this.toDate(service.updatedAt),
+    };
+  }
+
+  private hydrateStaff(staff: Staff): Staff {
+    return {
+      ...staff,
+      createdAt: this.toDate(staff.createdAt),
+      updatedAt: this.toDate(staff.updatedAt),
+    };
+  }
+
+  private hydrateSafetyRule(rule: SafetyRule): SafetyRule {
+    return {
+      ...rule,
+      createdAt: this.toDate(rule.createdAt),
+      updatedAt: this.toDate(rule.updatedAt),
+    };
+  }
+
+  private hydrateHairHistory(history: HairHistory): HairHistory {
+    return {
+      ...history,
+      createdAt: this.toDate(history.createdAt),
+    };
+  }
+
+  private toDate(value: Date): Date {
+    return value instanceof Date ? value : new Date(value);
   }
 
   private logAiFallback(operation: string, error: unknown): void {
