@@ -3,7 +3,7 @@ import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { AuthSession } from '@coopers/entities';
-import type { EntityManager, Repository } from 'typeorm';
+import { DataSource, type EntityManager, type Repository } from 'typeorm';
 import { getRequiredConfigInteger } from '../../configs/env.util';
 import {
   SESSION_EXPIRED_CODE,
@@ -38,6 +38,7 @@ export class SessionService {
     @InjectRepository(AuthSession)
     private readonly sessionsRepo: Repository<AuthSession>,
     private readonly configService: ConfigService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async createSession(
@@ -292,15 +293,22 @@ export class SessionService {
     currentSession: AuthSession,
     newRefreshToken: string,
   ): Promise<AuthSession> {
-    await this.sessionsRepo.update(currentSession.id, {
-      lastUsedAt: new Date(),
-      revokedAt: new Date(),
-    });
+    return this.dataSource.transaction(async (manager) => {
+      const sessionsRepo = manager.getRepository(AuthSession);
 
-    return this.createSession({
-      userId: currentSession.user.id,
-      refreshToken: newRefreshToken,
-      tokenFamilyId: currentSession.tokenFamilyId, // keep the rotated session in the same family
+      await sessionsRepo.update(currentSession.id, {
+        lastUsedAt: new Date(),
+        revokedAt: new Date(),
+      });
+
+      return this.createSession(
+        {
+          userId: currentSession.user.id,
+          refreshToken: newRefreshToken,
+          tokenFamilyId: currentSession.tokenFamilyId, // keep the rotated session in the same family
+        },
+        manager,
+      );
     });
   }
 
