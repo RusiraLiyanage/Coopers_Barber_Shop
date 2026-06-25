@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MoreThan, Repository } from 'typeorm';
+import { DataSource, MoreThan, Repository } from 'typeorm';
 import { PasswordService } from '@coopers/common';
 import { InviteToken, User, UserRole } from '@coopers/entities';
 import { AcceptAdminInviteDto } from './dto/accept-admin-invite.dto';
@@ -48,6 +48,7 @@ export class InvitesService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly passwordService: PasswordService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async createAdminInvite(
@@ -135,23 +136,65 @@ export class InvitesService {
       throw new ConflictException('An account already exists for this email.');
     }
 
-    const user = this.userRepository.create({
-      email: inviteToken.email,
-      passwordHash: await this.passwordService.hash(
-        acceptAdminInviteDto.password,
-      ),
-      firstName: optionalText(acceptAdminInviteDto.firstName),
-      lastName: optionalText(acceptAdminInviteDto.lastName),
-      mobile: optionalText(acceptAdminInviteDto.mobile),
-      suburb: optionalText(acceptAdminInviteDto.suburb),
-      role: UserRole.ADMIN,
-    });
-    const savedUser = await this.userRepository.save(user);
+    const passwordHash = await this.passwordService.hash(
+      acceptAdminInviteDto.password,
+    );
 
-    inviteToken.used = true;
-    inviteToken.usedAt = new Date();
-    inviteToken.acceptedUser = savedUser;
-    await this.inviteTokenRepository.save(inviteToken);
+    const savedUser = await this.dataSource.transaction(async (manager) => {
+      const userRepository = manager.getRepository(User);
+      const inviteTokenRepository = manager.getRepository(InviteToken);
+      const lockedInviteToken = await inviteTokenRepository.findOne({
+        where: {
+          token: acceptAdminInviteDto.token,
+        },
+        relations: {
+          acceptedUser: true,
+        },
+        lock: {
+          mode: 'pessimistic_write',
+        },
+      });
+
+      if (
+        !lockedInviteToken ||
+        lockedInviteToken.used ||
+        lockedInviteToken.usedAt
+      ) {
+        throw new NotFoundException('Invite token is invalid or already used.');
+      }
+
+      if (lockedInviteToken.expiresAt <= new Date()) {
+        throw new BadRequestException('Invite token has expired.');
+      }
+
+      const existingUserInTransaction = await userRepository.findOne({
+        where: { email: lockedInviteToken.email },
+      });
+
+      if (existingUserInTransaction) {
+        throw new ConflictException(
+          'An account already exists for this email.',
+        );
+      }
+
+      const user = userRepository.create({
+        email: lockedInviteToken.email,
+        passwordHash,
+        firstName: optionalText(acceptAdminInviteDto.firstName),
+        lastName: optionalText(acceptAdminInviteDto.lastName),
+        mobile: optionalText(acceptAdminInviteDto.mobile),
+        suburb: optionalText(acceptAdminInviteDto.suburb),
+        role: UserRole.ADMIN,
+      });
+      const createdUser = await userRepository.save(user);
+
+      lockedInviteToken.used = true;
+      lockedInviteToken.usedAt = new Date();
+      lockedInviteToken.acceptedUser = createdUser;
+      await inviteTokenRepository.save(lockedInviteToken);
+
+      return createdUser;
+    });
 
     return {
       success: true,
