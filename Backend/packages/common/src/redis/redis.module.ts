@@ -1,6 +1,7 @@
 import { DynamicModule, Global, Logger, Module } from '@nestjs/common';
 import Redis, { RedisOptions } from 'ioredis';
 import { CacheService } from './cache.service';
+import { getRedisClientConfig } from './redis.config';
 import { REDIS_CLUSTER } from './redis.constants';
 
 type RedisProviderConfig = {
@@ -41,9 +42,10 @@ export class RedisModule {
   }
 
   private static createRedisClient(config: RedisProviderConfig): Redis {
+    const clientConfig = getRedisClientConfig(config.hostEnv, config.portEnv);
     const client = new Redis({
-      host: this.getRequiredEnv(config.hostEnv),
-      port: this.parsePort(config.portEnv),
+      host: clientConfig.host,
+      port: clientConfig.port,
       lazyConnect: true,
       maxRetriesPerRequest: 1,
       enableOfflineQueue: false,
@@ -54,26 +56,5 @@ export class RedisModule {
     });
 
     return client;
-  }
-
-  private static getRequiredEnv(envName: string): string {
-    const value = process.env[envName];
-
-    if (value === undefined) {
-      throw new Error(`${envName} is not configured`);
-    }
-
-    return value;
-  }
-
-  private static parsePort(envName: string): number {
-    const value = this.getRequiredEnv(envName);
-    const parsedPort = Number(value);
-
-    if (!Number.isInteger(parsedPort) || parsedPort <= 0) {
-      throw new Error(`${envName} must be a positive integer`);
-    }
-
-    return parsedPort;
   }
 }

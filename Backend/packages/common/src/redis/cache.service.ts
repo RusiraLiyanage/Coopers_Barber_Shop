@@ -1,10 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import Redis from 'ioredis';
-import {
-  REDIS_CACHE_DEFAULT_TTL_SECONDS_ENV,
-  REDIS_CACHE_ENABLED_ENV,
-  REDIS_CLUSTER,
-} from './redis.constants';
+import { getRedisCacheRuntimeConfig } from './redis.config';
+import { REDIS_CLUSTER } from './redis.constants';
 
 export type CacheHealth = {
   enabled: boolean;
@@ -25,11 +22,10 @@ export class CacheService {
     @Inject(REDIS_CLUSTER.READER)
     private readonly redisReader: Redis,
   ) {
-    this.cacheEnabled =
-      process.env[REDIS_CACHE_ENABLED_ENV]?.toLowerCase() === 'true';
-    this.defaultTtlSeconds = this.cacheEnabled
-      ? this.getDefaultCacheTtlSeconds()
-      : 0;
+    const cacheConfig = getRedisCacheRuntimeConfig();
+
+    this.cacheEnabled = cacheConfig.enabled;
+    this.defaultTtlSeconds = cacheConfig.defaultTtlSeconds;
   }
 
   public async getCachedData(key: string): Promise<string | null> {
@@ -166,26 +162,6 @@ export class CacheService {
 
   private isCacheEnabled(): boolean {
     return this.cacheEnabled;
-  }
-
-  private getDefaultCacheTtlSeconds(): number {
-    const ttlValue = process.env[REDIS_CACHE_DEFAULT_TTL_SECONDS_ENV];
-
-    if (ttlValue === undefined) {
-      throw new Error(
-        `${REDIS_CACHE_DEFAULT_TTL_SECONDS_ENV} is not configured`,
-      );
-    }
-
-    const ttlSeconds = Number(ttlValue);
-
-    if (!Number.isInteger(ttlSeconds) || ttlSeconds < 0) {
-      throw new Error(
-        `${REDIS_CACHE_DEFAULT_TTL_SECONDS_ENV} must be a positive integer or 0`,
-      );
-    }
-
-    return ttlSeconds;
   }
 
   private logRedisFailure(
