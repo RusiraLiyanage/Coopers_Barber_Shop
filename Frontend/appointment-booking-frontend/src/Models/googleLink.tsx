@@ -19,7 +19,7 @@ interface GoogleLinkModalProps {
 }
 
 type FieldType = {
-  password?: string;
+  googleLinkPassword?: string;
 };
 
 export default function GoogleLinkModal({
@@ -38,14 +38,14 @@ export default function GoogleLinkModal({
     values: FieldType,
     endExistingSessions = false,
   ) => {
-    if (!values.password) {
+    if (!values.googleLinkPassword) {
       return;
     }
 
     setConfirmLoading(true);
 
     try {
-      const response = await linkGoogleAccount(values.password, {
+      const response = await linkGoogleAccount(values.googleLinkPassword, {
         endExistingSessions,
       });
       messageApi.success('Google connected to your account.');
@@ -57,7 +57,7 @@ export default function GoogleLinkModal({
         error instanceof ApiRequestError &&
         error.code === ACTIVE_ACCOUNT_SESSION_EXISTS_CODE
       ) {
-        setSessionConflictPassword(values.password);
+        setSessionConflictPassword(values.googleLinkPassword);
         return;
       }
 
@@ -112,7 +112,7 @@ export default function GoogleLinkModal({
           >
             <Form.Item<FieldType>
               label="Password"
-              name="password"
+              name="googleLinkPassword"
               rules={[
                 {
                   required: true,
@@ -120,7 +120,7 @@ export default function GoogleLinkModal({
                 },
               ]}
             >
-              <Input.Password autoComplete="current-password" />
+              <Input.Password autoComplete="off" />
             </Form.Item>
 
             <Button
@@ -146,7 +146,7 @@ export default function GoogleLinkModal({
         onOk={() => {
           if (sessionConflictPassword) {
             void handleSubmit(
-              { password: sessionConflictPassword },
+              { googleLinkPassword: sessionConflictPassword },
               true,
             );
           }
