@@ -4,6 +4,12 @@ import { App } from 'supertest/types';
 import request from 'supertest';
 import { HealthController } from '../src/health.controller';
 
+interface HealthResponseBody {
+  status: string;
+  service: string;
+  timestamp: string;
+}
+
 describe('Booking API health (e2e)', () => {
   let app: INestApplication<App>;
 
@@ -25,11 +31,13 @@ describe('Booking API health (e2e)', () => {
       .get('/health')
       .expect(200)
       .expect(({ body }) => {
-        expect(body).toMatchObject({
+        const healthResponse = body as HealthResponseBody;
+
+        expect(healthResponse).toMatchObject({
           status: 'ok',
           service: 'booking-api',
         });
-        expect(typeof body.timestamp).toBe('string');
+        expect(typeof healthResponse.timestamp).toBe('string');
       });
   });
 });

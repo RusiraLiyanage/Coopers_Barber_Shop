@@ -11,6 +11,7 @@ import {
 import { StaffService } from '../staff/staff.service';
 import { ConflictException } from '@nestjs/common';
 import { CacheService, REDIS_CACHE_KEYS } from '@coopers/common';
+import { DataSource } from 'typeorm';
 
 // Mock repositories
 const mockAppointmentsRepo = {
@@ -63,10 +64,35 @@ const mockCacheService = {
   deleteKey: jest.fn(),
 };
 
+const mockTransactionManager = {
+  getRepository: jest.fn(),
+};
+
+const mockDataSource = {
+  transaction: jest.fn(),
+};
+
 describe('AppointmentsService', () => {
   let service: AppointmentsService;
 
   beforeEach(async () => {
+    mockDataSource.transaction.mockImplementation(
+      (callback: (manager: typeof mockTransactionManager) => unknown) =>
+        Promise.resolve(callback(mockTransactionManager)),
+    );
+    mockTransactionManager.getRepository.mockImplementation((entity) => {
+      if (entity === Appointment) {
+        return mockAppointmentsRepo;
+      }
+      if (entity === AppointmentBrief) {
+        return mockAppointmentBriefsRepo;
+      }
+      if (entity === HairHistory) {
+        return mockHairHistoryRepo;
+      }
+
+      throw new Error(`Unexpected repository requested: ${String(entity)}`);
+    });
     mockAppointmentsRepo.createQueryBuilder.mockReturnValue(
       mockAppointmentsQueryBuilder,
     );
@@ -104,6 +130,7 @@ describe('AppointmentsService', () => {
         { provide: getRepositoryToken(Service), useValue: mockServicesRepo },
         { provide: getRepositoryToken(Staff), useValue: mockStaffRepo },
         { provide: StaffService, useValue: mockStaffService },
+        { provide: DataSource, useValue: mockDataSource },
         { provide: CacheService, useValue: mockCacheService },
       ],
     }).compile();

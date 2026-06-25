@@ -12,9 +12,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import {
-  HAIR_PHOTO_MEDIA_TYPES,
-} from '../../consultation/dto/hair-photo.dto';
+import { HAIR_PHOTO_MEDIA_TYPES } from '../../consultation/dto/hair-photo.dto';
 import type { HairPhotoMediaType } from '../../consultation/dto/hair-photo.dto';
 
 export class AppointmentGoalPhotoDto {

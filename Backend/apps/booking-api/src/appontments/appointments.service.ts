@@ -7,7 +7,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { DeepPartial, Repository } from 'typeorm';
+import { DataSource, DeepPartial, Repository } from 'typeorm';
 import {
   Appointment,
   AppointmentBrief,
@@ -100,6 +100,7 @@ export class AppointmentsService {
     private staffService: StaffService,
     @Inject(getRepositoryToken(Staff as EntityClassOrSchema))
     private staffRepo: Repository<Staff>,
+    private readonly dataSource: DataSource,
     @Optional()
     private readonly cacheService?: CacheService,
   ) {}
@@ -290,12 +291,15 @@ export class AppointmentsService {
     staff: Staff,
     user: BookingUser,
     dto: CreateAppointmentDto,
+    appointmentBriefsRepo: Repository<AppointmentBrief> = this
+      .appointmentBriefsRepo,
+    hairHistoryRepo: Repository<HairHistory> = this.hairHistoryRepo,
   ): Promise<void> {
     if (!this.hasConsultationSummary(dto)) {
       return;
     }
 
-    const appointmentBrief = this.appointmentBriefsRepo.create({
+    const appointmentBrief = appointmentBriefsRepo.create({
       booking: appointment,
       barber: staff,
       clientSummary: dto.consultationSummary?.trim(),
@@ -310,9 +314,9 @@ export class AppointmentsService {
       ),
     });
 
-    await this.appointmentBriefsRepo.save(appointmentBrief);
+    await appointmentBriefsRepo.save(appointmentBrief);
 
-    const hairHistory = this.hairHistoryRepo.create({
+    const hairHistory = hairHistoryRepo.create({
       client: { id: user.userId },
       barber: staff,
       service: appointment.service.name,
@@ -322,10 +326,7 @@ export class AppointmentsService {
       visitDate: dto.date,
     });
 
-    await this.hairHistoryRepo.save(hairHistory);
-    await this.cacheService?.deleteKey(
-      REDIS_CACHE_KEYS.consultation.clientHairHistory(user.userId),
-    );
+    await hairHistoryRepo.save(hairHistory);
   }
 
   private buildCustomerReportedHairHistoryNotes(
@@ -556,11 +557,35 @@ export class AppointmentsService {
       status: 'booked',
     };
 
-    const appointment: Appointment =
-      this.appointmentsRepo.create(appointmentInput);
-    const saved: Appointment = await this.appointmentsRepo.save(appointment);
+    const saved: Appointment = await this.dataSource.transaction(
+      async (manager) => {
+        const appointmentsRepo = manager.getRepository(Appointment);
+        const appointmentBriefsRepo = manager.getRepository(AppointmentBrief);
+        const hairHistoryRepo = manager.getRepository(HairHistory);
 
-    await this.createAppointmentBrief(saved, staff, user, dto);
+        const appointment: Appointment =
+          appointmentsRepo.create(appointmentInput);
+        const savedAppointment: Appointment =
+          await appointmentsRepo.save(appointment);
+
+        await this.createAppointmentBrief(
+          savedAppointment,
+          staff,
+          user,
+          dto,
+          appointmentBriefsRepo,
+          hairHistoryRepo,
+        );
+
+        return savedAppointment;
+      },
+    );
+
+    if (this.hasConsultationSummary(dto)) {
+      await this.cacheService?.deleteKey(
+        REDIS_CACHE_KEYS.consultation.clientHairHistory(user.userId),
+      );
+    }
 
     return this.toAppointmentResponse(saved, staff.timezone);
   }
@@ -651,7 +676,9 @@ export class AppointmentsService {
     appointment.startAt = startAt;
     appointment.endAt = endAt;
 
-    const saved = await this.appointmentsRepo.save(appointment);
+    const saved = await this.dataSource.transaction(async (manager) =>
+      manager.getRepository(Appointment).save(appointment),
+    );
 
     return this.toAppointmentResponse(saved, appointment.staff.timezone);
   }
@@ -680,7 +707,9 @@ export class AppointmentsService {
 
     appointment.status = 'cancelled_by_client';
 
-    const saved = await this.appointmentsRepo.save(appointment);
+    const saved = await this.dataSource.transaction(async (manager) =>
+      manager.getRepository(Appointment).save(appointment),
+    );
 
     return this.toAppointmentResponse(saved, appointment.staff.timezone);
   }
