@@ -1,6 +1,15 @@
 import { ConfigService } from '@nestjs/config';
+import { CacheService, REDIS_CACHE_KEYS } from '@coopers/common';
 import { Repository } from 'typeorm';
-import { HairHistory, SafetyRule, Service, Staff } from '@coopers/entities';
+import {
+  HairHistory,
+  SafetyRule,
+  Service,
+  ServiceComplexity,
+  Staff,
+  StaffGender,
+  StaffRole,
+} from '@coopers/entities';
 import { ConsultationAiService } from './consultation-ai.service';
 import { ConsultationAnswerDto } from './dto/consultation-answer.dto';
 import { HairPhotoDto } from './dto/hair-photo.dto';
@@ -125,10 +134,12 @@ describe('ConsultationAiService submit fallback', () => {
   // Proves the `await` fix: with no API key the first Claude call throws, and
   // submitConsultation must catch it and return the deterministic fallback.
   it('falls back to the deterministic service when Claude is unavailable', async () => {
-    const fallbackResult = { matchScore: 42 } as unknown as ConsultationSubmitResponse;
+    const fallbackResult = {
+      matchScore: 42,
+    } as unknown as ConsultationSubmitResponse;
     const fallbackService = {
       submitConsultation: jest.fn().mockResolvedValue(fallbackResult),
-    } as unknown as ConsultationService;
+    };
     const configService = {
       get: jest.fn().mockReturnValue(undefined),
     } as unknown as ConfigService;
@@ -149,20 +160,22 @@ describe('ConsultationAiService submit fallback', () => {
     );
 
     expect(result).toBe(fallbackResult);
-    expect(fallbackService.submitConsultation).toHaveBeenCalledWith(
+    expect(fallbackService.submitConsultation.mock.calls[0]).toEqual([
       'user-1',
       'service-1',
       answers,
-    );
+    ]);
   });
 
   // Proves the output-validation guard: a well-formed recommendation pointing
   // at a barber that is not in the available set is rejected, then falls back.
   it('falls back when Claude recommends a barber that is not available', async () => {
-    const fallbackResult = { matchScore: 7 } as unknown as ConsultationSubmitResponse;
+    const fallbackResult = {
+      matchScore: 7,
+    } as unknown as ConsultationSubmitResponse;
     const fallbackService = {
       submitConsultation: jest.fn().mockResolvedValue(fallbackResult),
-    } as unknown as ConsultationService;
+    };
     const configService = {
       get: jest
         .fn()
@@ -233,6 +246,134 @@ describe('ConsultationAiService submit fallback', () => {
     );
 
     expect(result).toBe(fallbackResult);
-    expect(fallbackService.submitConsultation).toHaveBeenCalled();
+    expect(
+      fallbackService.submitConsultation.mock.calls.length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('validates Claude recommendations using cached service, history, and barbers', async () => {
+    const fallbackService = {
+      submitConsultation: jest.fn(),
+    };
+    const configService = {
+      get: jest
+        .fn()
+        .mockImplementation((key: string) =>
+          key === 'ANTHROPIC_API_KEY' ? 'test-key' : undefined,
+        ),
+    } as unknown as ConfigService;
+    const servicesRepository = {
+      findOne: jest.fn(),
+    } as unknown as jest.Mocked<Repository<Service>>;
+    const staffRepository = {
+      find: jest.fn(),
+    } as unknown as jest.Mocked<Repository<Staff>>;
+    const hairHistoryRepository = {
+      createQueryBuilder: jest.fn(),
+    } as unknown as jest.Mocked<Repository<HairHistory>>;
+    const safetyRuleRepository = {
+      find: jest.fn(),
+    } as unknown as Repository<SafetyRule>;
+    const cacheService = {
+      getJson: jest.fn().mockImplementation((key: string) => {
+        if (key === REDIS_CACHE_KEYS.consultation.activeService('service-1')) {
+          return Promise.resolve({
+            id: 'service-1',
+            name: 'Hair Coloring',
+            complexity: ServiceComplexity.HIGH,
+            requiredSkills: ['colour correction'],
+            safetyTriggers: [],
+            durationMinutes: 90,
+            isActive: true,
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-02T00:00:00.000Z',
+          } as unknown as Service);
+        }
+
+        if (key === REDIS_CACHE_KEYS.consultation.clientHairHistory('user-1')) {
+          return Promise.resolve([
+            {
+              service: 'Previous colour',
+              hairState: ['dry ends'],
+              productsUsed: null,
+              barberNotes: null,
+              visitDate: '2026-01-10',
+              createdAt: '2026-01-10T00:00:00.000Z',
+            },
+          ] as unknown as HairHistory[]);
+        }
+
+        if (key === REDIS_CACHE_KEYS.consultation.availableBarbers) {
+          return Promise.resolve([
+            {
+              id: 'staff-1',
+              displayName: 'Sofia Bennett',
+              gender: StaffGender.FEMALE,
+              role: StaffRole.SENIOR,
+              skills: ['colour correction'],
+              rating: 4.8,
+              active: true,
+              available: true,
+              createdAt: '2026-01-03T00:00:00.000Z',
+              updatedAt: '2026-01-04T00:00:00.000Z',
+            },
+          ] as unknown as Staff[]);
+        }
+
+        return Promise.resolve(null);
+      }),
+    } as unknown as Pick<CacheService, 'getJson'>;
+
+    const service = new ConsultationAiService(
+      configService,
+      fallbackService,
+      servicesRepository,
+      staffRepository,
+      safetyRuleRepository,
+      hairHistoryRepository,
+      cacheService as CacheService,
+    );
+
+    (service as unknown as { anthropic: unknown }).anthropic = {
+      messages: {
+        create: jest.fn().mockResolvedValue({
+          stop_reason: 'tool_use',
+          usage: { cache_creation_input_tokens: 0, cache_read_input_tokens: 0 },
+          content: [
+            {
+              type: 'tool_use',
+              id: 'tool-1',
+              name: 'finalize_consultation_result',
+              input: {
+                matchedBarberId: 'staff-1',
+                matchScore: 91,
+                matchReasons: ['Strong colour correction capability.'],
+                safetyNotes: [],
+                hairState: ['dry ends'],
+                desiredLook: 'Natural brown colour.',
+                consultationSummary: 'Colour consultation summary.',
+              },
+            },
+          ],
+        }),
+      },
+    };
+
+    const result = await service.submitConsultation(
+      'user-1',
+      'service-1',
+      answers,
+    );
+
+    expect(servicesRepository.findOne.mock.calls).toHaveLength(0);
+    expect(staffRepository.find.mock.calls).toHaveLength(0);
+    expect(hairHistoryRepository.createQueryBuilder.mock.calls).toHaveLength(0);
+    expect(fallbackService.submitConsultation.mock.calls).toHaveLength(0);
+    expect(result.generation).toEqual({
+      source: 'claude',
+      model: 'claude-haiku-4-5',
+    });
+    expect(result.matchedBarber.id).toBe('staff-1');
+    expect(result.previousHairHistoryCount).toBe(1);
   });
 });
