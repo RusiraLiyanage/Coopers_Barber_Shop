@@ -630,6 +630,7 @@ export default function AdminDashboard() {
       }
 
       await dispatch(getBarbersAction(barbersPage)).unwrap();
+      await refreshKnownVersion();
       messageApi.success('Barber profile saved.');
       setBarberModalOpen(false);
     } catch (error) {
@@ -641,6 +642,7 @@ export default function AdminDashboard() {
     try {
       await dispatch(deleteBarberAction(barber.id)).unwrap();
       await dispatch(getBarbersAction(barbersPage)).unwrap();
+      await refreshKnownVersion();
       messageApi.success(`${barber.displayName} deleted.`);
     } catch (error) {
       showRequestError(error);
@@ -672,6 +674,7 @@ export default function AdminDashboard() {
       }
 
       await dispatch(getServiceConfigsAction(servicesPage)).unwrap();
+      await refreshKnownVersion();
       messageApi.success('Service saved.');
       setServiceModalOpen(false);
     } catch (error) {
@@ -708,6 +711,7 @@ export default function AdminDashboard() {
       }
 
       await dispatch(getSafetyRulesAction(safetyPage)).unwrap();
+      await refreshKnownVersion();
       messageApi.success('Safety rule saved.');
       setSafetyModalOpen(false);
     } catch (error) {
@@ -745,6 +749,7 @@ export default function AdminDashboard() {
             : safetyTriggerPage),
         }),
       ).unwrap();
+      await refreshKnownVersion();
       messageApi.success('Reference data saved.');
       setReferenceDataModalOpen(false);
     } catch (error) {
@@ -765,6 +770,7 @@ export default function AdminDashboard() {
             : safetyTriggerPage),
         }),
       ).unwrap();
+      await refreshKnownVersion();
       messageApi.success(`${item.label} deleted.`);
     } catch (error) {
       showRequestError(error);
@@ -784,6 +790,7 @@ export default function AdminDashboard() {
       });
 
       setCreatedInvite(invite);
+      await refreshKnownVersion();
       messageApi.success('Admin invite created.');
     } catch (error) {
       showRequestError(error);
@@ -832,6 +839,7 @@ export default function AdminDashboard() {
         barberNotes: values.barberNotes?.trim() || undefined,
       });
       await dispatch(getHairHistoryAction(hairHistoryPage)).unwrap();
+      await refreshKnownVersion();
       messageApi.success('Hair history saved for future consultations.');
       hairHistoryFromBriefForm.resetFields();
     } catch (error) {
