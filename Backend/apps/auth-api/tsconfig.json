@@ -11,8 +11,8 @@
       "@coopers/database": ["../../packages/database/dist/index.d.ts"],
       "@coopers/common": ["../../packages/common/dist/index.d.ts"]
     },
-    "types": ["node"]
+    "types": ["node", "jest"]
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "**/*.spec.ts"]
+  "exclude": ["node_modules", "dist"]
 }

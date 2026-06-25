@@ -38,7 +38,7 @@ import { CompleteGoogleOAuthDto } from './dto/complete-google-oauth.dto';
 import { LinkGoogleOAuthDto } from './dto/link-google-oauth.dto';
 import { OAuthLinkTicketService } from './oauth-link-ticket.service';
 import { ConfigService } from '@nestjs/config';
-import { IsNull, type Repository } from 'typeorm';
+import { DataSource, IsNull, type Repository } from 'typeorm';
 
 export type AccountProfileResponse = {
   id: string;
@@ -108,6 +108,7 @@ export class AuthService {
     private readonly emailService: EmailService,
     private readonly configService: ConfigService,
     private readonly oauthLinkTicketService: OAuthLinkTicketService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async validateUser(
@@ -414,11 +415,46 @@ export class AuthService {
     const resetToken = await this.findVerifiedPasswordResetToken(dto);
     const passwordHash = await this.passwordService.hash(dto.password);
 
-    await this.usersService.updatePassword(resetToken.user.id, passwordHash);
+    await this.dataSource.transaction(async (manager) => {
+      const passwordResetTokensRepo = manager.getRepository(PasswordResetToken);
+      const lockedResetToken = await passwordResetTokensRepo.findOne({
+        where: {
+          id: resetToken.id,
+        },
+        relations: {
+          user: true,
+        },
+        lock: {
+          mode: 'pessimistic_write',
+        },
+      });
 
-    resetToken.usedAt = new Date();
-    await this.passwordResetTokensRepo.save(resetToken);
-    await this.sessionService.revokeUserSessions(resetToken.user.id);
+      if (!lockedResetToken || lockedResetToken.usedAt) {
+        throw new UnauthorizedException('Invalid or expired reset code');
+      }
+
+      if (lockedResetToken.expiresAt <= new Date()) {
+        throw new UnauthorizedException('Invalid or expired reset code');
+      }
+
+      await manager.getRepository(User).update(lockedResetToken.user.id, {
+        passwordHash,
+      });
+
+      lockedResetToken.usedAt = new Date();
+      await passwordResetTokensRepo.save(lockedResetToken);
+
+      await manager
+        .getRepository(AuthSession)
+        .createQueryBuilder()
+        .update(AuthSession)
+        .set({
+          revokedAt: new Date(),
+        })
+        .where('user_id = :userId', { userId: lockedResetToken.user.id })
+        .andWhere('revoked_at IS NULL')
+        .execute();
+    });
 
     return { success: true };
   }
