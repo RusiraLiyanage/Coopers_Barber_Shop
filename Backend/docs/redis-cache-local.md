@@ -40,6 +40,20 @@ From the `Backend` directory:
 pnpm redis:up
 ```
 
+The normal backend dev command starts Redis automatically before starting the apps:
+
+```bash
+pnpm dev
+```
+
+This requires Docker Desktop to be running. If Docker is not running, `pnpm dev` stops before starting the backend apps so Redis is not silently skipped.
+
+If you intentionally want to run the backend apps without starting Docker Redis, use:
+
+```bash
+pnpm dev:no-redis
+```
+
 Check logs:
 
 ```bash
