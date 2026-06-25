@@ -259,25 +259,6 @@ export class AppointmentsService {
     });
   }
 
-  private formatDate(date: Date, timeZone: string): string {
-    const parts = new Intl.DateTimeFormat('en-AU', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      timeZone,
-    }).formatToParts(date);
-
-    const year = parts.find((part) => part.type === 'year')?.value;
-    const month = parts.find((part) => part.type === 'month')?.value;
-    const day = parts.find((part) => part.type === 'day')?.value;
-
-    if (!year || !month || !day) {
-      throw new BadRequestException('Unable to resolve appointment date');
-    }
-
-    return `${year}-${month}-${day}`;
-  }
-
   private getAppointmentTimesForSlot(
     date: string,
     slot: string,
