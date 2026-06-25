@@ -33,14 +33,19 @@ export class CacheService {
       return null;
     }
 
+    const startedAt = Date.now();
+
     try {
       const cachedValue = await this.redisReader.get(key);
+      const latencyMs = Date.now() - startedAt;
 
       if (cachedValue !== null) {
-        this.logger.debug(`Redis cache hit: ${key}`);
+        this.logger.debug(`Redis cache hit: ${key} (${latencyMs}ms)`);
+        return cachedValue;
       }
 
-      return cachedValue;
+      this.logger.debug(`Redis cache miss: ${key} (${latencyMs}ms)`);
+      return null;
     } catch (error) {
       this.logRedisFailure('read', key, error);
       return null;
@@ -72,14 +77,21 @@ export class CacheService {
     }
 
     try {
+      const startedAt = Date.now();
       const resolvedTtlSeconds = ttlSeconds ?? this.defaultTtlSeconds;
 
       if (resolvedTtlSeconds > 0) {
         await this.redisPrimary.setex(key, resolvedTtlSeconds, value);
+        this.logger.debug(
+          `Redis cache write: ${key} (${Date.now() - startedAt}ms, ttl=${resolvedTtlSeconds}s)`,
+        );
         return;
       }
 
       await this.redisPrimary.set(key, value);
+      this.logger.debug(
+        `Redis cache write: ${key} (${Date.now() - startedAt}ms, ttl=none)`,
+      );
     } catch (error) {
       this.logRedisFailure('write', key, error);
     }
@@ -99,7 +111,11 @@ export class CacheService {
     }
 
     try {
+      const startedAt = Date.now();
       await this.redisPrimary.del(key);
+      this.logger.debug(
+        `Redis cache delete: ${key} (${Date.now() - startedAt}ms)`,
+      );
     } catch (error) {
       this.logRedisFailure('delete', key, error);
     }
@@ -112,6 +128,8 @@ export class CacheService {
 
     try {
       let cursor = '0';
+      let deletedKeyCount = 0;
+      const startedAt = Date.now();
 
       do {
         const [nextCursor, keys] = await this.redisPrimary.scan(
@@ -124,10 +142,15 @@ export class CacheService {
 
         if (keys.length > 0) {
           await this.redisPrimary.del(...keys);
+          deletedKeyCount += keys.length;
         }
 
         cursor = nextCursor;
       } while (cursor !== '0');
+
+      this.logger.debug(
+        `Redis cache delete pattern: ${pattern} (${Date.now() - startedAt}ms, deleted=${deletedKeyCount})`,
+      );
     } catch (error) {
       this.logRedisFailure('delete pattern', pattern, error);
     }

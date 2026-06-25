@@ -38,6 +38,18 @@ Redis failures must not fail booking, consultation, or admin writes.
 - Delete failures are logged and the mutation still succeeds; stale Redis data is bounded by the configured TTL.
 - Health checks report Redis as `unavailable` when primary or reader pings fail.
 
+## Performance Measurement
+
+`CacheService` logs Redis cache operations with latency:
+
+- `Redis cache hit: {key} ({latencyMs}ms)`
+- `Redis cache miss: {key} ({latencyMs}ms)`
+- `Redis cache write: {key} ({latencyMs}ms, ttl={ttlSeconds}s)`
+- `Redis cache delete: {key} ({latencyMs}ms)`
+- `Redis cache delete pattern: {pattern} ({latencyMs}ms, deleted={count})`
+
+For local comparison, run the same consultation flow twice. The first run should show cache misses followed by writes, and the second run should show hits for the same consultation context keys.
+
 Invalidation tests now cover the mutation paths that change service, barber, safety-rule, and hair-history data:
 
 - Service create/update/AI-config update clears service and safety-rule consultation cache.
