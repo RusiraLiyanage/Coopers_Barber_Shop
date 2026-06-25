@@ -254,6 +254,7 @@ export default function MakeAppointmentModal({
   const [goalPhotoName, setGoalPhotoName] = useState('');
   const [goalPhotoError, setGoalPhotoError] = useState<string | null>(null);
   const [consultationStreaming, setConsultationStreaming] = useState(false);
+  const isMatchingBarber = consultationSubmitting || consultationStreaming;
   const [form] = Form.useForm<AppointmentFormValues>();
   const selectedServiceId = Form.useWatch('serviceId', form);
   const selectedAppointmentDate = Form.useWatch('appointmentDate', form);
@@ -802,7 +803,7 @@ export default function MakeAppointmentModal({
                   <span className="appointment-consultation-eyebrow">
                     AI barber match
                   </span>
-                  {!currentConsultationResult ? (
+                  {!currentConsultationResult && !isMatchingBarber ? (
                     <strong>
                       Tell us what you need before choosing a time.
                     </strong>
@@ -819,7 +820,36 @@ export default function MakeAppointmentModal({
                   />
                 ) : currentConsultationStartResult &&
                   !currentConsultationResult ? (
-                  <div className="appointment-consultation-questions">
+                  isMatchingBarber ? (
+                    <div
+                      className="appointment-consultation-matching"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <div className="appointment-consultation-match-orbit">
+                        <span className="appointment-consultation-match-node appointment-consultation-match-node-client">
+                          You
+                        </span>
+                        <span className="appointment-consultation-match-ring" />
+                        <span className="appointment-consultation-match-node appointment-consultation-match-node-barber">
+                          Barber
+                        </span>
+                      </div>
+                      <div className="appointment-consultation-matching-copy">
+                        <strong>Matching you with the best barber...</strong>
+                        <span>
+                          Reviewing your answers, photos, service needs, and
+                          barber capabilities.
+                        </span>
+                      </div>
+                      <div className="appointment-consultation-matching-steps">
+                        <span>Understanding your goal</span>
+                        <span>Checking specialist skills</span>
+                        <span>Preparing your recommendation</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="appointment-consultation-questions">
                     {currentConsultationStartResult.previousHairHistory.length >
                     0 ? (
                       <Alert
@@ -990,6 +1020,7 @@ export default function MakeAppointmentModal({
                       Match Barber
                     </Button>
                   </div>
+                  )
                 ) : currentConsultationResult ? (
                   <div className="appointment-consultation-result">
                     <div>

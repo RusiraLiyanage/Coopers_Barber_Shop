@@ -40,6 +40,132 @@
   gap: 14px;
 }
 
+.appointment-consultation-matching {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  padding: 24px 16px 22px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(239, 246, 255, 0.96), rgba(255, 255, 255, 0.98)),
+    #ffffff;
+  box-shadow: 0 16px 36px rgba(37, 99, 235, 0.12);
+  text-align: center;
+}
+
+.appointment-consultation-match-orbit {
+  position: relative;
+  display: grid;
+  width: min(100%, 320px);
+  min-height: 116px;
+  align-items: center;
+  justify-items: center;
+}
+
+.appointment-consultation-match-ring {
+  position: absolute;
+  width: 108px;
+  height: 108px;
+  border: 2px solid rgba(37, 99, 235, 0.18);
+  border-top-color: #2563eb;
+  border-right-color: #60a5fa;
+  border-radius: 50%;
+  animation: appointment-match-spin 1200ms linear infinite;
+  box-shadow:
+    0 0 0 8px rgba(219, 234, 254, 0.7),
+    0 0 28px rgba(37, 99, 235, 0.18);
+}
+
+.appointment-consultation-match-ring::after {
+  position: absolute;
+  top: 9px;
+  right: 10px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #2563eb;
+  box-shadow: 0 0 18px rgba(37, 99, 235, 0.8);
+  content: '';
+}
+
+.appointment-consultation-match-node {
+  position: absolute;
+  z-index: 1;
+  display: inline-flex;
+  min-width: 82px;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.appointment-consultation-match-node-client {
+  left: 0;
+  border: 1px solid #bae6fd;
+  background: #ecfeff;
+  color: #0e7490;
+  animation: appointment-match-node-pulse 1300ms ease-in-out infinite;
+}
+
+.appointment-consultation-match-node-barber {
+  right: 0;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  animation: appointment-match-node-pulse 1300ms ease-in-out 260ms infinite;
+}
+
+.appointment-consultation-matching-copy {
+  display: grid;
+  max-width: 430px;
+  gap: 6px;
+}
+
+.appointment-consultation-matching-copy strong {
+  color: #111827;
+  font-size: 18px;
+}
+
+.appointment-consultation-matching-copy span {
+  color: #4b5563;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.appointment-consultation-matching-steps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.appointment-consultation-matching-steps span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 700;
+  animation: appointment-match-step-fade 1600ms ease-in-out infinite;
+}
+
+.appointment-consultation-matching-steps span:nth-child(2) {
+  animation-delay: 220ms;
+}
+
+.appointment-consultation-matching-steps span:nth-child(3) {
+  animation-delay: 440ms;
+}
+
 .appointment-consultation-question {
   display: grid;
   gap: 6px;
@@ -181,6 +307,34 @@
 
 .appointment-consultation-reasons li + li {
   margin-top: 6px;
+}
+
+@keyframes appointment-match-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes appointment-match-node-pulse {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes appointment-match-step-fade {
+  0%,
+  100% {
+    opacity: 0.58;
+  }
+
+  45% {
+    opacity: 1;
+  }
 }
 
 .appointment-original-date-cell {
