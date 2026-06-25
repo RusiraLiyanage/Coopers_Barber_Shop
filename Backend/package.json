@@ -18,7 +18,11 @@
     "booking:api": "turbo dev --filter @coopers/booking.api",
     "booking:guard": "turbo dev --filter @coopers/booking.guard",
     "auth:api": "turbo dev --filter @coopers/auth.api",
-    "admin:api": "turbo dev --filter @coopers/admin.api"
+    "admin:api": "turbo dev --filter @coopers/admin.api",
+    "redis:up": "docker compose up -d redis",
+    "redis:down": "docker compose down",
+    "redis:logs": "docker compose logs -f redis",
+    "redis:cli": "docker compose exec redis redis-cli"
   },
   "devDependencies": {
     "prettier": "^3.4.2",
