@@ -64,7 +64,6 @@ export class RedisModule {
       port: clientConfig.port,
       tls: clientConfig.tlsEnabled ? {} : undefined,
       username: clientConfig.username,
-      lazyConnect: true,
       maxRetriesPerRequest: 1,
       enableOfflineQueue: false,
     } satisfies RedisOptions);
