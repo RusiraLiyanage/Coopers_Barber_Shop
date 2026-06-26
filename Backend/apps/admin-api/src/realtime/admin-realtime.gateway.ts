@@ -11,9 +11,29 @@ import { AdminRealtimeAuthService } from './admin-realtime-auth.service';
 import { AdminRealtimeService } from './admin-realtime.service';
 import { ADMIN_REALTIME_NAMESPACE } from './admin-realtime.types';
 
+function getAllowedAdminRealtimeOrigins(): string[] {
+  const guardPortOrigin = process.env.GUARD_PORT
+    ? `http://localhost:${process.env.GUARD_PORT}`
+    : undefined;
+
+  return [
+    process.env.ADMIN_FRONTEND_DEV_URL,
+    process.env.ADMIN_FRONTEND_URL,
+    process.env.GUARD_URL,
+    guardPortOrigin,
+  ]
+    .flatMap((value) => value?.split(',') ?? [])
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}
+
 @WebSocketGateway({
   namespace: ADMIN_REALTIME_NAMESPACE,
   transports: ['websocket'],
+  cors: {
+    origin: getAllowedAdminRealtimeOrigins(),
+    credentials: true,
+  },
 })
 export class AdminRealtimeGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
