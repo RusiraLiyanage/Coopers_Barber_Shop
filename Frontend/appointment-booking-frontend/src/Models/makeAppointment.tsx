@@ -12,7 +12,13 @@ import {
   message,
 } from 'antd';
 import { UserOutlined } from '@ant-design/icons';
-import { useCallback, useEffect, useState, type ChangeEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 import {
   isSessionIdleExpiredError,
@@ -81,6 +87,29 @@ type ConsultationAnswers = Record<string, string>;
 const ADDITIONAL_COMMENTS_QUESTION_ID = 'additional-comments';
 const MAX_HAIR_PHOTO_BYTES = 3_750_000;
 const ACCEPTED_HAIR_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+function createIdempotencyKey() {
+  if (window.crypto.randomUUID) {
+    return window.crypto.randomUUID();
+  }
+
+  const bytes = window.crypto.getRandomValues(new Uint8Array(16));
+
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+  const hex = Array.from(bytes, (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  );
+
+  return [
+    hex.slice(0, 4).join(''),
+    hex.slice(4, 6).join(''),
+    hex.slice(6, 8).join(''),
+    hex.slice(8, 10).join(''),
+    hex.slice(10, 16).join(''),
+  ].join('-');
+}
 
 function decodeEscapedUnicode(value: string) {
   return value.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex: string) =>
@@ -228,6 +257,7 @@ export default function MakeAppointmentModal({
 }: MakeAppointmentModalProps) {
   const dispatch = useAppDispatch();
   const [messageApi, contextHolder] = message.useMessage();
+  const bookingIdempotencyKeyRef = useRef<string | null>(null);
   const services = useAppSelector(selectActiveServices);
   const servicesLoading = useAppSelector(selectServicesLoading);
   const slots = useAppSelector(selectAppointmentAvailabilitySlots);
@@ -361,6 +391,7 @@ export default function MakeAppointmentModal({
     }
 
     form.resetFields();
+    bookingIdempotencyKeyRef.current = null;
     dispatch(clearAvailabilitySlots());
     dispatch(clearConsultation());
     setSelectedSlot(null);
@@ -481,6 +512,7 @@ export default function MakeAppointmentModal({
   };
 
   const clearConsultationOutcome = () => {
+    bookingIdempotencyKeyRef.current = null;
     dispatch(clearConsultationResult());
     dispatch(clearAvailabilitySlots());
     form.setFieldValue('appointmentTime', undefined);
@@ -551,6 +583,7 @@ export default function MakeAppointmentModal({
     const file = event.target.files?.[0];
 
     event.target.value = '';
+    bookingIdempotencyKeyRef.current = null;
     setGoalPhoto(undefined);
     setGoalPhotoName('');
     setGoalPhotoError(null);
@@ -578,6 +611,7 @@ export default function MakeAppointmentModal({
   };
 
   const handleRemoveGoalPhoto = () => {
+    bookingIdempotencyKeyRef.current = null;
     setGoalPhoto(undefined);
     setGoalPhotoName('');
     setGoalPhotoError(null);
@@ -667,27 +701,36 @@ export default function MakeAppointmentModal({
           return;
         }
 
+        const idempotencyKey =
+          bookingIdempotencyKeyRef.current ?? createIdempotencyKey();
+        bookingIdempotencyKeyRef.current = idempotencyKey;
+
         await dispatch(
           createAppointmentAction({
-            serviceId: values.serviceId,
-            date: values.appointmentDate.format('YYYY-MM-DD'),
-            slot: values.appointmentTime,
-            staffId: currentConsultationResult.matchedBarber.id,
-            consultationSummary: currentConsultationResult.consultationSummary,
-            safetyNotes: getSafetyNotesText(currentConsultationResult),
-            hairState: currentConsultationResult.hairState.map(
-              cleanConsultationText,
-            ),
-            desiredLook: currentConsultationResult.desiredLook
-              ? cleanConsultationText(currentConsultationResult.desiredLook)
-              : undefined,
-            goalPhoto,
-            consultationGenerationSource:
-              currentConsultationResult.generation.source,
-            consultationGenerationModel:
-              currentConsultationResult.generation.model ?? undefined,
+            data: {
+              serviceId: values.serviceId,
+              date: values.appointmentDate.format('YYYY-MM-DD'),
+              slot: values.appointmentTime,
+              staffId: currentConsultationResult.matchedBarber.id,
+              consultationSummary:
+                currentConsultationResult.consultationSummary,
+              safetyNotes: getSafetyNotesText(currentConsultationResult),
+              hairState: currentConsultationResult.hairState.map(
+                cleanConsultationText,
+              ),
+              desiredLook: currentConsultationResult.desiredLook
+                ? cleanConsultationText(currentConsultationResult.desiredLook)
+                : undefined,
+              goalPhoto,
+              consultationGenerationSource:
+                currentConsultationResult.generation.source,
+              consultationGenerationModel:
+                currentConsultationResult.generation.model ?? undefined,
+            },
+            idempotencyKey,
           }),
         ).unwrap();
+        bookingIdempotencyKeyRef.current = null;
         messageApi.success('Appointment created successfully');
       }
 
@@ -745,6 +788,14 @@ export default function MakeAppointmentModal({
             form={form}
             onFinish={handleSubmit}
             onValuesChange={(changedValues) => {
+              if (
+                'serviceId' in changedValues ||
+                'appointmentDate' in changedValues ||
+                'appointmentTime' in changedValues
+              ) {
+                bookingIdempotencyKeyRef.current = null;
+              }
+
               if ('serviceId' in changedValues) {
                 form.setFieldValue('appointmentDate', undefined);
                 form.setFieldValue('appointmentTime', undefined);
@@ -1191,6 +1242,7 @@ export default function MakeAppointmentModal({
                         .join(' ')}
                       aria-pressed={selectedSlot === currentAppointmentSlot}
                       onClick={() => {
+                        bookingIdempotencyKeyRef.current = null;
                         setSelectedSlot(currentAppointmentSlot);
                         setCurrentSlotPulseKey((currentKey) => currentKey + 1);
                         form.setFieldValue(
@@ -1235,6 +1287,7 @@ export default function MakeAppointmentModal({
                           size="large"
                           className="appointment-slot-button"
                           onClick={() => {
+                            bookingIdempotencyKeyRef.current = null;
                             setSelectedSlot(slot);
                             form.setFieldValue('appointmentTime', slot);
                           }}

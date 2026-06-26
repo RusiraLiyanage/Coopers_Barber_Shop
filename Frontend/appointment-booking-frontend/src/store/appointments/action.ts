@@ -30,8 +30,8 @@ export const getAppointmentAvailabilityAction = createAppAsyncThunk<
 export const createAppointmentAction = createAppAsyncThunk<
   AppointmentRecord,
   CreateAppointmentPayload
->(`${SLICE_NAME}/createAppointment`, async (payload) =>
-  createAppointment(payload),
+>(`${SLICE_NAME}/createAppointment`, async ({ data, idempotencyKey }) =>
+  createAppointment(data, { idempotencyKey }),
 );
 
 export const updateAppointmentAction = createAppAsyncThunk<

@@ -139,6 +139,10 @@ export type CreateAppointmentRequest = {
   consultationGenerationModel?: string;
 };
 
+export type CreateAppointmentOptions = {
+  idempotencyKey: string;
+};
+
 export interface AppointmentRecord {
   id: string;
   status: string;
@@ -827,10 +831,16 @@ export function getAvailability({
   });
 }
 
-export function createAppointment(payload: CreateAppointmentRequest) {
+export function createAppointment(
+  payload: CreateAppointmentRequest,
+  options: CreateAppointmentOptions,
+) {
   return request<AppointmentRecord>("/appointments", {
     method: "POST",
-    headers: buildHeaders(),
+    headers: {
+      ...buildHeaders(),
+      "Idempotency-Key": options.idempotencyKey,
+    },
     body: JSON.stringify(payload),
   });
 }

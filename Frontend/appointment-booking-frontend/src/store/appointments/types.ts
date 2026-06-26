@@ -12,7 +12,10 @@ export type AppointmentAvailabilityPayload = {
   excludeAppointmentId?: string;
 };
 
-export type CreateAppointmentPayload = CreateAppointmentRequest;
+export type CreateAppointmentPayload = {
+  data: CreateAppointmentRequest;
+  idempotencyKey: string;
+};
 
 export type UpdateAppointmentPayload = {
   appointmentId: string;
