@@ -2,7 +2,12 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppointmentsService } from './appointments.service';
 import { AppointmentsController } from './appointments.controller';
-import { Appointment, AppointmentBrief, HairHistory } from '@coopers/entities';
+import {
+  Appointment,
+  AppointmentBrief,
+  HairHistory,
+  IdempotencyKey,
+} from '@coopers/entities';
 import { Service } from '@coopers/entities';
 import { StaffModule } from '../staff/staff.module'; // ✅ import StaffModule
 import { Staff } from '@coopers/entities';
@@ -13,6 +18,7 @@ import { Staff } from '@coopers/entities';
       Appointment,
       AppointmentBrief,
       HairHistory,
+      IdempotencyKey,
       Service,
       Staff,
     ]), // register appointment-related entities

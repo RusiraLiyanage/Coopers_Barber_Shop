@@ -10,3 +10,4 @@ export * from './appointment-brief.entity';
 export * from './invite-token.entity';
 export * from './oauth-identity.entity';
 export * from './reference-data-item.entity';
+export * from './idempotency-key.entity';
