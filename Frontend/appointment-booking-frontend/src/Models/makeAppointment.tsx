@@ -21,6 +21,7 @@ import {
 } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 import {
+  ApiRequestError,
   isSessionIdleExpiredError,
   type AppointmentRecord,
   type AuthSession,
@@ -87,6 +88,8 @@ type ConsultationAnswers = Record<string, string>;
 const ADDITIONAL_COMMENTS_QUESTION_ID = 'additional-comments';
 const MAX_HAIR_PHOTO_BYTES = 3_750_000;
 const ACCEPTED_HAIR_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const APPOINTMENT_PROCESSING_MESSAGE =
+  'An identical request is already being processed.';
 
 function createIdempotencyKey() {
   if (window.crypto.randomUUID) {
@@ -109,6 +112,14 @@ function createIdempotencyKey() {
     hex.slice(8, 10).join(''),
     hex.slice(10, 16).join(''),
   ].join('-');
+}
+
+function isAppointmentProcessingConflict(error: unknown) {
+  return (
+    error instanceof ApiRequestError &&
+    error.statusCode === 409 &&
+    error.message === APPOINTMENT_PROCESSING_MESSAGE
+  );
 }
 
 function decodeEscapedUnicode(value: string) {
@@ -749,6 +760,15 @@ export default function MakeAppointmentModal({
       onBooked();
     } catch (error) {
       if (isSessionIdleExpiredError(error)) {
+        return;
+      }
+
+      if (!editingAppointment && isAppointmentProcessingConflict(error)) {
+        messageApi.open({
+          type: 'loading',
+          content: 'Your booking is already being processed.',
+          duration: 2.5,
+        });
         return;
       }
 

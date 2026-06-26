@@ -56,6 +56,7 @@ Expected result:
 
 - At most one appointment is created.
 - If the second request reaches the backend while the first is still running, it returns `409 Conflict`.
+- The customer UI shows `Your booking is already being processed.` instead of a generic error toast.
 - If the second request reaches the backend after the first completed, it returns the same stored appointment response.
 
 ## Curl QA
