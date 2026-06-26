@@ -49,7 +49,13 @@ export class AppointmentsController {
   }
 
   @ApiOperation({ summary: 'Update appointment date and time' })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description: 'Unique key for this appointment update attempt.',
+  })
   @UseGuards(JwtAuthGuard)
+  @UseInterceptors(IdempotencyInterceptor)
   @Patch(':id')
   async updateAppointmentTime(
     @Request() req: JwtAuthenticatedRequest,
@@ -64,7 +70,13 @@ export class AppointmentsController {
   }
 
   @ApiOperation({ summary: 'Cancel an appointment' })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description: 'Unique key for this appointment cancellation attempt.',
+  })
   @UseGuards(JwtAuthGuard)
+  @UseInterceptors(IdempotencyInterceptor)
   @Patch(':id/cancel')
   async cancelAppointment(
     @Request() req: JwtAuthenticatedRequest,

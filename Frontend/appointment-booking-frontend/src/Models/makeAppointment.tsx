@@ -31,6 +31,7 @@ import {
   submitConsultationStream,
 } from '../lib/api';
 import { getGenericErrorMessage } from '../lib/errors';
+import { createIdempotencyKey } from '../lib/idempotency';
 import { SAModalHeader } from '../components/common';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
@@ -90,29 +91,6 @@ const MAX_HAIR_PHOTO_BYTES = 3_750_000;
 const ACCEPTED_HAIR_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const APPOINTMENT_PROCESSING_MESSAGE =
   'An identical request is already being processed.';
-
-function createIdempotencyKey() {
-  if (window.crypto.randomUUID) {
-    return window.crypto.randomUUID();
-  }
-
-  const bytes = window.crypto.getRandomValues(new Uint8Array(16));
-
-  bytes[6] = (bytes[6] & 0x0f) | 0x40;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-
-  const hex = Array.from(bytes, (byte) =>
-    byte.toString(16).padStart(2, '0'),
-  );
-
-  return [
-    hex.slice(0, 4).join(''),
-    hex.slice(4, 6).join(''),
-    hex.slice(6, 8).join(''),
-    hex.slice(8, 10).join(''),
-    hex.slice(10, 16).join(''),
-  ].join('-');
-}
 
 function isAppointmentProcessingConflict(error: unknown) {
   return (
@@ -696,15 +674,21 @@ export default function MakeAppointmentModal({
 
     try {
       if (editingAppointment) {
+        const idempotencyKey =
+          bookingIdempotencyKeyRef.current ?? createIdempotencyKey();
+        bookingIdempotencyKeyRef.current = idempotencyKey;
+
         await dispatch(
           updateAppointmentAction({
             appointmentId: editingAppointment.id,
+            idempotencyKey,
             data: {
               date: values.appointmentDate.format('YYYY-MM-DD'),
               slot: values.appointmentTime,
             },
           }),
         ).unwrap();
+        bookingIdempotencyKeyRef.current = null;
         messageApi.success('Appointment updated successfully');
       } else {
         if (!currentConsultationResult) {

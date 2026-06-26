@@ -143,6 +143,10 @@ export type CreateAppointmentOptions = {
   idempotencyKey: string;
 };
 
+export type AppointmentMutationOptions = {
+  idempotencyKey: string;
+};
+
 export interface AppointmentRecord {
   id: string;
   status: string;
@@ -848,18 +852,28 @@ export function createAppointment(
 export function updateAppointment(
   appointmentId: string,
   payload: { date: string; slot: string },
+  options: AppointmentMutationOptions,
 ) {
   return request<AppointmentRecord>(`/appointments/${appointmentId}`, {
     method: "PATCH",
-    headers: buildHeaders(),
+    headers: {
+      ...buildHeaders(),
+      "Idempotency-Key": options.idempotencyKey,
+    },
     body: JSON.stringify(payload),
   });
 }
 
-export function cancelAppointment(appointmentId: string) {
+export function cancelAppointment(
+  appointmentId: string,
+  options: AppointmentMutationOptions,
+) {
   return request<AppointmentRecord>(`/appointments/${appointmentId}/cancel`, {
     method: "PATCH",
-    headers: buildHeaders(),
+    headers: {
+      ...buildHeaders(),
+      "Idempotency-Key": options.idempotencyKey,
+    },
   });
 }
 

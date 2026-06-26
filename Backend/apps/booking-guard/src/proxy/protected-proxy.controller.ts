@@ -161,10 +161,16 @@ export class ProtectedProxyController {
   }
 
   @ApiOperation({ summary: 'Proxy appointment time update to booking-api' })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description: 'Unique key for this appointment update attempt.',
+  })
   @Patch(':id')
   async updateAppointmentTime(
     @Headers('authorization') authorizationHeader: string | undefined,
     @Headers('x-refresh-token') refreshTokenHeader: string | undefined,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Headers('cookie') cookieHeader: string | undefined,
     @Param('id') appointmentId: string,
     @Body() body: UpdateAppointmentRequestBody,
@@ -182,6 +188,7 @@ export class ProtectedProxyController {
       method: 'PATCH',
       path: `/appointments/${appointmentId}`,
       body,
+      forwardedHeaders: createIdempotencyForwardHeaders(idempotencyKey),
     });
 
     writeProxyResponse(
@@ -194,10 +201,16 @@ export class ProtectedProxyController {
   }
 
   @ApiOperation({ summary: 'Proxy appointment cancellation to booking-api' })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description: 'Unique key for this appointment cancellation attempt.',
+  })
   @Patch(':id/cancel')
   async cancelAppointment(
     @Headers('authorization') authorizationHeader: string | undefined,
     @Headers('x-refresh-token') refreshTokenHeader: string | undefined,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Headers('cookie') cookieHeader: string | undefined,
     @Param('id') appointmentId: string,
     @Res({ passthrough: true }) response: AuthCookieResponse,
@@ -213,6 +226,7 @@ export class ProtectedProxyController {
       ),
       method: 'PATCH',
       path: `/appointments/${appointmentId}/cancel`,
+      forwardedHeaders: createIdempotencyForwardHeaders(idempotencyKey),
     });
 
     writeProxyResponse(

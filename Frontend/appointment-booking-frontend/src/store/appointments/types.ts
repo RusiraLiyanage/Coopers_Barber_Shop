@@ -19,10 +19,16 @@ export type CreateAppointmentPayload = {
 
 export type UpdateAppointmentPayload = {
   appointmentId: string;
+  idempotencyKey: string;
   data: {
     date: string;
     slot: string;
   };
+};
+
+export type CancelAppointmentPayload = {
+  appointmentId: string;
+  idempotencyKey: string;
 };
 
 export type AppointmentsState = {

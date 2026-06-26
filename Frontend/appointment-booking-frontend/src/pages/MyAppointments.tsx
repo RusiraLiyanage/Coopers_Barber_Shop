@@ -41,6 +41,7 @@ import {
   getGenericErrorMessage,
   logDevelopmentError,
 } from '../lib/errors';
+import { createIdempotencyKey } from '../lib/idempotency';
 import {
   SACard,
   SALoadingPanel,
@@ -939,7 +940,10 @@ export default function MyAppointments({
 
     try {
       await dispatch(
-        cancelAppointmentAction(appointmentPendingCancellation.id),
+        cancelAppointmentAction({
+          appointmentId: appointmentPendingCancellation.id,
+          idempotencyKey: createIdempotencyKey(),
+        }),
       ).unwrap();
       setAppointmentPendingCancellation(null);
       messageApi.success('Appointment cancelled successfully');

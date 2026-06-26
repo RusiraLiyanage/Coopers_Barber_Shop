@@ -2,15 +2,17 @@
 
 ## Scope
 
-This QA pass validates duplicate-safe customer appointment creation through the booking guard.
+This QA pass validates duplicate-safe customer appointment mutations through the booking guard.
 
-The protected endpoint is:
+The protected endpoints are:
 
 - `POST /appointments`
+- `PATCH /appointments/:id`
+- `PATCH /appointments/:id/cancel`
 
 The required request header is:
 
-- `Idempotency-Key: <stable UUID for this booking attempt>`
+- `Idempotency-Key: <stable UUID for this appointment mutation attempt>`
 
 Expired idempotency rows are deleted by `IdempotencyCleanupService` inside `booking-api`.
 

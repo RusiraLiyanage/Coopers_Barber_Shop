@@ -9,6 +9,7 @@ import {
 import type {
   AppointmentAvailabilityPayload,
   AppointmentRecord,
+  CancelAppointmentPayload,
   CreateAppointmentPayload,
   UpdateAppointmentPayload,
 } from './types';
@@ -37,13 +38,15 @@ export const createAppointmentAction = createAppAsyncThunk<
 export const updateAppointmentAction = createAppAsyncThunk<
   AppointmentRecord,
   UpdateAppointmentPayload
->(`${SLICE_NAME}/updateAppointment`, async ({ appointmentId, data }) =>
-  updateAppointment(appointmentId, data),
+>(
+  `${SLICE_NAME}/updateAppointment`,
+  async ({ appointmentId, data, idempotencyKey }) =>
+    updateAppointment(appointmentId, data, { idempotencyKey }),
 );
 
 export const cancelAppointmentAction = createAppAsyncThunk<
   AppointmentRecord,
-  string
->(`${SLICE_NAME}/cancelAppointment`, async (appointmentId) =>
-  cancelAppointment(appointmentId),
+  CancelAppointmentPayload
+>(`${SLICE_NAME}/cancelAppointment`, async ({ appointmentId, idempotencyKey }) =>
+  cancelAppointment(appointmentId, { idempotencyKey }),
 );
