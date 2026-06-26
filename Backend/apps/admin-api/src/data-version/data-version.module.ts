@@ -30,5 +30,6 @@ import { DataVersionService } from './data-version.service';
   ],
   controllers: [DataVersionController],
   providers: [DataVersionService],
+  exports: [DataVersionService],
 })
 export class DataVersionModule {}

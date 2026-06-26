@@ -2,6 +2,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -12,6 +13,7 @@ import {
   PagingMetaDto,
   PagingReqDto,
 } from '../common/pagination.dto';
+import { AdminRealtimeNotifierService } from '../realtime/admin-realtime-notifier.service';
 import { CreateBarberDto } from './dto/create-barber.dto';
 import { UpdateBarberDto } from './dto/update-barber.dto';
 
@@ -73,6 +75,8 @@ export class BarbersService {
     @InjectRepository(Appointment)
     private readonly appointmentRepository: Repository<Appointment>,
     private readonly cacheService: CacheService,
+    @Optional()
+    private readonly adminRealtimeNotifier?: AdminRealtimeNotifierService,
   ) {}
 
   async findAll(
@@ -118,6 +122,7 @@ export class BarbersService {
 
     const savedStaff = await this.staffRepository.save(staff);
     await this.invalidateAvailableBarbersCache();
+    await this.adminRealtimeNotifier?.notifyDataChanged('barber');
 
     return normalizeStaffResponse(savedStaff);
   }
@@ -141,6 +146,7 @@ export class BarbersService {
 
     const savedStaff = await this.staffRepository.save(staff);
     await this.invalidateAvailableBarbersCache();
+    await this.adminRealtimeNotifier?.notifyDataChanged('barber');
 
     return normalizeStaffResponse(savedStaff);
   }
@@ -170,6 +176,7 @@ export class BarbersService {
 
     await this.staffRepository.remove(staff);
     await this.invalidateAvailableBarbersCache();
+    await this.adminRealtimeNotifier?.notifyDataChanged('barber');
 
     return { success: true };
   }

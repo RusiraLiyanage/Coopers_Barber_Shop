@@ -1,13 +1,17 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { JWT_AUDIENCE, JWT_ISSUER } from '@coopers/common';
+import { DataVersionModule } from '../data-version/data-version.module';
 import { AdminRealtimeAuthService } from './admin-realtime-auth.service';
 import { AdminRealtimeGateway } from './admin-realtime.gateway';
+import { AdminRealtimeNotifierService } from './admin-realtime-notifier.service';
 import { AdminRealtimeService } from './admin-realtime.service';
 
+@Global()
 @Module({
   imports: [
+    DataVersionModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
@@ -22,8 +26,9 @@ import { AdminRealtimeService } from './admin-realtime.service';
   providers: [
     AdminRealtimeAuthService,
     AdminRealtimeGateway,
+    AdminRealtimeNotifierService,
     AdminRealtimeService,
   ],
-  exports: [AdminRealtimeService],
+  exports: [AdminRealtimeNotifierService, AdminRealtimeService],
 })
 export class AdminRealtimeModule {}

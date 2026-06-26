@@ -2,6 +2,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -12,6 +13,7 @@ import {
   PagingMetaDto,
   PagingReqDto,
 } from '../common/pagination.dto';
+import { AdminRealtimeNotifierService } from '../realtime/admin-realtime-notifier.service';
 import { CreateServiceDto } from './dto/create-service.dto';
 import { UpdateServiceAiConfigDto } from './dto/update-service-ai-config.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
@@ -42,6 +44,8 @@ export class AdminServicesService {
     @InjectRepository(Service)
     private readonly servicesRepository: Repository<Service>,
     private readonly cacheService: CacheService,
+    @Optional()
+    private readonly adminRealtimeNotifier?: AdminRealtimeNotifierService,
   ) {}
 
   async create(createServiceDto: CreateServiceDto): Promise<Service> {
@@ -63,6 +67,7 @@ export class AdminServicesService {
 
     const savedService = await this.servicesRepository.save(service);
     await this.invalidateServiceCache(savedService.id);
+    await this.adminRealtimeNotifier?.notifyDataChanged('service');
 
     return savedService;
   }
@@ -125,6 +130,7 @@ export class AdminServicesService {
 
     const savedService = await this.servicesRepository.save(service);
     await this.invalidateServiceCache(id);
+    await this.adminRealtimeNotifier?.notifyDataChanged('service');
 
     return savedService;
   }
@@ -150,6 +156,7 @@ export class AdminServicesService {
 
     const savedService = await this.servicesRepository.save(service);
     await this.invalidateServiceCache(id);
+    await this.adminRealtimeNotifier?.notifyDataChanged('service');
 
     return savedService;
   }

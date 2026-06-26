@@ -3,11 +3,13 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, MoreThan, Repository } from 'typeorm';
 import { PasswordService } from '@coopers/common';
 import { InviteToken, User, UserRole } from '@coopers/entities';
+import { AdminRealtimeNotifierService } from '../realtime/admin-realtime-notifier.service';
 import { AcceptAdminInviteDto } from './dto/accept-admin-invite.dto';
 import { CreateAdminInviteDto } from './dto/create-admin-invite.dto';
 
@@ -49,6 +51,8 @@ export class InvitesService {
     private readonly userRepository: Repository<User>,
     private readonly passwordService: PasswordService,
     private readonly dataSource: DataSource,
+    @Optional()
+    private readonly adminRealtimeNotifier?: AdminRealtimeNotifierService,
   ) {}
 
   async createAdminInvite(
@@ -99,6 +103,7 @@ export class InvitesService {
       acceptedUser: null,
     });
     const savedInvite = await this.inviteTokenRepository.save(inviteToken);
+    await this.adminRealtimeNotifier?.notifyDataChanged('invite');
 
     return {
       token: savedInvite.token,
@@ -195,6 +200,7 @@ export class InvitesService {
 
       return createdUser;
     });
+    await this.adminRealtimeNotifier?.notifyDataChanged('invite');
 
     return {
       success: true,

@@ -19,10 +19,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PaginatedResult, PagingReqDto } from '../common/pagination.dto';
 import { CreateSafetyRuleDto } from './dto/create-safety-rule.dto';
 import { UpdateSafetyRuleDto } from './dto/update-safety-rule.dto';
-import {
-  SafetyRuleResponse,
-  SafetyRulesService,
-} from './safety-rules.service';
+import { SafetyRuleResponse, SafetyRulesService } from './safety-rules.service';
 
 @ApiTags('safety-rules')
 @ApiBearerAuth('access-token')

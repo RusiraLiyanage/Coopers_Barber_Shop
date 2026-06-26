@@ -2,11 +2,13 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ReferenceDataItem, ReferenceDataType } from '@coopers/entities';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { PaginatedResult, PagingMetaDto } from '../common/pagination.dto';
+import { AdminRealtimeNotifierService } from '../realtime/admin-realtime-notifier.service';
 import { CreateReferenceDataItemDto } from './dto/create-reference-data-item.dto';
 import { ReferenceDataQueryDto } from './dto/reference-data-query.dto';
 import { UpdateReferenceDataItemDto } from './dto/update-reference-data-item.dto';
@@ -29,6 +31,8 @@ export class ReferenceDataService {
     @InjectRepository(ReferenceDataItem)
     private readonly referenceDataRepository: Repository<ReferenceDataItem>,
     private readonly dataSource: DataSource,
+    @Optional()
+    private readonly adminRealtimeNotifier?: AdminRealtimeNotifierService,
   ) {}
 
   async findAll(
@@ -72,7 +76,10 @@ export class ReferenceDataService {
       value,
     });
 
-    return this.referenceDataRepository.save(item);
+    const savedItem = await this.referenceDataRepository.save(item);
+    await this.adminRealtimeNotifier?.notifyDataChanged('reference-data');
+
+    return savedItem;
   }
 
   async update(
@@ -87,7 +94,10 @@ export class ReferenceDataService {
 
     item.label = normalizeLabel(updateReferenceDataItemDto.label);
 
-    return this.referenceDataRepository.save(item);
+    const savedItem = await this.referenceDataRepository.save(item);
+    await this.adminRealtimeNotifier?.notifyDataChanged('reference-data');
+
+    return savedItem;
   }
 
   async delete(id: string): Promise<DeleteReferenceDataItemResponse> {
@@ -102,6 +112,7 @@ export class ReferenceDataService {
       await this.removeReferences(manager, item.type, item.value);
       await referenceDataRepository.remove(item);
     });
+    await this.adminRealtimeNotifier?.notifyDataChanged('reference-data');
 
     return { success: true };
   }

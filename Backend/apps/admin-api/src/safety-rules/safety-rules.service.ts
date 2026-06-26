@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { SafetyRule, Service } from '@coopers/entities';
@@ -8,6 +8,7 @@ import {
   PagingMetaDto,
   PagingReqDto,
 } from '../common/pagination.dto';
+import { AdminRealtimeNotifierService } from '../realtime/admin-realtime-notifier.service';
 import { CreateSafetyRuleDto } from './dto/create-safety-rule.dto';
 import { UpdateSafetyRuleDto } from './dto/update-safety-rule.dto';
 
@@ -40,6 +41,8 @@ export class SafetyRulesService {
     @InjectRepository(Service)
     private readonly serviceRepository: Repository<Service>,
     private readonly cacheService: CacheService,
+    @Optional()
+    private readonly adminRealtimeNotifier?: AdminRealtimeNotifierService,
   ) {}
 
   async findAll(
@@ -83,6 +86,7 @@ export class SafetyRulesService {
 
     const savedSafetyRule = await this.safetyRuleRepository.save(safetyRule);
     await this.invalidateSafetyRulesCache();
+    await this.adminRealtimeNotifier?.notifyDataChanged('safety-rule');
 
     return this.attachServicesToRule(savedSafetyRule);
   }
@@ -114,6 +118,7 @@ export class SafetyRulesService {
 
     const savedSafetyRule = await this.safetyRuleRepository.save(safetyRule);
     await this.invalidateSafetyRulesCache();
+    await this.adminRealtimeNotifier?.notifyDataChanged('safety-rule');
 
     return this.attachServicesToRule(savedSafetyRule);
   }

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -9,6 +9,7 @@ import {
 } from '@coopers/entities';
 import { CacheService, REDIS_CACHE_KEYS } from '@coopers/common';
 import { PaginatedResult, PagingMetaDto } from '../common/pagination.dto';
+import { AdminRealtimeNotifierService } from '../realtime/admin-realtime-notifier.service';
 import { BriefsQueryDto } from './dto/briefs-query.dto';
 import { CreateBriefDto } from './dto/create-brief.dto';
 import { CreateHairHistoryFromBriefDto } from './dto/create-hair-history-from-brief.dto';
@@ -78,6 +79,8 @@ export class BriefsService {
     @InjectRepository(HairHistory)
     private readonly hairHistoryRepository: Repository<HairHistory>,
     private readonly cacheService: CacheService,
+    @Optional()
+    private readonly adminRealtimeNotifier?: AdminRealtimeNotifierService,
   ) {}
 
   private toBriefResponse(brief: AppointmentBrief): AppointmentBriefResponse {
@@ -221,6 +224,7 @@ export class BriefsService {
     await this.invalidateClientHairHistoryCache(
       appointmentBrief.booking.customer.id,
     );
+    await this.adminRealtimeNotifier?.notifyDataChanged('hair-history');
 
     return this.hairHistoryRepository.findOneOrFail({
       where: { id: savedHistory.id },
@@ -269,6 +273,7 @@ export class BriefsService {
 
     const savedBrief =
       await this.appointmentBriefRepository.save(appointmentBrief);
+    await this.adminRealtimeNotifier?.notifyDataChanged('brief');
 
     return this.findOne(savedBrief.id);
   }

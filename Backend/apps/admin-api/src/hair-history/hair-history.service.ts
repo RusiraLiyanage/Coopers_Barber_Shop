@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { HairHistory, Staff, User } from '@coopers/entities';
 import { CacheService, REDIS_CACHE_KEYS } from '@coopers/common';
 import { PaginatedResult, PagingMetaDto } from '../common/pagination.dto';
+import { AdminRealtimeNotifierService } from '../realtime/admin-realtime-notifier.service';
 import { CreateHairHistoryDto } from './dto/create-hair-history.dto';
 import { HairHistoryQueryDto } from './dto/hair-history-query.dto';
 
@@ -25,6 +26,8 @@ export class HairHistoryService {
     @InjectRepository(Staff)
     private readonly staffRepository: Repository<Staff>,
     private readonly cacheService: CacheService,
+    @Optional()
+    private readonly adminRealtimeNotifier?: AdminRealtimeNotifierService,
   ) {}
 
   async findAll(
@@ -112,6 +115,7 @@ export class HairHistoryService {
 
     const savedHistory = await this.hairHistoryRepository.save(hairHistory);
     await this.invalidateClientHairHistoryCache(createHairHistoryDto.clientId);
+    await this.adminRealtimeNotifier?.notifyDataChanged('hair-history');
 
     return this.hairHistoryRepository.findOneOrFail({
       where: { id: savedHistory.id },
