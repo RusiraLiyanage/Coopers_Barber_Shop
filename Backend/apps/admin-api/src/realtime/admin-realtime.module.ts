@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { JWT_AUDIENCE, JWT_ISSUER } from '@coopers/common';
 import { DataVersionModule } from '../data-version/data-version.module';
 import { AdminRealtimeAuthService } from './admin-realtime-auth.service';
+import { AdminRealtimeController } from './admin-realtime.controller';
 import { AdminRealtimeGateway } from './admin-realtime.gateway';
 import { AdminRealtimeNotifierService } from './admin-realtime-notifier.service';
 import { AdminRealtimeService } from './admin-realtime.service';
@@ -23,6 +24,7 @@ import { AdminRealtimeService } from './admin-realtime.service';
       }),
     }),
   ],
+  controllers: [AdminRealtimeController],
   providers: [
     AdminRealtimeAuthService,
     AdminRealtimeGateway,

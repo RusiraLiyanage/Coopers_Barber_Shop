@@ -7,6 +7,7 @@ import { Appointment, AppointmentBrief, HairHistory } from '@coopers/entities';
 import { Service } from '@coopers/entities';
 import { StaffModule } from '../staff/staff.module'; // ✅ import StaffModule
 import { Staff } from '@coopers/entities';
+import { AdminRealtimeNotificationModule } from '../admin-realtime/admin-realtime-notification.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { Staff } from '@coopers/entities';
       Staff,
     ]), // register appointment-related entities
     IdempotencyModule,
+    AdminRealtimeNotificationModule,
     StaffModule, // import StaffModule to use StaffService if needed
   ],
   controllers: [AppointmentsController], // the API endpoints are defined here.

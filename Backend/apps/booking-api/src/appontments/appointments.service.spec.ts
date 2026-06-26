@@ -12,6 +12,7 @@ import { StaffService } from '../staff/staff.service';
 import { ConflictException } from '@nestjs/common';
 import { CacheService, REDIS_CACHE_KEYS } from '@coopers/common';
 import { DataSource } from 'typeorm';
+import { AdminRealtimeNotificationService } from '../admin-realtime/admin-realtime-notification.service';
 
 // Mock repositories
 const mockAppointmentsRepo = {
@@ -62,6 +63,10 @@ const mockStaffService = {
 
 const mockCacheService = {
   deleteKey: jest.fn(),
+};
+
+const mockAdminRealtimeNotificationService = {
+  notifyAppointmentChanged: jest.fn(),
 };
 
 const mockTransactionManager = {
@@ -132,6 +137,10 @@ describe('AppointmentsService', () => {
         { provide: StaffService, useValue: mockStaffService },
         { provide: DataSource, useValue: mockDataSource },
         { provide: CacheService, useValue: mockCacheService },
+        {
+          provide: AdminRealtimeNotificationService,
+          useValue: mockAdminRealtimeNotificationService,
+        },
       ],
     }).compile();
 
@@ -398,6 +407,9 @@ describe('AppointmentsService', () => {
         staff: selectedStaff,
       }),
     );
+    expect(
+      mockAdminRealtimeNotificationService.notifyAppointmentChanged,
+    ).toHaveBeenCalledTimes(1);
     expect(result.staffId).toBe(selectedStaff.id);
     expect(result.staffName).toBe('Sofia Bennett');
   });
@@ -488,6 +500,9 @@ describe('AppointmentsService', () => {
     expect(mockCacheService.deleteKey).toHaveBeenCalledWith(
       REDIS_CACHE_KEYS.consultation.clientHairHistory('user-1'),
     );
+    expect(
+      mockAdminRealtimeNotificationService.notifyAppointmentChanged,
+    ).toHaveBeenCalledTimes(1);
   });
 
   it('should update an appointment onto the selected date when the slot is available', async () => {
@@ -527,6 +542,9 @@ describe('AppointmentsService', () => {
 
     expect(appointment.startAt.toISOString()).toBe('2025-09-25T00:30:00.000Z');
     expect(appointment.endAt.toISOString()).toBe('2025-09-25T01:00:00.000Z');
+    expect(
+      mockAdminRealtimeNotificationService.notifyAppointmentChanged,
+    ).toHaveBeenCalledTimes(1);
     expect(result.startAt).toContain('25/09/2025');
     expect(result.startAt).toContain('10:30');
   });
@@ -600,6 +618,9 @@ describe('AppointmentsService', () => {
     );
 
     expect(appointment.status).toBe('cancelled_by_client');
+    expect(
+      mockAdminRealtimeNotificationService.notifyAppointmentChanged,
+    ).toHaveBeenCalledTimes(1);
     expect(result.status).toBe('cancelled_by_client');
   });
 });

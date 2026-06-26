@@ -20,6 +20,7 @@ import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { StaffService } from '../staff/staff.service';
 import { EntityClassOrSchema } from '@nestjs/typeorm/dist/interfaces/entity-class-or-schema.type';
+import { AdminRealtimeNotificationService } from '../admin-realtime/admin-realtime-notification.service';
 
 const WORKDAY_START = '09:00';
 const WORKDAY_END = '17:00';
@@ -103,6 +104,8 @@ export class AppointmentsService {
     private readonly dataSource: DataSource,
     @Optional()
     private readonly cacheService?: CacheService,
+    @Optional()
+    private readonly adminRealtimeNotificationService?: AdminRealtimeNotificationService,
   ) {}
 
   private addMinutes(date: Date, minutes: number): Date {
@@ -587,6 +590,8 @@ export class AppointmentsService {
       );
     }
 
+    void this.adminRealtimeNotificationService?.notifyAppointmentChanged();
+
     return this.toAppointmentResponse(saved, staff.timezone);
   }
 
@@ -680,6 +685,8 @@ export class AppointmentsService {
       manager.getRepository(Appointment).save(appointment),
     );
 
+    void this.adminRealtimeNotificationService?.notifyAppointmentChanged();
+
     return this.toAppointmentResponse(saved, appointment.staff.timezone);
   }
 
@@ -710,6 +717,8 @@ export class AppointmentsService {
     const saved = await this.dataSource.transaction(async (manager) =>
       manager.getRepository(Appointment).save(appointment),
     );
+
+    void this.adminRealtimeNotificationService?.notifyAppointmentChanged();
 
     return this.toAppointmentResponse(saved, appointment.staff.timezone);
   }
