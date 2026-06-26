@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { getRequiredConfigInteger, getRequiredConfigString } from './env.util';
+import { normalizeServiceUrl } from '../utils';
 
 export type GuardUpstreamConfig = {
   bookingApiUrl: string;
@@ -18,10 +19,6 @@ export type GoogleOAuthConfig = {
   failureRedirectUrl: string;
   scope: string[];
 };
-
-function normalizeServiceUrl(value: string): string {
-  return value.replace(/\/+$/, ''); // get rid of any end slashes of the url
-}
 
 function getFirstConfiguredUrl(value: string): string {
   return value.split(',')[0]?.trim() ?? value;

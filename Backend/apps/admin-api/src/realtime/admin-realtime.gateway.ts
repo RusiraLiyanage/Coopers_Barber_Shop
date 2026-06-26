@@ -7,9 +7,9 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
+import { ADMIN_REALTIME_NAMESPACE } from '@coopers/common';
 import { AdminRealtimeAuthService } from './admin-realtime-auth.service';
 import { AdminRealtimeService } from './admin-realtime.service';
-import { ADMIN_REALTIME_NAMESPACE } from './admin-realtime.types';
 
 function getAllowedAdminRealtimeOrigins(): string[] {
   const guardPortOrigin = process.env.GUARD_PORT

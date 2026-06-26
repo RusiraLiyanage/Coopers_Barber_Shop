@@ -1,5 +1,6 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ADMIN_REALTIME_DATA_CHANGED_ROUTE } from '@coopers/common';
 import { AdminRealtimeNotifierService } from './admin-realtime-notifier.service';
 import { NotifyAdminDataChangedDto } from './dto/notify-admin-data-changed.dto';
 
@@ -15,7 +16,7 @@ export class AdminRealtimeController {
   })
   @ApiBody({ type: NotifyAdminDataChangedDto })
   @HttpCode(HttpStatus.ACCEPTED)
-  @Post('internal/data-changed')
+  @Post(ADMIN_REALTIME_DATA_CHANGED_ROUTE)
   async notifyDataChanged(
     @Body() dto: NotifyAdminDataChangedDto,
   ): Promise<{ accepted: true }> {

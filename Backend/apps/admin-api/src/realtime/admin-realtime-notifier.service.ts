@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { AdminDataChangedReason } from '@coopers/common';
 import { DataVersionService } from '../data-version/data-version.service';
 import { AdminRealtimeService } from './admin-realtime.service';
-import { AdminDataChangedReason } from './admin-realtime.types';
 
 @Injectable()
 export class AdminRealtimeNotifierService {

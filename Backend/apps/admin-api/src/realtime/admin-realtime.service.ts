@@ -3,7 +3,7 @@ import type { Server } from 'socket.io';
 import {
   ADMIN_DATA_CHANGED_EVENT,
   AdminDataChangedPayload,
-} from './admin-realtime.types';
+} from '@coopers/common';
 
 @Injectable()
 export class AdminRealtimeService {

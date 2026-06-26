@@ -1,6 +1,6 @@
 import type { Server } from 'socket.io';
+import { ADMIN_DATA_CHANGED_EVENT } from '@coopers/common';
 import { AdminRealtimeService } from './admin-realtime.service';
-import { ADMIN_DATA_CHANGED_EVENT } from './admin-realtime.types';
 
 describe('AdminRealtimeService', () => {
   it('returns false when the realtime server is not ready', () => {
