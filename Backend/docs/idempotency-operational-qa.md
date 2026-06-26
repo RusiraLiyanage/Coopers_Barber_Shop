@@ -4,15 +4,33 @@
 
 This QA pass validates duplicate-safe customer appointment mutations through the booking guard.
 
-The protected endpoints are:
+## Protected Endpoints
 
-- `POST /appointments`
-- `PATCH /appointments/:id`
-- `PATCH /appointments/:id/cancel`
+| Customer action        | Guard endpoint                   | Internal booking-api endpoint    | Idempotent |
+| ---------------------- | -------------------------------- | -------------------------------- | ---------- |
+| Create appointment     | `POST /appointments`             | `POST /appointments`             | Yes        |
+| Reschedule appointment | `PATCH /appointments/:id`        | `PATCH /appointments/:id`        | Yes        |
+| Cancel appointment     | `PATCH /appointments/:id/cancel` | `PATCH /appointments/:id/cancel` | Yes        |
 
 The required request header is:
 
 - `Idempotency-Key: <stable UUID for this appointment mutation attempt>`
+
+## Request Flow
+
+1. The customer frontend generates an idempotency key with browser crypto.
+2. The key is sent as the `Idempotency-Key` HTTP header.
+3. `booking-guard` reads the header and forwards it to `booking-api`.
+4. `booking-api` runs `IdempotencyInterceptor` before the appointment service method.
+5. `IdempotencyService` checks `userId + method + path + request body hash`.
+6. New requests run normally and store the final response.
+7. Completed duplicate requests replay the original response.
+8. In-flight duplicate requests return `409 Conflict`.
+9. Same key with a different payload returns `409 Conflict`.
+
+Only the three appointment mutation routes above are protected by the idempotency interceptor. Read-only routes such as availability and appointment listing do not require this header.
+
+## Expiry And Cleanup
 
 Expired idempotency rows are deleted by `IdempotencyCleanupService` inside `booking-api`.
 
@@ -20,6 +38,13 @@ Required cleanup env:
 
 - `IDEMPOTENCY_KEY_TTL_SECONDS`
 - `IDEMPOTENCY_KEY_CLEANUP_INTERVAL_SECONDS`
+
+Current local defaults:
+
+- `IDEMPOTENCY_KEY_TTL_SECONDS=86400`
+- `IDEMPOTENCY_KEY_CLEANUP_INTERVAL_SECONDS=3600`
+
+Cleanup runs once when `booking-api` starts and then every configured interval. Since each row stores an absolute `expires_at` timestamp, rows that expire while local services are stopped are deleted on the next startup cleanup.
 
 ## Local Prerequisites
 
@@ -39,7 +64,7 @@ curl http://localhost:7310/health
 
 Confirm the migration for `idempotency_keys` has been applied before running the duplicate-submit checks.
 
-## Browser QA
+## Browser QA: Create
 
 1. Log in as a customer.
 2. Open the new appointment modal.
@@ -57,6 +82,39 @@ Expected result:
 - One appointment brief is created.
 - One `idempotency_keys` row exists for the booking attempt with `status = completed`.
 
+## Browser QA: Reschedule
+
+1. Log in as a customer.
+2. Open `My Appointments`.
+3. Select an existing booked appointment and choose the update action.
+4. Select a different valid date/time.
+5. Open browser DevTools on the Network tab.
+6. Click `Update Appointment`.
+7. Confirm the `PATCH /appointments/:id` request includes an `Idempotency-Key` header.
+8. Confirm the appointment changes once.
+
+Expected result:
+
+- One appointment row is updated.
+- No duplicate appointment row is created.
+- One `idempotency_keys` row exists for the update attempt with `method = PATCH` and `status = completed`.
+
+## Browser QA: Cancel
+
+1. Log in as a customer.
+2. Open `My Appointments`.
+3. Select a booked appointment and choose cancel.
+4. Open browser DevTools on the Network tab.
+5. Confirm cancellation.
+6. Confirm the `PATCH /appointments/:id/cancel` request includes an `Idempotency-Key` header.
+7. Confirm the appointment changes to cancelled once.
+
+Expected result:
+
+- The appointment is soft-cancelled once.
+- No duplicate appointment row is created.
+- One `idempotency_keys` row exists for the cancel attempt with `method = PATCH` and `status = completed`.
+
 ## Duplicate Click QA
 
 Use the browser flow and double-click `Book Appointment` quickly.
@@ -68,7 +126,14 @@ Expected result:
 - The customer UI shows `Your booking is already being processed.` instead of a generic error toast.
 - If the second request reaches the backend after the first completed, it returns the same stored appointment response.
 
-## Curl QA
+Repeat the same idea for update and cancel by triggering the action twice before the first request completes.
+
+Expected result:
+
+- At most one mutation is applied.
+- The second in-flight request returns `409 Conflict`, or a later duplicate receives the stored response.
+
+## Curl QA: Login
 
 Log in through the booking guard and keep cookies:
 
@@ -78,6 +143,8 @@ curl -i -c /tmp/coopers-customer.cookies \
   -d '{"email":"customer@example.com","password":"Password123!"}' \
   http://localhost:7311/auth/login
 ```
+
+## Curl QA: Create
 
 Set a key and payload. Replace IDs/date/slot with valid local data:
 
@@ -123,6 +190,74 @@ Expected result:
 - Response status and body match the original completed booking response.
 - No second appointment row is created.
 
+## Curl QA: Reschedule
+
+Use a new key and replace `replace-appointment-id` with a booked appointment owned by the logged-in customer:
+
+```bash
+export IDEMPOTENCY_KEY="$(uuidgen | tr '[:upper:]' '[:lower:]')"
+
+cat > /tmp/coopers-update-payload.json <<'JSON'
+{
+  "date": "2026-06-26",
+  "slot": "10:00-10:30"
+}
+JSON
+
+curl -i -b /tmp/coopers-customer.cookies \
+  -H 'Content-Type: application/json' \
+  -H "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  --data @/tmp/coopers-update-payload.json \
+  -X PATCH \
+  http://localhost:7311/appointments/replace-appointment-id
+```
+
+Replay the same update with the same key:
+
+```bash
+curl -i -b /tmp/coopers-customer.cookies \
+  -H 'Content-Type: application/json' \
+  -H "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  --data @/tmp/coopers-update-payload.json \
+  -X PATCH \
+  http://localhost:7311/appointments/replace-appointment-id
+```
+
+Expected result:
+
+- Response status and body match the original completed update response.
+- The appointment is not updated twice.
+
+## Curl QA: Cancel
+
+Use a new key and replace `replace-appointment-id` with a booked appointment owned by the logged-in customer:
+
+```bash
+export IDEMPOTENCY_KEY="$(uuidgen | tr '[:upper:]' '[:lower:]')"
+
+curl -i -b /tmp/coopers-customer.cookies \
+  -H 'Content-Type: application/json' \
+  -H "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -X PATCH \
+  http://localhost:7311/appointments/replace-appointment-id/cancel
+```
+
+Replay the same cancel with the same key:
+
+```bash
+curl -i -b /tmp/coopers-customer.cookies \
+  -H 'Content-Type: application/json' \
+  -H "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -X PATCH \
+  http://localhost:7311/appointments/replace-appointment-id/cancel
+```
+
+Expected result:
+
+- Response status and body match the original completed cancellation response.
+- The appointment remains cancelled.
+- No second appointment row is created.
+
 ## Different Payload Same Key QA
 
 Change the payload while keeping the same key:
@@ -144,9 +279,11 @@ Expected result:
 - Error message says the idempotency key was already used for a different request.
 - No appointment is created for the changed payload.
 
+For update, repeat this by changing the update date or slot while keeping the same key. For cancel, the path is part of the idempotency context, so the same key cannot be reused for another appointment ID.
+
 ## Missing Header QA
 
-Send a booking request without the header:
+Send a mutation request without the header:
 
 ```bash
 curl -i -b /tmp/coopers-customer.cookies \
@@ -159,11 +296,11 @@ Expected result:
 
 - Backend returns `400 Bad Request`.
 - Error message says `Idempotency-Key header is required.`
-- No appointment is created.
+- No appointment is created, updated, or cancelled.
 
 ## Failed Retry QA
 
-Use a valid idempotency key with an intentionally invalid payload, for example an invalid slot or unavailable staff member.
+Use a valid idempotency key with an intentionally invalid payload, for example an invalid slot, unavailable staff member, or invalid appointment state.
 
 Expected result:
 
@@ -210,12 +347,35 @@ Expected result:
 
 - The duplicate check returns no rows for idempotency QA attempts.
 
+Confirm expired idempotency records are eventually removed:
+
+```sql
+SELECT COUNT(*)
+FROM idempotency_keys
+WHERE expires_at <= NOW();
+```
+
+Expected result:
+
+- After startup cleanup or the next cleanup interval, this count trends back to `0`.
+
+## Readiness Checklist
+
+- Frontend sends `Idempotency-Key` for create/update/cancel only.
+- Booking guard forwards `Idempotency-Key` for create/update/cancel only.
+- Booking API applies `IdempotencyInterceptor` to create/update/cancel only.
+- Same key + same request replays or reports in-flight processing.
+- Same key + different request returns `409 Conflict`.
+- Expired rows are removed by cleanup.
+- `.env.example` documents required idempotency env values.
+- No real secret values are needed for the idempotency feature.
+
 ## Automated Checks
 
 Run the idempotency service tests:
 
 ```bash
-pnpm --dir Backend --filter @coopers/common test -- idempotency.service.spec.ts --runInBand
+pnpm --dir Backend --filter @coopers/common test -- idempotency-cleanup.service.spec.ts idempotency.service.spec.ts --runInBand
 ```
 
 Run the affected package checks:
@@ -238,7 +398,7 @@ Date: 2026-06-26
 Verified:
 
 - `@coopers/common` lint/build passed.
-- `idempotency.service.spec.ts` passed with 7 tests.
+- `idempotency-cleanup.service.spec.ts` and `idempotency.service.spec.ts` passed with 10 tests.
 - `@coopers/booking.api` lint/build passed.
 - `@coopers/booking.guard` lint/build passed.
 - `appointment-booking-frontend` lint/build passed.
