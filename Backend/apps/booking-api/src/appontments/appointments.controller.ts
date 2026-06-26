@@ -7,10 +7,17 @@ import {
   Param,
   Query,
   UseGuards,
+  UseInterceptors,
   Request,
   Req,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { IdempotencyInterceptor } from '@coopers/common';
+import {
+  ApiBearerAuth,
+  ApiHeader,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { AppointmentsService } from './appointments.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
@@ -26,7 +33,13 @@ export class AppointmentsController {
 
   // Book appointment
   @ApiOperation({ summary: 'Book an appointment' })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description: 'Unique key for this booking attempt.',
+  })
   @UseGuards(JwtAuthGuard)
+  @UseInterceptors(IdempotencyInterceptor)
   @Post()
   async book(
     @Request() req: JwtAuthenticatedRequest,

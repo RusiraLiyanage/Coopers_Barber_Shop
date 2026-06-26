@@ -465,6 +465,9 @@ importers:
       nodemailer:
         specifier: ^8.0.10
         version: 8.0.10
+      rxjs:
+        specifier: ^7.8.1
+        version: 7.8.2
       typeorm:
         specifier: ^0.3.29
         version: 0.3.29(ioredis@5.11.1)(pg@8.20.0)(ts-node@10.9.2(@types/node@22.19.18)(typescript@6.0.3))

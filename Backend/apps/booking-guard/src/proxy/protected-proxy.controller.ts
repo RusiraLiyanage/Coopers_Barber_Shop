@@ -9,7 +9,13 @@ import {
   Query,
   Res,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiHeader,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import {
   ProtectedProxyResponse,
   ProtectedProxyService,
@@ -50,6 +56,14 @@ type AvailabilityQuery = {
   excludeAppointmentId?: string;
 };
 
+function createIdempotencyForwardHeaders(
+  idempotencyKey: string | undefined,
+): Record<string, string> | undefined {
+  const normalizedKey = idempotencyKey?.trim();
+
+  return normalizedKey ? { 'idempotency-key': normalizedKey } : undefined;
+}
+
 function writeProxyResponse(
   response: AuthCookieResponse,
   result: ProtectedProxyResponse,
@@ -69,6 +83,11 @@ export class ProtectedProxyController {
   constructor(private readonly protectedProxyService: ProtectedProxyService) {}
 
   @ApiOperation({ summary: 'Proxy appointment booking to booking-api' })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description: 'Unique key for this booking attempt.',
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -95,7 +114,8 @@ export class ProtectedProxyController {
             },
             data: {
               type: 'string',
-              description: 'Base64-encoded image data without a data URL prefix.',
+              description:
+                'Base64-encoded image data without a data URL prefix.',
             },
           },
         },
@@ -111,6 +131,7 @@ export class ProtectedProxyController {
   async bookAppointment(
     @Headers('authorization') authorizationHeader: string | undefined,
     @Headers('x-refresh-token') refreshTokenHeader: string | undefined,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Headers('cookie') cookieHeader: string | undefined,
     @Body() body: AppointmentRequestBody,
     @Res({ passthrough: true }) response: AuthCookieResponse,
@@ -127,6 +148,7 @@ export class ProtectedProxyController {
       method: 'POST',
       path: '/appointments',
       body,
+      forwardedHeaders: createIdempotencyForwardHeaders(idempotencyKey),
     });
 
     writeProxyResponse(

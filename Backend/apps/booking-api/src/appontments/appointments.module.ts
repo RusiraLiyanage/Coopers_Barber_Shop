@@ -2,12 +2,8 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppointmentsService } from './appointments.service';
 import { AppointmentsController } from './appointments.controller';
-import {
-  Appointment,
-  AppointmentBrief,
-  HairHistory,
-  IdempotencyKey,
-} from '@coopers/entities';
+import { IdempotencyModule } from '@coopers/common';
+import { Appointment, AppointmentBrief, HairHistory } from '@coopers/entities';
 import { Service } from '@coopers/entities';
 import { StaffModule } from '../staff/staff.module'; // ✅ import StaffModule
 import { Staff } from '@coopers/entities';
@@ -18,10 +14,10 @@ import { Staff } from '@coopers/entities';
       Appointment,
       AppointmentBrief,
       HairHistory,
-      IdempotencyKey,
       Service,
       Staff,
     ]), // register appointment-related entities
+    IdempotencyModule,
     StaffModule, // import StaffModule to use StaffService if needed
   ],
   controllers: [AppointmentsController], // the API endpoints are defined here.

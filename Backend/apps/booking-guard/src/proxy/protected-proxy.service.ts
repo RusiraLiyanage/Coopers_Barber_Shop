@@ -23,6 +23,7 @@ type ProtectedForwardOptions = Omit<
   target?: ProxyRequestOptions['target'];
   authorizationHeader: string | undefined;
   refreshToken: string | undefined;
+  forwardedHeaders?: Record<string, string>;
 };
 
 type SessionValidationOptions = {
@@ -163,10 +164,10 @@ export class ProtectedProxyService {
       path: options.path,
       query: options.query,
       body: options.body,
-      headers: createUserContextHeaders(
-        context.authorizationHeader,
-        context.user,
-      ),
+      headers: {
+        ...createUserContextHeaders(context.authorizationHeader, context.user),
+        ...options.forwardedHeaders,
+      },
     });
 
     return {
@@ -189,10 +190,10 @@ export class ProtectedProxyService {
       path: options.path,
       query: options.query,
       body: options.body,
-      headers: createUserContextHeaders(
-        context.authorizationHeader,
-        context.user,
-      ),
+      headers: {
+        ...createUserContextHeaders(context.authorizationHeader, context.user),
+        ...options.forwardedHeaders,
+      },
     });
 
     return {

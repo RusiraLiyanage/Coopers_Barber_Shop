@@ -229,7 +229,9 @@ export class GoogleOAuthSessionService {
       clearGoogleOAuthLinkCookie(response);
       response.status(400);
 
-      return { message: 'Google session switch request is missing or expired.' };
+      return {
+        message: 'Google session switch request is missing or expired.',
+      };
     }
 
     const result = await this.proxyService.forward({

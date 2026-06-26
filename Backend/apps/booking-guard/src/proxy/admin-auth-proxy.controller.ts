@@ -75,7 +75,9 @@ function isAuthTokensResponse(value: unknown): value is AuthTokensResponse {
   );
 }
 
-function isAccountProfileResponse(value: unknown): value is AccountProfileResponse {
+function isAccountProfileResponse(
+  value: unknown,
+): value is AccountProfileResponse {
   if (typeof value !== 'object' || value === null) {
     return false;
   }
@@ -196,7 +198,10 @@ export class AdminAuthProxyController {
       body: createLoginAuthApiBody(body),
     });
 
-    if (!isSuccessStatus(result.statusCode) || !isAuthTokensResponse(result.body)) {
+    if (
+      !isSuccessStatus(result.statusCode) ||
+      !isAuthTokensResponse(result.body)
+    ) {
       return writeAdminAuthResponse(response, result, getRememberMe(body));
     }
 

@@ -10,7 +10,7 @@ import { IdempotencyKey, IdempotencyKeyStatus } from '@coopers/entities';
 import { LessThanOrEqual, Repository } from 'typeorm';
 import { getRequiredConfigInteger } from '../../configs/env.util';
 
-type JsonValue =
+export type IdempotencyResponseBody =
   | Record<string, unknown>
   | unknown[]
   | string
@@ -28,7 +28,7 @@ type IdempotencyContextInput = {
 
 type IdempotencyCompleteInput = {
   record: IdempotencyKey;
-  responseBody: JsonValue;
+  responseBody: IdempotencyResponseBody;
   responseStatusCode: number;
 };
 
@@ -39,12 +39,19 @@ export type IdempotencyReservation =
     }
   | {
       kind: 'completed';
-      responseBody: JsonValue;
+      responseBody: IdempotencyResponseBody;
       responseStatusCode: number;
     }
   | {
       kind: 'processing';
     };
+
+type DatabaseErrorWithCode = {
+  code?: unknown;
+  driverError?: {
+    code?: unknown;
+  };
+};
 
 @Injectable()
 export class IdempotencyService {
@@ -72,25 +79,7 @@ export class IdempotencyService {
     });
 
     if (existingRecord) {
-      if (existingRecord.expiresAt <= new Date()) {
-        await this.idempotencyKeyRepository.remove(existingRecord);
-        return this.createProcessingRecord(input, key, requestHash);
-      }
-
-      this.assertSameRequest(existingRecord, input, requestHash);
-
-      if (
-        existingRecord.status === IdempotencyKeyStatus.COMPLETED &&
-        existingRecord.responseStatusCode !== null
-      ) {
-        return {
-          kind: 'completed',
-          responseBody: existingRecord.responseBody,
-          responseStatusCode: existingRecord.responseStatusCode,
-        };
-      }
-
-      return { kind: 'processing' };
+      return this.resolveExistingRecord(existingRecord, input, requestHash);
     }
 
     return this.createProcessingRecord(input, key, requestHash);
@@ -118,7 +107,38 @@ export class IdempotencyService {
     return result.affected ?? 0;
   }
 
-  private createProcessingRecord(
+  private async resolveExistingRecord(
+    existingRecord: IdempotencyKey,
+    input: IdempotencyContextInput,
+    requestHash: string,
+  ): Promise<IdempotencyReservation> {
+    if (existingRecord.expiresAt <= new Date()) {
+      await this.idempotencyKeyRepository.remove(existingRecord);
+      return this.createProcessingRecord(input, input.key.trim(), requestHash);
+    }
+
+    this.assertSameRequest(existingRecord, input, requestHash);
+
+    if (existingRecord.status === IdempotencyKeyStatus.FAILED) {
+      await this.idempotencyKeyRepository.remove(existingRecord);
+      return this.createProcessingRecord(input, input.key.trim(), requestHash);
+    }
+
+    if (
+      existingRecord.status === IdempotencyKeyStatus.COMPLETED &&
+      existingRecord.responseStatusCode !== null
+    ) {
+      return {
+        kind: 'completed',
+        responseBody: existingRecord.responseBody,
+        responseStatusCode: existingRecord.responseStatusCode,
+      };
+    }
+
+    return { kind: 'processing' };
+  }
+
+  private async createProcessingRecord(
     input: IdempotencyContextInput,
     key: string,
     requestHash: string,
@@ -136,10 +156,31 @@ export class IdempotencyService {
       expiresAt: this.createExpiresAt(),
     });
 
-    return this.idempotencyKeyRepository.save(record).then((savedRecord) => ({
-      kind: 'created',
-      record: savedRecord,
-    }));
+    try {
+      const savedRecord = await this.idempotencyKeyRepository.save(record);
+
+      return {
+        kind: 'created',
+        record: savedRecord,
+      };
+    } catch (error: unknown) {
+      if (!this.isUniqueConstraintViolation(error)) {
+        throw error;
+      }
+
+      const existingRecord = await this.idempotencyKeyRepository.findOne({
+        where: {
+          key,
+          userId: input.userId,
+        },
+      });
+
+      if (!existingRecord) {
+        throw error;
+      }
+
+      return this.resolveExistingRecord(existingRecord, input, requestHash);
+    }
   }
 
   private assertSameRequest(
@@ -168,6 +209,17 @@ export class IdempotencyService {
     expiresAt.setSeconds(expiresAt.getSeconds() + ttlSeconds);
 
     return expiresAt;
+  }
+
+  private isUniqueConstraintViolation(error: unknown): boolean {
+    if (typeof error !== 'object' || error === null) {
+      return false;
+    }
+
+    const databaseError = error as DatabaseErrorWithCode;
+    const code = databaseError.driverError?.code ?? databaseError.code;
+
+    return code === '23505';
   }
 
   private hashRequest(requestBody: unknown): string {

@@ -110,6 +110,44 @@ describe('IdempotencyService', () => {
     );
   });
 
+  it('returns processing when another request creates the same key first', async () => {
+    const service = createService();
+    const createdRecord = createRecord({
+      key: 'request-key-1',
+      userId: 'user-1',
+      status: IdempotencyKeyStatus.PROCESSING,
+    });
+    const existingRecord = createRecord({
+      key: 'request-key-1',
+      userId: 'user-1',
+      method: 'POST',
+      path: '/appointments',
+      requestHash: hashRequestBody({ serviceId: 'svc-1' }),
+      status: IdempotencyKeyStatus.PROCESSING,
+      responseStatusCode: null,
+      responseBody: null,
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+
+    idempotencyKeyRepository.findOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(existingRecord);
+    idempotencyKeyRepository.create.mockReturnValue(createdRecord);
+    idempotencyKeyRepository.save.mockRejectedValue({
+      driverError: { code: '23505' },
+    });
+
+    await expect(
+      service.reserve({
+        key: 'request-key-1',
+        method: 'POST',
+        path: '/appointments',
+        requestBody: { serviceId: 'svc-1' },
+        userId: 'user-1',
+      }),
+    ).resolves.toEqual({ kind: 'processing' });
+  });
+
   it('returns the stored response for a completed matching request', async () => {
     const service = createService();
     const responseBody = { id: 'appointment-1' };
@@ -171,6 +209,45 @@ describe('IdempotencyService', () => {
         userId: 'user-1',
       }),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('allows retrying a matching request after a failed attempt', async () => {
+    const service = createService();
+    const failedRecord = createRecord({
+      key: 'request-key-1',
+      userId: 'user-1',
+      method: 'POST',
+      path: '/appointments',
+      requestHash: hashRequestBody({ serviceId: 'svc-1' }),
+      status: IdempotencyKeyStatus.FAILED,
+      responseStatusCode: null,
+      responseBody: null,
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    const newRecord = createRecord({
+      key: 'request-key-1',
+      userId: 'user-1',
+      status: IdempotencyKeyStatus.PROCESSING,
+    });
+
+    idempotencyKeyRepository.findOne.mockResolvedValue(failedRecord);
+    idempotencyKeyRepository.create.mockReturnValue(newRecord);
+    idempotencyKeyRepository.save.mockResolvedValue(newRecord);
+
+    await expect(
+      service.reserve({
+        key: 'request-key-1',
+        method: 'POST',
+        path: '/appointments',
+        requestBody: { serviceId: 'svc-1' },
+        userId: 'user-1',
+      }),
+    ).resolves.toEqual({
+      kind: 'created',
+      record: newRecord,
+    });
+
+    expect(idempotencyKeyRepository.remove).toHaveBeenCalledWith(failedRecord);
   });
 
   it('marks records as completed or failed', async () => {
