@@ -15,6 +15,7 @@ import { HairHistoryModule } from './hair-history/hair-history.module';
 import { HealthController } from './health.controller';
 import { InvitesModule } from './invites/invites.module';
 import { ReferenceDataModule } from './reference-data/reference-data.module';
+import { AdminRealtimeModule } from './realtime/admin-realtime.module';
 import { SafetyRulesModule } from './safety-rules/safety-rules.module';
 import { AdminServicesModule } from './services/admin-services.module';
 
@@ -36,6 +37,7 @@ import { AdminServicesModule } from './services/admin-services.module';
     HairHistoryModule,
     InvitesModule,
     DataVersionModule,
+    AdminRealtimeModule,
   ],
   controllers: [HealthController],
 })
