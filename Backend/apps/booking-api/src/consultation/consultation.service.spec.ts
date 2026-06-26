@@ -69,6 +69,8 @@ describe('ConsultationService', () => {
   } as Staff;
 
   beforeEach(async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-26T00:00:00.000Z'));
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ConsultationService,
@@ -115,6 +117,7 @@ describe('ConsultationService', () => {
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     jest.clearAllMocks();
   });
 
@@ -154,14 +157,54 @@ describe('ConsultationService', () => {
       'recent-chemical-history',
     ]);
     expect(result.previousHairHistory).toEqual([
-      {
+      expect.objectContaining({
         service: 'Hair Coloring',
         hairState: ['dry ends'],
         productsUsed: 'toner',
         barberNotes: 'Use lower developer',
         visitDate: '2026-01-10',
-      },
+        relevance: 'medium',
+        safetyCritical: false,
+      }),
     ]);
+  });
+
+  it('adds a follow-up question when old history has safety-critical context', async () => {
+    const history = [
+      {
+        service: 'Hair Coloring',
+        hairState: ['scalp sensitivity'],
+        productsUsed: null,
+        barberNotes: 'Patch test recommended before colour.',
+        visitDate: '2024-01-10',
+      },
+    ] as HairHistory[];
+
+    servicesRepository.findOne.mockResolvedValue(colourService);
+    hairHistoryRepository.createQueryBuilder.mockReturnValue(
+      createHairHistoryQueryBuilder(history) as never,
+    );
+
+    const result = await service.startConsultation('user-1', colourService.id);
+
+    expect(result.questions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'history-follow-up',
+          required: true,
+        }),
+      ]),
+    );
+    expect(
+      result.questions.find((question) => question.id === 'history-follow-up')
+        ?.label,
+    ).toContain('scalp sensitivity');
+    expect(result.previousHairHistory[0]).toEqual(
+      expect.objectContaining({
+        relevance: 'low',
+        safetyCritical: true,
+      }),
+    );
   });
 
   it('loads service context and hair history from Redis when cached', async () => {
@@ -201,13 +244,15 @@ describe('ConsultationService', () => {
     expect(cacheService.setJson.mock.calls).toHaveLength(0);
     expect(result.service.id).toBe(colourService.id);
     expect(result.previousHairHistory).toEqual([
-      {
+      expect.objectContaining({
         service: 'Hair Coloring',
         hairState: ['dry ends'],
         productsUsed: 'toner',
         barberNotes: 'Use lower developer',
         visitDate: '2026-01-10',
-      },
+        relevance: 'medium',
+        safetyCritical: false,
+      }),
     ]);
   });
 

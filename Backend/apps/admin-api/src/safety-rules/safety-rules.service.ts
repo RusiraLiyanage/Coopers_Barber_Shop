@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { SafetyRule } from '@coopers/entities';
+import { In, Repository } from 'typeorm';
+import { SafetyRule, Service } from '@coopers/entities';
 import { CacheService, REDIS_CACHE_KEYS } from '@coopers/common';
 import {
   PaginatedResult,
@@ -23,17 +23,28 @@ function normalizeIdArray(values: string[]): string[] {
   );
 }
 
+export type SafetyRuleServiceSummary = {
+  id: string;
+  name: string;
+};
+
+export type SafetyRuleResponse = SafetyRule & {
+  services: SafetyRuleServiceSummary[];
+};
+
 @Injectable()
 export class SafetyRulesService {
   constructor(
     @InjectRepository(SafetyRule)
     private readonly safetyRuleRepository: Repository<SafetyRule>,
+    @InjectRepository(Service)
+    private readonly serviceRepository: Repository<Service>,
     private readonly cacheService: CacheService,
   ) {}
 
   async findAll(
     pagination: PagingReqDto = new PagingReqDto(),
-  ): Promise<PaginatedResult<SafetyRule>> {
+  ): Promise<PaginatedResult<SafetyRuleResponse>> {
     const [rules, totalItem] = await this.safetyRuleRepository.findAndCount({
       order: {
         createdAt: 'DESC',
@@ -43,12 +54,12 @@ export class SafetyRulesService {
     });
 
     return {
-      data: rules,
+      data: await this.attachServices(rules),
       pagingMeta: new PagingMetaDto(pagination, totalItem),
     };
   }
 
-  async findOne(id: string): Promise<SafetyRule> {
+  async findOne(id: string): Promise<SafetyRuleResponse> {
     const safetyRule = await this.safetyRuleRepository.findOne({
       where: { id },
     });
@@ -57,10 +68,12 @@ export class SafetyRulesService {
       throw new NotFoundException('Safety rule not found.');
     }
 
-    return safetyRule;
+    return this.attachServicesToRule(safetyRule);
   }
 
-  async create(createSafetyRuleDto: CreateSafetyRuleDto): Promise<SafetyRule> {
+  async create(
+    createSafetyRuleDto: CreateSafetyRuleDto,
+  ): Promise<SafetyRuleResponse> {
     const safetyRule = this.safetyRuleRepository.create({
       ...createSafetyRuleDto,
       condition: normalizeText(createSafetyRuleDto.condition),
@@ -71,13 +84,13 @@ export class SafetyRulesService {
     const savedSafetyRule = await this.safetyRuleRepository.save(safetyRule);
     await this.invalidateSafetyRulesCache();
 
-    return savedSafetyRule;
+    return this.attachServicesToRule(savedSafetyRule);
   }
 
   async update(
     id: string,
     updateSafetyRuleDto: UpdateSafetyRuleDto,
-  ): Promise<SafetyRule> {
+  ): Promise<SafetyRuleResponse> {
     const safetyRule = await this.safetyRuleRepository.preload({
       id,
       ...updateSafetyRuleDto,
@@ -102,12 +115,66 @@ export class SafetyRulesService {
     const savedSafetyRule = await this.safetyRuleRepository.save(safetyRule);
     await this.invalidateSafetyRulesCache();
 
-    return savedSafetyRule;
+    return this.attachServicesToRule(savedSafetyRule);
   }
 
   private invalidateSafetyRulesCache(): Promise<void> {
     return this.cacheService.deleteKey(
       REDIS_CACHE_KEYS.consultation.activeSafetyRules,
     );
+  }
+
+  private async attachServicesToRule(
+    rule: SafetyRule,
+  ): Promise<SafetyRuleResponse> {
+    const [ruleWithServices] = await this.attachServices([rule]);
+
+    return ruleWithServices;
+  }
+
+  private async attachServices(
+    rules: SafetyRule[],
+  ): Promise<SafetyRuleResponse[]> {
+    const serviceIds = Array.from(
+      new Set(rules.flatMap((rule) => rule.serviceIds)),
+    );
+
+    if (serviceIds.length === 0) {
+      return rules.map((rule) => ({
+        ...rule,
+        services: [],
+      }));
+    }
+
+    const services = await this.serviceRepository.find({
+      select: {
+        id: true,
+        name: true,
+      },
+      where: {
+        id: In(serviceIds),
+      },
+    });
+    const serviceNameById = new Map(
+      services.map((service) => [service.id, service.name] as const),
+    );
+
+    return rules.map((rule) => ({
+      ...rule,
+      services: rule.serviceIds
+        .map((serviceId) => {
+          const serviceName = serviceNameById.get(serviceId);
+
+          return serviceName
+            ? {
+                id: serviceId,
+                name: serviceName,
+              }
+            : null;
+        })
+        .filter((service): service is SafetyRuleServiceSummary =>
+          Boolean(service),
+        ),
+    }));
   }
 }

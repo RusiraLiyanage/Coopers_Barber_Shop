@@ -28,6 +28,9 @@ export type ConsultationHairHistorySummary = {
   productsUsed: string | null;
   barberNotes: string | null;
   visitDate: string;
+  monthsAgo: number;
+  relevance: 'high' | 'medium' | 'low';
+  safetyCritical: boolean;
 };
 
 export type ConsultationStartResponse = {

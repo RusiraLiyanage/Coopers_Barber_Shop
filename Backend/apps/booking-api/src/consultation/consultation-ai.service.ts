@@ -31,6 +31,11 @@ import {
   ConsultationSubmitResponse,
 } from './consultation.types';
 import { ConsultationService } from './consultation.service';
+import {
+  getHairHistoryFollowUpRequirement,
+  getHairHistoryRelevanceSummary,
+  HairHistoryFollowUpRequirement,
+} from './consultation-history-policy';
 
 type ClaudeTool = Anthropic.Messages.Tool;
 type ClaudeContentBlockParam = Anthropic.Messages.ContentBlockParam;
@@ -157,12 +162,15 @@ function toServiceSummary(service: Service): ConsultationServiceSummary {
 function toHairHistorySummary(
   history: HairHistory,
 ): ConsultationHairHistorySummary {
+  const relevanceSummary = getHairHistoryRelevanceSummary(history);
+
   return {
     service: history.service,
     hairState: history.hairState ?? [],
     productsUsed: history.productsUsed,
     barberNotes: history.barberNotes,
     visitDate: history.visitDate,
+    ...relevanceSummary,
   };
 }
 
@@ -227,15 +235,20 @@ export class ConsultationAiService {
         this.getActiveService(serviceId),
         this.getClientHairHistory(userId),
       ]);
-      const cacheKey = this.getQuestionCacheKey(service);
+      const historyFollowUp = getHairHistoryFollowUpRequirement(
+        service,
+        previousHairHistory,
+      );
+      const cacheKey = this.getQuestionCacheKey(service, historyFollowUp);
       const cachedQuestions = this.getCachedQuestions(cacheKey);
       const questions =
         cachedQuestions ??
         this.validateAiQuestions(
           this.assertAiStartToolInput(
-            await this.requestAiQuestions(userId, serviceId),
+            await this.requestAiQuestions(userId, serviceId, historyFollowUp),
           ).questions,
           service,
+          historyFollowUp,
         );
 
       if (!cachedQuestions) {
@@ -259,10 +272,20 @@ export class ConsultationAiService {
     }
   }
 
-  private getQuestionCacheKey(service: Service): string {
+  private getQuestionCacheKey(
+    service: Service,
+    historyFollowUp: HairHistoryFollowUpRequirement,
+  ): string {
     const updatedAt = service.updatedAt?.toISOString?.() ?? '';
+    const historyCacheKey = historyFollowUp.history
+      ? [
+          historyFollowUp.history.visitDate,
+          historyFollowUp.history.conditionLabel,
+          historyFollowUp.history.relevance,
+        ].join(':')
+      : 'no-history-follow-up';
 
-    return [this.model, service.id, updatedAt].join(':');
+    return [this.model, service.id, updatedAt, historyCacheKey].join(':');
   }
 
   private getCachedQuestions(cacheKey: string): ConsultationQuestion[] | null {
@@ -403,6 +426,7 @@ export class ConsultationAiService {
   private async requestAiQuestions(
     userId: string,
     serviceId: string,
+    historyFollowUp: HairHistoryFollowUpRequirement,
   ): Promise<unknown> {
     return this.runClaudeToolLoop({
       system: this.buildSystemPrompt(),
@@ -413,8 +437,9 @@ export class ConsultationAiService {
           content: JSON.stringify({
             task: 'Generate the consultation questions for this service.',
             serviceId,
+            historyFollowUp,
             instructions:
-              'Use the available tools to inspect service context, customer hair history, and safety rules before calling finalize_consultation_questions.',
+              'Use the available tools to inspect service context, customer hair history, and safety rules before calling finalize_consultation_questions. If historyFollowUp.required is true, include one customer-friendly question with id history-follow-up that asks whether the previous condition is still relevant for this appointment or whether the customer wants to leave a note for the barber.',
           }),
         },
       ],
@@ -838,7 +863,7 @@ export class ConsultationAiService {
     return {
       name: 'get_customer_hair_history',
       description:
-        'Fetch recent hair history for the authenticated customer. The user ID is supplied by the backend, not by Claude.',
+        'Fetch recent hair history for the authenticated customer, including visit recency, relevance, and safety-critical flags. The user ID is supplied by the backend, not by Claude.',
       strict: true,
       input_schema: {
         type: 'object',
@@ -1052,6 +1077,7 @@ export class ConsultationAiService {
   private validateAiQuestions(
     questions: AiQuestion[],
     service: Service,
+    historyFollowUp: HairHistoryFollowUpRequirement,
   ): ConsultationQuestion[] {
     const normalizedQuestions = questions
       .map((question): ConsultationQuestion | null => {
@@ -1104,6 +1130,33 @@ export class ConsultationAiService {
         normalizedQuestions[MAX_AI_QUESTIONS - 1] = safetyQuestion;
       } else {
         normalizedQuestions.push(safetyQuestion);
+      }
+    }
+
+    if (
+      historyFollowUp.required &&
+      historyFollowUp.history &&
+      !normalizedQuestions.some(
+        (question) =>
+          question.id === 'history-follow-up' ||
+          `${question.label} ${question.helperText ?? ''}`
+            .toLowerCase()
+            .includes('previous'),
+      )
+    ) {
+      const historyQuestion: ConsultationQuestion = {
+        id: 'history-follow-up',
+        label: `You previously had a note about ${historyFollowUp.history.conditionLabel}. Is this still something the barber should consider?`,
+        helperText:
+          'Confirm if this is still relevant, no longer applies, or add anything the barber should know before this appointment.',
+        required: true,
+        answerType: 'text',
+      };
+
+      if (normalizedQuestions.length >= MAX_AI_QUESTIONS) {
+        normalizedQuestions[MAX_AI_QUESTIONS - 1] = historyQuestion;
+      } else {
+        normalizedQuestions.push(historyQuestion);
       }
     }
 

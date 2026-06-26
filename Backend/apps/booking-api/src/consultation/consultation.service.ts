@@ -27,6 +27,10 @@ import {
   ConsultationStartResponse,
   ConsultationSubmitResponse,
 } from './consultation.types';
+import {
+  getHairHistoryFollowUpRequirement,
+  getHairHistoryRelevanceSummary,
+} from './consultation-history-policy';
 
 type BarberMatchCandidate = {
   staff: Staff;
@@ -79,12 +83,15 @@ function toServiceSummary(service: Service): ConsultationServiceSummary {
 function toHairHistorySummary(
   history: HairHistory,
 ): ConsultationHairHistorySummary {
+  const relevanceSummary = getHairHistoryRelevanceSummary(history);
+
   return {
     service: history.service,
     hairState: history.hairState ?? [],
     productsUsed: history.productsUsed,
     barberNotes: history.barberNotes,
     visitDate: history.visitDate,
+    ...relevanceSummary,
   };
 }
 
@@ -112,7 +119,7 @@ export class ConsultationService {
 
     return {
       service: toServiceSummary(service), // returning the service information
-      questions: this.buildQuestions(service), // returning the built questions based on the service, it's complexity, and the safty triggers.
+      questions: this.buildQuestions(service, previousHairHistory), // returning the built questions based on the service, it's complexity, and the safty triggers.
       previousHairHistory: previousHairHistory.map(toHairHistorySummary), // take the hair history of the client (previous appointments)
     };
   }
@@ -210,7 +217,10 @@ export class ConsultationService {
   }
 
   // build static questions accordingly
-  private buildQuestions(service: Service): ConsultationQuestion[] {
+  private buildQuestions(
+    service: Service,
+    previousHairHistory: HairHistory[],
+  ): ConsultationQuestion[] {
     const questions: ConsultationQuestion[] = [
       {
         id: 'desired-look',
@@ -246,6 +256,21 @@ export class ConsultationService {
           'Have you had recent colour, bleach, relaxer, or chemical treatments?',
         helperText:
           'This helps select a barber with the right technical experience.',
+        required: true,
+      });
+    }
+
+    const historyFollowUp = getHairHistoryFollowUpRequirement(
+      service,
+      previousHairHistory,
+    );
+
+    if (historyFollowUp.required && historyFollowUp.history) {
+      questions.push({
+        id: 'history-follow-up',
+        label: `You previously had a note about ${historyFollowUp.history.conditionLabel}. Is this still something the barber should consider?`,
+        helperText:
+          'Confirm if this is still relevant, no longer applies, or add anything the barber should know before this appointment.',
         required: true,
       });
     }

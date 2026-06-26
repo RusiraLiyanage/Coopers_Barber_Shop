@@ -137,6 +137,10 @@ export interface SafetyRuleRecord {
   id: string;
   condition: string;
   serviceIds: string[];
+  services: Array<{
+    id: string;
+    name: string;
+  }>;
   message: string;
   severity: SafetyRuleSeverity;
   active: boolean;

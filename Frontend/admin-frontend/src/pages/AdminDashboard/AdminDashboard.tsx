@@ -252,11 +252,20 @@ export default function AdminDashboard() {
   const safetyRulesSaving = useAppSelector(selectSafetyRulesSaving);
 
   const serviceNameById = useMemo(
-    () =>
-      new Map(
+    () => {
+      const serviceNames = new Map(
         serviceConfigs.map((service) => [service.id, service.name] as const),
-      ),
-    [serviceConfigs],
+      );
+
+      safetyRules.forEach((rule) => {
+        rule.services?.forEach((service) => {
+          serviceNames.set(service.id, service.name);
+        });
+      });
+
+      return serviceNames;
+    },
+    [safetyRules, serviceConfigs],
   );
 
   const barberCapabilityItems = useMemo(
@@ -364,12 +373,27 @@ export default function AdminDashboard() {
   );
 
   const serviceOptions = useMemo(
-    () =>
-      configuredServiceConfigs.map((service) => ({
-        label: service.name,
-        value: service.id,
-      })),
-    [configuredServiceConfigs],
+    () => {
+      const optionsById = new Map(
+        configuredServiceConfigs.map((service) => [
+          service.id,
+          {
+            label: service.name,
+            value: service.id,
+          },
+        ]),
+      );
+
+      editingSafetyRule?.services?.forEach((service) => {
+        optionsById.set(service.id, {
+          label: service.name,
+          value: service.id,
+        });
+      });
+
+      return Array.from(optionsById.values());
+    },
+    [configuredServiceConfigs, editingSafetyRule],
   );
 
   const unconfiguredServiceOptions = useMemo(
@@ -1034,10 +1058,14 @@ export default function AdminDashboard() {
       title: 'Services',
       dataIndex: 'serviceIds',
       key: 'serviceIds',
-      render: (serviceIds: string[]) =>
+      render: (serviceIds: string[], rule) =>
         renderTags(
           serviceIds.map(
-            (serviceId) => serviceNameById.get(serviceId) ?? 'Unknown service',
+            (serviceId) =>
+              rule.services?.find((service) => service.id === serviceId)
+                ?.name ??
+              serviceNameById.get(serviceId) ??
+              'Unknown service',
           ),
         ),
     },

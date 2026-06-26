@@ -14,13 +14,15 @@ import {
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
-import { SafetyRule } from '@coopers/entities';
 import { AdminRoleGuard } from '../auth/guards/admin-role.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PaginatedResult, PagingReqDto } from '../common/pagination.dto';
 import { CreateSafetyRuleDto } from './dto/create-safety-rule.dto';
 import { UpdateSafetyRuleDto } from './dto/update-safety-rule.dto';
-import { SafetyRulesService } from './safety-rules.service';
+import {
+  SafetyRuleResponse,
+  SafetyRulesService,
+} from './safety-rules.service';
 
 @ApiTags('safety-rules')
 @ApiBearerAuth('access-token')
@@ -33,14 +35,14 @@ export class SafetyRulesController {
   @Get()
   findAll(
     @Query() pagination: PagingReqDto,
-  ): Promise<PaginatedResult<SafetyRule>> {
+  ): Promise<PaginatedResult<SafetyRuleResponse>> {
     return this.safetyRulesService.findAll(pagination);
   }
 
   @ApiOperation({ summary: 'Get a safety rule' })
   @ApiParam({ name: 'id' })
   @Get(':id')
-  findOne(@Param('id') id: string): Promise<SafetyRule> {
+  findOne(@Param('id') id: string): Promise<SafetyRuleResponse> {
     return this.safetyRulesService.findOne(id);
   }
 
@@ -48,7 +50,7 @@ export class SafetyRulesController {
   @Post()
   create(
     @Body() createSafetyRuleDto: CreateSafetyRuleDto,
-  ): Promise<SafetyRule> {
+  ): Promise<SafetyRuleResponse> {
     return this.safetyRulesService.create(createSafetyRuleDto);
   }
 
@@ -58,7 +60,7 @@ export class SafetyRulesController {
   update(
     @Param('id') id: string,
     @Body() updateSafetyRuleDto: UpdateSafetyRuleDto,
-  ): Promise<SafetyRule> {
+  ): Promise<SafetyRuleResponse> {
     return this.safetyRulesService.update(id, updateSafetyRuleDto);
   }
 }
