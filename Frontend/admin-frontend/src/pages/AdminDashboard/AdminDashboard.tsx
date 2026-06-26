@@ -191,6 +191,8 @@ export default function AdminDashboard() {
     useState<ReferenceDataType>('barber_capability');
   const [selectedBrief, setSelectedBrief] =
     useState<AppointmentBriefRecord | null>(null);
+  const [selectedHairHistory, setSelectedHairHistory] =
+    useState<HairHistoryRecord | null>(null);
   const [barbersPage, setBarbersPage] = useState<TablePage>({
     page: 1,
     limit: DEFAULT_TABLE_PAGE_SIZE,
@@ -848,6 +850,21 @@ export default function AdminDashboard() {
     messageApi.success('Appointment prep brief copied.');
   };
 
+  const getHairHistoryClientName = (history: HairHistoryRecord) => {
+    const fullName = [history.client.firstName, history.client.lastName]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+
+    return fullName || history.client.email;
+  };
+
+  const getHairHistoryTextLines = (value: string | null) =>
+    (value ?? '')
+      .split(/\n+/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
   const handleSaveHairHistoryFromBrief = async () => {
     if (!selectedBrief) {
       return;
@@ -1235,23 +1252,16 @@ export default function AdminDashboard() {
       title: 'Client',
       key: 'client',
       width: 220,
-      render: (_, history) => {
-        const fullName = [history.client.firstName, history.client.lastName]
-          .filter(Boolean)
-          .join(' ')
-          .trim();
-
-        return (
-          <div className="admin-primary-cell">
-            <Typography.Text strong>
-              {fullName || history.client.email}
-            </Typography.Text>
-            <Typography.Text type="secondary">
-              {history.client.email}
-            </Typography.Text>
-          </div>
-        );
-      },
+      render: (_, history) => (
+        <div className="admin-primary-cell">
+          <Typography.Text strong>
+            {getHairHistoryClientName(history)}
+          </Typography.Text>
+          <Typography.Text type="secondary">
+            {history.client.email}
+          </Typography.Text>
+        </div>
+      ),
     },
     {
       title: 'Service',
@@ -1260,10 +1270,21 @@ export default function AdminDashboard() {
       width: 180,
     },
     {
-      title: 'Hair state',
-      dataIndex: 'hairState',
-      key: 'hairState',
-      render: (hairState: string[]) => renderTags(hairState),
+      title: 'Recorded details',
+      key: 'recordedDetails',
+      width: 180,
+      render: (_, history) => {
+        const detailCount =
+          history.hairState.length +
+          getHairHistoryTextLines(history.productsUsed).length +
+          getHairHistoryTextLines(history.barberNotes).length;
+
+        return (
+          <Tag color={detailCount > 0 ? 'blue' : 'default'}>
+            {detailCount > 0 ? `${detailCount} item(s)` : 'No details'}
+          </Tag>
+        );
+      },
     },
     {
       title: 'Barber',
@@ -1272,11 +1293,12 @@ export default function AdminDashboard() {
       render: (_, history) => history.barber?.displayName ?? 'Unassigned',
     },
     {
-      title: 'Notes',
-      dataIndex: 'barberNotes',
-      key: 'barberNotes',
-      render: (barberNotes: string | null) =>
-        barberNotes ?? <Typography.Text type="secondary">None</Typography.Text>,
+      title: '',
+      key: 'action',
+      width: 120,
+      render: (_, history) => (
+        <Button onClick={() => setSelectedHairHistory(history)}>Open</Button>
+      ),
     },
   ];
 
@@ -1815,6 +1837,101 @@ export default function AdminDashboard() {
             </Form.Item>
           </div>
         </Form>
+      </Modal>
+
+      <Modal
+        open={Boolean(selectedHairHistory)}
+        onCancel={() => setSelectedHairHistory(null)}
+        footer={null}
+        width={760}
+      >
+        {selectedHairHistory ? (
+          <>
+            <SAModalHeader
+              title="Hair History Detail"
+              subtitle={`${getHairHistoryClientName(selectedHairHistory)} - ${selectedHairHistory.service}`}
+              className="admin-modal-header"
+            />
+            <Space direction="vertical" size={20} className="admin-full-width">
+              <section className="admin-history-section">
+                <Typography.Title level={5}>Visit summary</Typography.Title>
+                <Descriptions column={1} bordered size="small">
+                  <Descriptions.Item label="Client">
+                    {getHairHistoryClientName(selectedHairHistory)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Email">
+                    {selectedHairHistory.client.email}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Service">
+                    {selectedHairHistory.service}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Visit date">
+                    {formatDate(selectedHairHistory.visitDate)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Barber">
+                    {selectedHairHistory.barber?.displayName ?? 'Unassigned'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Recorded">
+                    {formatDateTime(selectedHairHistory.createdAt)}
+                  </Descriptions.Item>
+                </Descriptions>
+              </section>
+
+              <section className="admin-history-section">
+                <Typography.Title level={5}>Hair condition</Typography.Title>
+                {selectedHairHistory.hairState.length > 0 ? (
+                  <ul className="admin-history-list">
+                    {selectedHairHistory.hairState.map((state) => (
+                      <li key={state}>{state}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <Typography.Text type="secondary">
+                    No hair condition details recorded.
+                  </Typography.Text>
+                )}
+              </section>
+
+              <section className="admin-history-section">
+                <Typography.Title level={5}>
+                  Products and treatments
+                </Typography.Title>
+                {getHairHistoryTextLines(selectedHairHistory.productsUsed)
+                  .length > 0 ? (
+                  <ul className="admin-history-list">
+                    {getHairHistoryTextLines(
+                      selectedHairHistory.productsUsed,
+                    ).map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <Typography.Text type="secondary">
+                    No products or treatments recorded.
+                  </Typography.Text>
+                )}
+              </section>
+
+              <section className="admin-history-section">
+                <Typography.Title level={5}>Barber notes</Typography.Title>
+                {getHairHistoryTextLines(selectedHairHistory.barberNotes)
+                  .length > 0 ? (
+                  <ul className="admin-history-list">
+                    {getHairHistoryTextLines(
+                      selectedHairHistory.barberNotes,
+                    ).map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <Typography.Text type="secondary">
+                    No barber notes recorded.
+                  </Typography.Text>
+                )}
+              </section>
+            </Space>
+          </>
+        ) : null}
       </Modal>
 
       <Drawer

@@ -103,6 +103,26 @@
   background: #f9fafb;
 }
 
+.admin-history-section {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-history-section h5 {
+  margin: 0;
+}
+
+.admin-history-list {
+  margin: 0;
+  padding-left: 20px;
+  color: #1f2937;
+  line-height: 1.5;
+}
+
+.admin-history-list li + li {
+  margin-top: 6px;
+}
+
 .admin-modal-header {
   margin-bottom: 24px;
 }
