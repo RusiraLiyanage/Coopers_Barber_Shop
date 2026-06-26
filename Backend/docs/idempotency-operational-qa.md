@@ -12,6 +12,13 @@ The required request header is:
 
 - `Idempotency-Key: <stable UUID for this booking attempt>`
 
+Expired idempotency rows are deleted by `IdempotencyCleanupService` inside `booking-api`.
+
+Required cleanup env:
+
+- `IDEMPOTENCY_KEY_TTL_SECONDS`
+- `IDEMPOTENCY_KEY_CLEANUP_INTERVAL_SECONDS`
+
 ## Local Prerequisites
 
 Start the backend apps and the customer frontend:
