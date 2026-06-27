@@ -1,0 +1,83 @@
+{
+  "coopers.booking.api": {
+    "ecr_repo": "coopers-booking-api-staging",
+    "ecs_service": "coopers-booking-api-staging-service",
+    "ecs_cluster": "coopers-api-staging-cluster",
+    "ecs_task_name": "coopers-booking-api-staging-task",
+    "container_name": "coopers-booking-api-container",
+    "node_version": "22.x",
+    "work_directory": "Backend/apps/booking-api",
+    "docker_context": "Backend",
+    "dockerfile": "Backend/apps/booking-api/docker/Dockerfile",
+    "app_name": "@coopers/booking.api",
+    "app_folder": "apps/booking-api",
+    "container_port": 7310
+  },
+  "coopers.auth.api": {
+    "ecr_repo": "coopers-auth-api-staging",
+    "ecs_service": "coopers-auth-api-staging-service",
+    "ecs_cluster": "coopers-api-staging-cluster",
+    "ecs_task_name": "coopers-auth-api-staging-task",
+    "container_name": "coopers-auth-api-container",
+    "node_version": "22.x",
+    "work_directory": "Backend/apps/auth-api",
+    "docker_context": "Backend",
+    "dockerfile": "Backend/apps/auth-api/docker/Dockerfile",
+    "app_name": "@coopers/auth.api",
+    "app_folder": "apps/auth-api",
+    "container_port": 7312
+  },
+  "coopers.admin.api": {
+    "ecr_repo": "coopers-admin-api-staging",
+    "ecs_service": "coopers-admin-api-staging-service",
+    "ecs_cluster": "coopers-api-staging-cluster",
+    "ecs_task_name": "coopers-admin-api-staging-task",
+    "container_name": "coopers-admin-api-container",
+    "node_version": "22.x",
+    "work_directory": "Backend/apps/admin-api",
+    "docker_context": "Backend",
+    "dockerfile": "Backend/apps/admin-api/docker/Dockerfile",
+    "app_name": "@coopers/admin.api",
+    "app_folder": "apps/admin-api",
+    "container_port": 7313
+  },
+  "coopers.booking.guard": {
+    "ecr_repo": "coopers-booking-guard-staging",
+    "ecs_service": "coopers-booking-guard-staging-service",
+    "ecs_cluster": "coopers-guard-staging-cluster",
+    "ecs_task_name": "coopers-booking-guard-staging-task",
+    "container_name": "coopers-booking-guard-container",
+    "node_version": "22.x",
+    "work_directory": "Backend/apps/booking-guard",
+    "docker_context": "Backend",
+    "dockerfile": "Backend/apps/booking-guard/docker/Dockerfile",
+    "app_name": "@coopers/booking.guard",
+    "app_folder": "apps/booking-guard",
+    "container_port": 7311
+  },
+  "coopers.customer.frontend": {
+    "ecr_repo": "coopers-customer-frontend-staging",
+    "ecs_service": "coopers-customer-frontend-staging-service",
+    "ecs_cluster": "coopers-frontend-staging-cluster",
+    "ecs_task_name": "coopers-customer-frontend-staging-task",
+    "container_name": "coopers-customer-frontend-container",
+    "node_version": "22.x",
+    "work_directory": "Frontend/appointment-booking-frontend",
+    "docker_context": "Frontend/appointment-booking-frontend",
+    "dockerfile": "Frontend/appointment-booking-frontend/docker/Dockerfile",
+    "container_port": 8910
+  },
+  "coopers.admin.frontend": {
+    "ecr_repo": "coopers-admin-frontend-staging",
+    "ecs_service": "coopers-admin-frontend-staging-service",
+    "ecs_cluster": "coopers-frontend-staging-cluster",
+    "ecs_task_name": "coopers-admin-frontend-staging-task",
+    "container_name": "coopers-admin-frontend-container",
+    "node_version": "22.x",
+    "work_directory": "Frontend/admin-frontend",
+    "docker_context": "Frontend/admin-frontend",
+    "dockerfile": "Frontend/admin-frontend/docker/Dockerfile",
+    "container_port": 8911
+  }
+}
+

@@ -1,0 +1,12 @@
+# Shared config version used by this app for environment-wide values.
+commonConfVersion:
+  # AppConfig hosted configuration version for staging.
+  staging: 1
+  # AppConfig hosted configuration version for production.
+  production: 1
+# Service config version used by this app for booking-api-specific values.
+serviceConfVersion:
+  # AppConfig hosted configuration version for staging.
+  staging: 1
+  # AppConfig hosted configuration version for production.
+  production: 1
