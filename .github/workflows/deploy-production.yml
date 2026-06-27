@@ -1,0 +1,188 @@
+name: Deploy to ECS Production
+
+# Production deploys automatically when code lands on main.
+# Manual dispatch stays available when we need to redeploy one app on demand.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      app_key:
+        description: App to deploy, or all apps.
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - coopers.booking.api
+          - coopers.auth.api
+          - coopers.admin.api
+          - coopers.booking.guard
+          - coopers.customer.frontend
+          - coopers.admin.frontend
+
+# Only one production deployment should update ECS at a time.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  # Keep the AWS region explicit and shared by every job.
+  AWS_REGION: ap-southeast-2
+  # This workflow always deploys the production map.
+  DEPLOY_ENV: production
+
+jobs:
+  resolve-apps:
+    name: Resolve affected apps
+    runs-on: ubuntu-latest
+    outputs:
+      # Matrix jobs consume this JSON array of app keys.
+      apps: ${{ steps.resolve.outputs.apps }}
+    steps:
+      # Full history lets the script diff the push range accurately.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve app deployment list
+        id: resolve
+        shell: bash
+        run: |
+          chmod +x scripts/deployment/resolve-affected-apps.sh
+
+          MANUAL_APP_KEY=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            MANUAL_APP_KEY="${{ github.event.inputs.app_key }}"
+          fi
+
+          APPS="$(scripts/deployment/resolve-affected-apps.sh "$DEPLOY_ENV" "${{ github.event.before || github.sha }}" "${{ github.sha }}" "$MANUAL_APP_KEY")"
+          echo "Resolved apps: $APPS"
+          echo "apps=$APPS" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    name: Deploy ${{ matrix.app_key }}
+    needs: resolve-apps
+    if: ${{ needs.resolve-apps.outputs.apps != '[]' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app_key: ${{ fromJson(needs.resolve-apps.outputs.apps) }}
+    steps:
+      # Checkout is needed for Docker build context and deployment scripts.
+      - uses: actions/checkout@v4
+
+      # Resolve the selected app's ECS/ECR/Docker settings from config/production-map.json.
+      - name: Resolve deploy payload
+        id: payload
+        shell: bash
+        run: |
+          chmod +x scripts/deployment/resolve-deploy-payload.sh
+          scripts/deployment/resolve-deploy-payload.sh "$DEPLOY_ENV" "${{ matrix.app_key }}"
+
+      # Node is used by frontend build tooling and mirrors the app map node_version field.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.payload.outputs.node_version }}
+
+      # AWS credentials come from GitHub Secrets, not from repository files.
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: 'no'
+
+      # Pull AppConfig values before building, especially for frontend VITE_* build values.
+      - name: Pull AppConfig environment
+        shell: bash
+        env:
+          ENV: ${{ env.DEPLOY_ENV }}
+          AWS_REGION: ${{ env.AWS_REGION }}
+          EXPORT_TO_GITHUB_ENV: 'true'
+        run: |
+          chmod +x scripts/deployment/process-env.sh
+          scripts/deployment/process-env.sh "$work_directory"
+
+      # Authenticate Docker to the AWS account's ECR registry.
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          mask-password: 'true'
+
+      # Build and push the Docker image tagged with the Git commit SHA.
+      - name: Build and push Docker image
+        id: build-image
+        shell: bash
+        env:
+          ECR_REPOSITORY: ${{ steps.payload.outputs.ecr_repo }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          BUILD_ARGS=(
+            --build-arg "SERVICE_PORT=$container_port"
+            --build-arg "VITE_BUILD_MODE=$DEPLOY_ENV"
+          )
+
+          if [ -n "${app_name:-}" ]; then
+            BUILD_ARGS+=(--build-arg "APP_NAME=$app_name")
+          fi
+
+          if [ -n "${app_folder:-}" ]; then
+            BUILD_ARGS+=(--build-arg "APP_FOLDER=$app_folder")
+          fi
+
+          docker build \
+            -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" \
+            "${BUILD_ARGS[@]}" \
+            -f "$dockerfile" \
+            "$docker_context"
+
+          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+      # Download the existing ECS task definition so we preserve CPU/memory/env/secrets/log settings.
+      - name: Download ECS task definition
+        shell: bash
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "$ecs_task_name" \
+            --query taskDefinition \
+            > "$work_directory/task-definition.json"
+
+      # Remove AWS-managed fields before registering the next task definition revision.
+      - name: Clean ECS task definition
+        shell: bash
+        run: |
+          chmod +x scripts/deployment/task-def-clean.sh
+          scripts/deployment/task-def-clean.sh "$work_directory/task-definition.json"
+
+      # Replace only the configured container image in the task definition.
+      - name: Render task definition with new image
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ steps.payload.outputs.work_directory }}/task-definition.json
+          container-name: ${{ steps.payload.outputs.container_name }}
+          image: ${{ steps.build-image.outputs.image }}
+
+      # Deploy the new task definition revision to ECS and wait until it stabilizes.
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ steps.payload.outputs.ecs_service }}
+          cluster: ${{ steps.payload.outputs.ecs_cluster }}
+          wait-for-service-stability: true
+
+      # Notify Slack about deployment result for this app.
+      - name: Send Slack notification
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          chmod +x scripts/deployment/slack.sh
+          scripts/deployment/slack.sh "${{ secrets.SLACK_WEBHOOK_URL }}" "${{ matrix.app_key }}" "$DEPLOY_ENV" "${{ job.status }}"
