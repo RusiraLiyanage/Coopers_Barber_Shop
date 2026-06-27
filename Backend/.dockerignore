@@ -1,0 +1,22 @@
+# Exclude dependency folders because Docker installs dependencies inside the image.
+**/node_modules
+# Exclude local build output because Docker builds fresh output inside the image.
+**/dist
+# Exclude test coverage output because it is not needed at runtime.
+**/coverage
+# Exclude Turborepo local cache because it is machine-specific build metadata.
+**/.turbo
+# Exclude macOS metadata files that should never be copied into images.
+**/.DS_Store
+# Exclude local log files because container logs should go to stdout/CloudWatch.
+**/*.log
+
+# Exclude real app env files so secrets are not baked into Docker images.
+apps/*/.env*
+# Keep env examples because they document required runtime variables.
+!apps/*/.env.example
+
+# Exclude git history because it is unnecessary in runtime images.
+.git
+# Exclude GitHub workflow files because deployment metadata is not runtime code.
+.github
