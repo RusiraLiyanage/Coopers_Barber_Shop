@@ -1,0 +1,15 @@
+# Do not copy local dependency installs into the Docker build context.
+node_modules
+# Do not copy previous local Vite build output into the image.
+dist
+# Do not copy local test coverage reports into the image.
+coverage
+# Do not copy operating-system metadata into the image.
+.DS_Store
+# Do not copy local logs into the image.
+*.log
+# Do not copy real local environment files into the image context.
+.env
+# Keep env examples available as deployment documentation.
+!.env.example
+
