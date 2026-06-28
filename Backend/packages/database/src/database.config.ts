@@ -19,6 +19,7 @@ import {
 const DEFAULT_DB_PORT = '5432';
 const DEFAULT_DB_SSL = 'false';
 const DEFAULT_DB_SSL_REJECT_UNAUTHORIZED = 'false';
+const DEFAULT_DB_SYNCHRONIZE = 'false';
 const SHARED_ENTITIES = [
   Appointment,
   AppointmentBrief,
@@ -45,6 +46,11 @@ export const createDatabaseConfig = (
   config: ConfigService,
 ): TypeOrmModuleOptions => {
   const sslEnabled = getBooleanConfig(config, 'DB_SSL', DEFAULT_DB_SSL);
+  const synchronizeEnabled = getBooleanConfig(
+    config,
+    'DB_SYNCHRONIZE',
+    DEFAULT_DB_SYNCHRONIZE,
+  );
 
   return {
     type: 'postgres',
@@ -64,7 +70,7 @@ export const createDatabaseConfig = (
       : undefined,
     entities: SHARED_ENTITIES,
     autoLoadEntities: true,
-    synchronize: false,
+    synchronize: synchronizeEnabled,
     logging: ['error', 'warn'],
   };
 };
