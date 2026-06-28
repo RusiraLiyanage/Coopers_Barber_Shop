@@ -1,7 +1,10 @@
 import { DynamicModule, Global, Logger, Module } from '@nestjs/common';
 import Redis, { RedisOptions } from 'ioredis';
 import { CacheService } from './cache.service';
-import { getRedisClientConfig } from './redis.config';
+import {
+  getRedisCacheRuntimeConfig,
+  getRedisClientConfig,
+} from './redis.config';
 import { REDIS_CLUSTER } from './redis.constants';
 
 type RedisProviderConfig = {
@@ -38,9 +41,16 @@ export class RedisModule {
   private static readonly logger = new Logger(RedisModule.name);
 
   public static forRoot(): DynamicModule {
+    const cacheConfig = getRedisCacheRuntimeConfig();
+
+    if (!cacheConfig.enabled) {
+      this.logger.log('Redis cache disabled; Redis clients will not be created.');
+    }
+
     const providers = redisProviderConfigs.map((config) => ({
       provide: config.token,
-      useFactory: (): Redis => this.createRedisClient(config),
+      useFactory: (): Redis | undefined =>
+        cacheConfig.enabled ? this.createRedisClient(config) : undefined,
     }));
 
     return {

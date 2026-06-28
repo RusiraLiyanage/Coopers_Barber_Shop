@@ -18,9 +18,9 @@ export class CacheService {
 
   public constructor(
     @Inject(REDIS_CLUSTER.PRIMARY)
-    private readonly redisPrimary: Redis,
+    private readonly redisPrimary: Redis | undefined,
     @Inject(REDIS_CLUSTER.READER)
-    private readonly redisReader: Redis,
+    private readonly redisReader: Redis | undefined,
   ) {
     const cacheConfig = getRedisCacheRuntimeConfig();
 
@@ -33,10 +33,17 @@ export class CacheService {
       return null;
     }
 
+    const redisReader = this.redisReader;
+
+    if (redisReader === undefined) {
+      this.logRedisClientMissing('read', key);
+      return null;
+    }
+
     const startedAt = Date.now();
 
     try {
-      const cachedValue = await this.redisReader.get(key);
+      const cachedValue = await redisReader.get(key);
       const latencyMs = Date.now() - startedAt;
 
       if (cachedValue !== null) {
@@ -76,19 +83,26 @@ export class CacheService {
       return;
     }
 
+    const redisPrimary = this.redisPrimary;
+
+    if (redisPrimary === undefined) {
+      this.logRedisClientMissing('write', key);
+      return;
+    }
+
     try {
       const startedAt = Date.now();
       const resolvedTtlSeconds = ttlSeconds ?? this.defaultTtlSeconds;
 
       if (resolvedTtlSeconds > 0) {
-        await this.redisPrimary.setex(key, resolvedTtlSeconds, value);
+        await redisPrimary.setex(key, resolvedTtlSeconds, value);
         this.logger.debug(
           `Redis cache write: ${key} (${Date.now() - startedAt}ms, ttl=${resolvedTtlSeconds}s)`,
         );
         return;
       }
 
-      await this.redisPrimary.set(key, value);
+      await redisPrimary.set(key, value);
       this.logger.debug(
         `Redis cache write: ${key} (${Date.now() - startedAt}ms, ttl=none)`,
       );
@@ -110,9 +124,16 @@ export class CacheService {
       return;
     }
 
+    const redisPrimary = this.redisPrimary;
+
+    if (redisPrimary === undefined) {
+      this.logRedisClientMissing('delete', key);
+      return;
+    }
+
     try {
       const startedAt = Date.now();
-      await this.redisPrimary.del(key);
+      await redisPrimary.del(key);
       this.logger.debug(
         `Redis cache delete: ${key} (${Date.now() - startedAt}ms)`,
       );
@@ -126,13 +147,20 @@ export class CacheService {
       return;
     }
 
+    const redisPrimary = this.redisPrimary;
+
+    if (redisPrimary === undefined) {
+      this.logRedisClientMissing('delete pattern', pattern);
+      return;
+    }
+
     try {
       let cursor = '0';
       let deletedKeyCount = 0;
       const startedAt = Date.now();
 
       do {
-        const [nextCursor, keys] = await this.redisPrimary.scan(
+        const [nextCursor, keys] = await redisPrimary.scan(
           cursor,
           'MATCH',
           pattern,
@@ -141,7 +169,7 @@ export class CacheService {
         );
 
         if (keys.length > 0) {
-          await this.redisPrimary.del(...keys);
+          await redisPrimary.del(...keys);
           deletedKeyCount += keys.length;
         }
 
@@ -164,10 +192,21 @@ export class CacheService {
       };
     }
 
+    const redisPrimary = this.redisPrimary;
+    const redisReader = this.redisReader;
+
+    if (redisPrimary === undefined || redisReader === undefined) {
+      return {
+        enabled: true,
+        status: 'unavailable',
+        error: 'Redis clients are not configured.',
+      };
+    }
+
     const startedAt = Date.now();
 
     try {
-      await Promise.all([this.redisPrimary.ping(), this.redisReader.ping()]);
+      await Promise.all([redisPrimary.ping(), redisReader.ping()]);
 
       return {
         enabled: true,
@@ -185,6 +224,12 @@ export class CacheService {
 
   private isCacheEnabled(): boolean {
     return this.cacheEnabled;
+  }
+
+  private logRedisClientMissing(operation: string, key: string): void {
+    this.logger.warn(
+      `Redis cache ${operation} skipped for ${key}: Redis clients are not configured.`,
+    );
   }
 
   private logRedisFailure(
