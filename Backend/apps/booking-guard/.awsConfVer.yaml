@@ -7,6 +7,6 @@ commonConfVersion:
 # Service config version used by this app for booking-guard-specific values.
 serviceConfVersion:
   # AppConfig hosted configuration version for staging.
-  staging: 4
+  staging: 5
   # AppConfig hosted configuration version for production.
   production: 1
