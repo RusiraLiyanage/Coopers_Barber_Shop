@@ -7,6 +7,6 @@ commonConfVersion:
 # Service config version used by this app for auth-api-specific values.
 serviceConfVersion:
   # AppConfig hosted configuration version for staging.
-  staging: 1
+  staging: 3
   # AppConfig hosted configuration version for production.
   production: 1
