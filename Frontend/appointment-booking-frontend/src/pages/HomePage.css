@@ -5,7 +5,7 @@
   align-items: center;
   justify-content: center;
   background-attachment: fixed;
-  background-image: url('/Coopers_barber_background.png');
+  background-image: url('../assets/Coopers_barber_background.png');
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
