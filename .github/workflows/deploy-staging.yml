@@ -103,6 +103,7 @@ jobs:
           ENV: ${{ env.DEPLOY_ENV }}
           AWS_REGION: ${{ env.AWS_REGION }}
           EXPORT_TO_GITHUB_ENV: 'true'
+          SERVICE_CONFIG_NAME: ${{ steps.payload.outputs.service_config_name }}
         run: |
           chmod +x scripts/deployment/process-env.sh
           scripts/deployment/process-env.sh "$work_directory"
@@ -164,6 +165,17 @@ jobs:
         run: |
           chmod +x scripts/deployment/task-def-clean.sh
           scripts/deployment/task-def-clean.sh "$work_directory/task-definition.json"
+
+      # Frontend images are environment-neutral; ECS env vars provide browser runtime config.
+      - name: Inject frontend runtime environment
+        if: ${{ matrix.app_key == 'coopers.customer.frontend' || matrix.app_key == 'coopers.admin.frontend' }}
+        shell: bash
+        run: |
+          chmod +x scripts/deployment/inject-frontend-runtime-env.sh
+          scripts/deployment/inject-frontend-runtime-env.sh \
+            "$work_directory/task-definition.json" \
+            "$container_name" \
+            "${{ matrix.app_key }}"
 
       # Replace only the configured container image in the task definition.
       - name: Render task definition with new image

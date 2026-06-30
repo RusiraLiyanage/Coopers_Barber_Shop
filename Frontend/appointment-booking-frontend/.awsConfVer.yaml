@@ -7,6 +7,6 @@ commonConfVersion:
 # Service config version used by this frontend for Vite build-time values.
 serviceConfVersion:
   # AppConfig hosted configuration version for staging.
-  staging: 1
+  staging: 2
   # AppConfig hosted configuration version for production.
   production: 1

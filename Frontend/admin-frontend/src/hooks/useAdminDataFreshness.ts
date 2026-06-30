@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import { getAdminDataVersion } from '../lib/api';
+import { getRuntimeConfigValue } from '../lib/runtimeConfig';
 
 const ADMIN_DATA_FRESHNESS_POLL_MS = 45_000;
-const ADMIN_REALTIME_URL = import.meta.env.VITE_ADMIN_REALTIME_URL as
-  | string
-  | undefined;
+const ADMIN_REALTIME_URL = getRuntimeConfigValue('VITE_ADMIN_REALTIME_URL');
 const ADMIN_DATA_CHANGED_EVENT = 'admin.data.changed';
 
 type AdminDataChangedPayload = {

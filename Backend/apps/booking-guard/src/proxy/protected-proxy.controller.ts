@@ -46,6 +46,7 @@ type AppointmentRequestBody = {
 };
 
 type UpdateAppointmentRequestBody = {
+  date: string;
   slot: string;
 };
 

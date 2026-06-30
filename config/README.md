@@ -22,9 +22,9 @@ JSON does not support comments, so the field explanations live here instead of i
 - `dockerfile`: Dockerfile path passed to `docker build`.
 - `app_name`: Backend package name passed into the monorepo Docker build.
 - `app_folder`: Backend app folder inside the `Backend` Docker context.
+- `service_config_name`: Optional AppConfig application name override used when the AWS config name differs from `package.json`.
 - `container_port`: Internal container port exposed by the app.
 
 ## Flow
 
 The workflow reads the map for the selected environment, exports the selected app entry into GitHub Actions environment variables, builds the Docker image, pushes it to ECR, renders the ECS task definition with the new image, then deploys it to the configured ECS service.
-

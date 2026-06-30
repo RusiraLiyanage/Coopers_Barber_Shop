@@ -1,4 +1,9 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "";
+import { getRuntimeConfigValue } from './runtimeConfig';
+
+const API_BASE_URL = getRuntimeConfigValue(
+  'VITE_API_URL',
+  'http://localhost:7311',
+);
 const AUTH_BROWSER_SESSION_KEY = "coopers_auth_browser_session";
 const AUTH_REMEMBERED_SESSION_KEY = "coopers_auth_remembered_session";
 const AUTH_HAD_SESSION_KEY = "coopers_auth_had_session";
@@ -24,6 +29,22 @@ export interface ServiceOption {
   name: string;
   durationMinutes: number;
   isActive: boolean;
+  requiredSkills?: string[];
+  safetyTriggers?: string[];
+  complexity?: 'low' | 'medium' | 'high';
+}
+
+export interface StaffOption {
+  id: string;
+  displayName: string;
+  gender: 'male' | 'female' | 'non_binary' | 'unspecified';
+  role: 'junior' | 'senior' | 'owner';
+  timezone: string;
+  bufferAfterMinutes: number;
+  skills: string[];
+  rating: number;
+  available: boolean;
+  active: boolean;
 }
 
 export interface ConsultationQuestion {
@@ -704,6 +725,24 @@ export function confirmPasswordReset(payload: PasswordResetConfirmPayload) {
 
 export function getServices() {
   return request<ServiceOption[]>("/services", {
+    headers: buildHeaders(),
+  });
+}
+
+export function getService(serviceId: string) {
+  return request<ServiceOption>(`/services/${serviceId}`, {
+    headers: buildHeaders(),
+  });
+}
+
+export function getStaff() {
+  return request<StaffOption[]>("/staff", {
+    headers: buildHeaders(),
+  });
+}
+
+export function getStaffMember(staffId: string) {
+  return request<StaffOption>(`/staff/${staffId}`, {
     headers: buildHeaders(),
   });
 }

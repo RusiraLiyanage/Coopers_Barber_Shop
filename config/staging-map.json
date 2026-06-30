@@ -44,7 +44,7 @@
   "coopers.booking.guard": {
     "ecr_repo": "coopers-booking-guard-staging",
     "ecs_service": "coopers-booking-guard-staging-service",
-    "ecs_cluster": "coopers-guard-staging-cluster",
+    "ecs_cluster": "coopers-api-staging-cluster",
     "ecs_task_name": "coopers-booking-guard-staging-task",
     "container_name": "coopers-booking-guard-container",
     "node_version": "22.x",
@@ -58,26 +58,27 @@
   "coopers.customer.frontend": {
     "ecr_repo": "coopers-customer-frontend-staging",
     "ecs_service": "coopers-customer-frontend-staging-service",
-    "ecs_cluster": "coopers-frontend-staging-cluster",
+    "ecs_cluster": "coopers-api-staging-cluster",
     "ecs_task_name": "coopers-customer-frontend-staging-task",
     "container_name": "coopers-customer-frontend-container",
     "node_version": "22.x",
     "work_directory": "Frontend/appointment-booking-frontend",
     "docker_context": "Frontend/appointment-booking-frontend",
     "dockerfile": "Frontend/appointment-booking-frontend/docker/Dockerfile",
+    "service_config_name": "coopers.customer.frontend",
     "container_port": 8910
   },
   "coopers.admin.frontend": {
     "ecr_repo": "coopers-admin-frontend-staging",
     "ecs_service": "coopers-admin-frontend-staging-service",
-    "ecs_cluster": "coopers-frontend-staging-cluster",
+    "ecs_cluster": "coopers-api-staging-cluster",
     "ecs_task_name": "coopers-admin-frontend-staging-task",
     "container_name": "coopers-admin-frontend-container",
     "node_version": "22.x",
     "work_directory": "Frontend/admin-frontend",
     "docker_context": "Frontend/admin-frontend",
     "dockerfile": "Frontend/admin-frontend/docker/Dockerfile",
+    "service_config_name": "coopers.admin.frontend",
     "container_port": 8911
   }
 }
-

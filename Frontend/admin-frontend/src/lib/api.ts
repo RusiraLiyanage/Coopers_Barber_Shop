@@ -1,4 +1,9 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
+import { getRuntimeConfigValue } from './runtimeConfig';
+
+const API_BASE_URL = getRuntimeConfigValue(
+  'VITE_API_URL',
+  'http://localhost:7311',
+);
 const ADMIN_BROWSER_SESSION_KEY = 'coopers_admin_auth_browser_session';
 const ADMIN_REMEMBERED_SESSION_KEY = 'coopers_admin_auth_remembered_session';
 const ADMIN_HAD_SESSION_KEY = 'coopers_admin_auth_had_session';
@@ -403,7 +408,9 @@ function removeLocalStorageValue(key: string): void {
 }
 
 function getAdminSessionIdleTimeoutMs(): number {
-  const configuredSeconds = import.meta.env.VITE_SESSION_IDLE_TIMEOUT_SECONDS;
+  const configuredSeconds = getRuntimeConfigValue(
+    'VITE_SESSION_IDLE_TIMEOUT_SECONDS',
+  );
 
   return (
     toPositiveNumber(
@@ -414,8 +421,9 @@ function getAdminSessionIdleTimeoutMs(): number {
 }
 
 function getAdminSessionExtensionGraceMs(): number {
-  const configuredSeconds =
-    import.meta.env.VITE_SESSION_EXTENSION_GRACE_SECONDS;
+  const configuredSeconds = getRuntimeConfigValue(
+    'VITE_SESSION_EXTENSION_GRACE_SECONDS',
+  );
 
   return (
     toPositiveNumber(

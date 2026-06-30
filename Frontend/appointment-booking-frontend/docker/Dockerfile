@@ -25,6 +25,10 @@ FROM nginx:1.27-alpine AS runtime
 # Copy the customer-specific Nginx SPA routing configuration.
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 
+# Generate browser runtime config from ECS task environment variables at container startup.
+COPY docker/runtime-config.sh /docker-entrypoint.d/40-runtime-config.sh
+RUN chmod +x /docker-entrypoint.d/40-runtime-config.sh
+
 # Copy the generated Vite build output into Nginx's web root.
 COPY --from=build /app/dist /usr/share/nginx/html
 
