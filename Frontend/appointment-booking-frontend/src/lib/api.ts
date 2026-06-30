@@ -872,7 +872,7 @@ export function getAvailability({
     query.set("excludeAppointmentId", excludeAppointmentId);
   }
 
-  return request<string[]>(`/appointments/availability?${query.toString()}`, {
+  return request<string[]>(`/api/appointments/availability?${query.toString()}`, {
     headers: buildHeaders(),
   });
 }
@@ -881,7 +881,7 @@ export function createAppointment(
   payload: CreateAppointmentRequest,
   options: CreateAppointmentOptions,
 ) {
-  return request<AppointmentRecord>("/appointments", {
+  return request<AppointmentRecord>("/api/appointments", {
     method: "POST",
     headers: {
       ...buildHeaders(),
@@ -896,7 +896,7 @@ export function updateAppointment(
   payload: { date: string; slot: string },
   options: AppointmentMutationOptions,
 ) {
-  return request<AppointmentRecord>(`/appointments/${appointmentId}`, {
+  return request<AppointmentRecord>(`/api/appointments/${appointmentId}`, {
     method: "PATCH",
     headers: {
       ...buildHeaders(),
@@ -910,7 +910,7 @@ export function cancelAppointment(
   appointmentId: string,
   options: AppointmentMutationOptions,
 ) {
-  return request<AppointmentRecord>(`/appointments/${appointmentId}/cancel`, {
+  return request<AppointmentRecord>(`/api/appointments/${appointmentId}/cancel`, {
     method: "PATCH",
     headers: {
       ...buildHeaders(),
@@ -920,7 +920,7 @@ export function cancelAppointment(
 }
 
 export function getAppointments() {
-  return request<AppointmentRecord[]>("/appointments/all", {
+  return request<AppointmentRecord[]>("/api/appointments/all", {
     headers: buildHeaders(),
   });
 }

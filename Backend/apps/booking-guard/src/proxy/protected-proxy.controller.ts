@@ -79,7 +79,7 @@ function writeProxyResponse(
 
 @ApiTags('guard-protected-proxy')
 @ApiBearerAuth('access-token')
-@Controller('appointments')
+@Controller(['appointments', 'api/appointments'])
 export class ProtectedProxyController {
   constructor(private readonly protectedProxyService: ProtectedProxyService) {}
 

@@ -15,7 +15,12 @@ import {
   OAuthRedirectResponse,
 } from './google-oauth-session.service';
 import { GoogleOAuthCallbackGuard } from './guards/google-oauth-callback.guard';
-import { GoogleOAuthGuard } from './guards/google-oauth.guard';
+import { GuardConfigService } from '@coopers/common';
+import { getConfiguredGoogleOAuth } from './oauth-config.util';
+import {
+  createOAuthState,
+  setGoogleOAuthStateCookie,
+} from './oauth-state-cookie.util';
 import type { OAuthAuthenticatedRequest } from './oauth.types';
 
 type GoogleLinkRequestBody = {
@@ -28,13 +33,29 @@ type GoogleLinkRequestBody = {
 export class GoogleOAuthController {
   constructor(
     private readonly googleOAuthSessionService: GoogleOAuthSessionService,
+    private readonly guardConfig: GuardConfigService,
   ) {}
 
   @ApiOperation({ summary: 'Redirect to Google OAuth login' })
-  @UseGuards(GoogleOAuthGuard)
   @Get()
-  redirectToGoogle(): void {
-    return;
+  redirectToGoogle(@Res() response: OAuthRedirectResponse): void {
+    const googleConfig = getConfiguredGoogleOAuth(this.guardConfig);
+    const state = createOAuthState();
+    const authorizationUrl = new URL(
+      'https://accounts.google.com/o/oauth2/v2/auth',
+    );
+
+    setGoogleOAuthStateCookie(response, state);
+
+    authorizationUrl.searchParams.set('access_type', 'online');
+    authorizationUrl.searchParams.set('prompt', 'select_account');
+    authorizationUrl.searchParams.set('response_type', 'code');
+    authorizationUrl.searchParams.set('redirect_uri', googleConfig.callbackUrl);
+    authorizationUrl.searchParams.set('scope', googleConfig.scope.join(' '));
+    authorizationUrl.searchParams.set('state', state);
+    authorizationUrl.searchParams.set('client_id', googleConfig.clientId);
+
+    response.redirect(authorizationUrl.toString());
   }
 
   @ApiOperation({ summary: 'Handle Google OAuth callback' })
