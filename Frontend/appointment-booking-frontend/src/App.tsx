@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Layout, Modal } from 'antd';
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import HeaderNav from './components/HeaderNav';
@@ -75,6 +75,7 @@ function App() {
     );
   const [authSwitchPromptOpen, setAuthSwitchPromptOpen] = useState(false);
   const [authSwitchLoading, setAuthSwitchLoading] = useState(false);
+  const protectedActionRequestIdRef = useRef(0);
 
   const isAuthenticated = Boolean(authSession?.authenticated);
   const isSessionTimeoutPromptOpen = sessionTimeoutFlowState !== 'none';
@@ -410,14 +411,27 @@ function App() {
     setOpenAuthModal(false);
   };
 
+  const cancelPendingProtectedAction = useCallback(() => {
+    protectedActionRequestIdRef.current += 1;
+  }, []);
+
   const runProtectedAction = useCallback(
     async (action: () => void): Promise<void> => {
+      const requestId = protectedActionRequestIdRef.current + 1;
+      protectedActionRequestIdRef.current = requestId;
+      const isLatestRequest = () =>
+        protectedActionRequestIdRef.current === requestId;
+
       if (isSessionTimeoutPromptOpen) {
         return;
       }
 
       if (!isAuthenticated) {
         const restoredSession = await restoreCurrentSessionFromCookie();
+
+        if (!isLatestRequest()) {
+          return;
+        }
 
         if (restoredSession) {
           action();
@@ -431,9 +445,17 @@ function App() {
       try {
         const session = await dispatch(getCurrentSessionAction()).unwrap();
 
+        if (!isLatestRequest()) {
+          return;
+        }
+
         setAuthSession(toAuthSession(session));
         action();
       } catch (error: unknown) {
+        if (!isLatestRequest()) {
+          return;
+        }
+
         if (isSessionIdleExpiredError(error)) {
           showSessionExtensionPrompt();
           return;
@@ -535,7 +557,10 @@ function App() {
               open
               authSession={authSession}
               refreshKey={appointmentsRefreshKey}
-              onClose={() => navigate('/')}
+              onClose={() => {
+                cancelPendingProtectedAction();
+                navigate('/');
+              }}
               onMakeAppointment={openBookingFlow}
               onUpdateAppointment={openUpdateAppointmentFlow}
             />
@@ -547,7 +572,10 @@ function App() {
             <MyAccount
               open
               authSession={authSession}
-              onClose={() => navigate('/')}
+              onClose={() => {
+                cancelPendingProtectedAction();
+                navigate('/');
+              }}
             />
           </Suspense>
         ) : null}
@@ -589,6 +617,7 @@ function App() {
             authSession={authSession}
             editingAppointment={editingAppointment}
             onClose={() => {
+              cancelPendingProtectedAction();
               setOpenAppointmentModal(false);
               setEditingAppointment(null);
               if (isNewAppointmentRoute) {
