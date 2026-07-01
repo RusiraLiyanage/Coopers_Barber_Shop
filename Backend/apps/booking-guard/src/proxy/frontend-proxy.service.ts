@@ -7,6 +7,8 @@ type FrontendProxyResult = {
   body: Buffer;
 };
 
+const DEFAULT_FRONTEND_PROXY_TIMEOUT_MS = 5_000;
+
 const SKIPPED_RESPONSE_HEADERS = new Set([
   'connection',
   'content-encoding',
@@ -30,12 +32,57 @@ function isAdminFrontendRequest(originalUrl: string): boolean {
   );
 }
 
-function normalizeFrontendPath(originalUrl: string): string {
+function isStaticAssetRequest(originalUrl: string): boolean {
+  const pathname = new URL(originalUrl, 'http://guard.local').pathname;
+
+  return pathname.split('/').pop()?.includes('.') === true;
+}
+
+function normalizeFrontendPath(
+  originalUrl: string,
+  isAdminRequest: boolean,
+): string {
   if (originalUrl === '/admin-console') {
     return '/admin-console/';
   }
 
+  if (!isAdminRequest && !isStaticAssetRequest(originalUrl)) {
+    return '/';
+  }
+
   return originalUrl;
+}
+
+function getFrontendProxyTimeoutMs(): number {
+  const configuredValue = Number.parseInt(
+    process.env.FRONTEND_PROXY_TIMEOUT_MS ?? '',
+    10,
+  );
+
+  return Number.isFinite(configuredValue) && configuredValue > 0
+    ? configuredValue
+    : DEFAULT_FRONTEND_PROXY_TIMEOUT_MS;
+}
+
+async function fetchWithTimeout(url: string): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    getFrontendProxyTimeoutMs(),
+  );
+
+  try {
+    return await fetch(url, {
+      method: 'GET',
+      headers: {
+        accept: '*/*',
+        'x-coopers-guard-proxy': 'true',
+      },
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 @Injectable()
@@ -44,20 +91,15 @@ export class FrontendProxyService {
 
   async forward(originalUrl: string): Promise<FrontendProxyResult> {
     const { adminFrontendUrl, frontendUrl } = this.guardConfig.getUpstreams();
-    const targetFrontendUrl = isAdminFrontendRequest(originalUrl)
+    const isAdminRequest = isAdminFrontendRequest(originalUrl);
+    const targetFrontendUrl = isAdminRequest
       ? adminFrontendUrl
       : frontendUrl;
+    const targetPath = normalizeFrontendPath(originalUrl, isAdminRequest);
 
     try {
-      const response = await fetch(
-        buildFrontendUrl(targetFrontendUrl, normalizeFrontendPath(originalUrl)),
-        {
-          method: 'GET',
-          headers: {
-            accept: '*/*',
-            'x-coopers-guard-proxy': 'true',
-          },
-        },
+      const response = await fetchWithTimeout(
+        buildFrontendUrl(targetFrontendUrl, targetPath),
       );
       const body = Buffer.from(await response.arrayBuffer());
 
