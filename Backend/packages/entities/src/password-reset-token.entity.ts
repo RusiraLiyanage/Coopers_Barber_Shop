@@ -6,6 +6,7 @@ import {
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  RelationId,
   UpdateDateColumn,
 } from 'typeorm';
 import { User } from './user.entity';
@@ -18,6 +19,9 @@ export class PasswordResetToken {
   @ManyToOne(() => User, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;
+
+  @RelationId((resetToken: PasswordResetToken) => resetToken.user)
+  userId: string;
 
   @Index()
   @Column()

@@ -311,6 +311,7 @@ describe('AuthService', () => {
       usedAt: null,
       attemptCount: 0,
       user,
+      userId: user.id,
     };
     const lockedResetToken = { ...resetToken };
 
@@ -336,7 +337,6 @@ describe('AuthService', () => {
     expect(dataSource.transaction).toHaveBeenCalledTimes(1);
     expect(transactionalPasswordResetTokensRepo.findOne).toHaveBeenCalledWith({
       where: { id: 'reset-token-1' },
-      relations: { user: true },
       lock: { mode: 'pessimistic_write' },
     });
     expect(transactionalUsersRepo.update).toHaveBeenCalledWith(user.id, {

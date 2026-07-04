@@ -421,9 +421,6 @@ export class AuthService {
         where: {
           id: resetToken.id,
         },
-        relations: {
-          user: true,
-        },
         lock: {
           mode: 'pessimistic_write',
         },
@@ -437,7 +434,7 @@ export class AuthService {
         throw new UnauthorizedException('Invalid or expired reset code');
       }
 
-      await manager.getRepository(User).update(lockedResetToken.user.id, {
+      await manager.getRepository(User).update(lockedResetToken.userId, {
         passwordHash,
       });
 
@@ -451,7 +448,7 @@ export class AuthService {
         .set({
           revokedAt: new Date(),
         })
-        .where('user_id = :userId', { userId: lockedResetToken.user.id })
+        .where('user_id = :userId', { userId: lockedResetToken.userId })
         .andWhere('revoked_at IS NULL')
         .execute();
     });
