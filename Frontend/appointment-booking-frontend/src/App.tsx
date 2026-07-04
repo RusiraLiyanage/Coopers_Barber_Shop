@@ -124,10 +124,25 @@ function App() {
         setAuthSession(restoredSession);
 
         return restoredSession;
-      } catch {
+      } catch (error: unknown) {
+        if (isSessionIdleExpiredError(error)) {
+          showSessionExtensionPrompt();
+          return null;
+        }
+
+        if (isSessionExpiredError(error)) {
+          showSessionExpiredNotice();
+          return null;
+        }
+
         return null;
       }
-    }, [dispatch, setAuthSession]);
+    }, [
+      dispatch,
+      setAuthSession,
+      showSessionExpiredNotice,
+      showSessionExtensionPrompt,
+    ]);
 
   useEffect(() => {
     let isMounted = true;
