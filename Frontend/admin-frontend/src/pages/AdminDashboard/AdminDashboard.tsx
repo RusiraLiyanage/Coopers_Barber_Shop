@@ -68,7 +68,6 @@ import {
   selectReferenceData,
   selectReferenceDataLoading,
   selectReferenceDataPagingMetaByType,
-  selectReferenceDataSaving,
 } from '../../store/referenceData/selector';
 import {
   createSafetyRuleAction,
@@ -178,6 +177,10 @@ export default function AdminDashboard() {
   const [referenceDataModalOpen, setReferenceDataModalOpen] = useState(false);
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
   const [hairHistorySaving, setHairHistorySaving] = useState(false);
+  const [referenceDataModalSaving, setReferenceDataModalSaving] =
+    useState(false);
+  const [deletingReferenceDataItemId, setDeletingReferenceDataItemId] =
+    useState<string | null>(null);
   const [createdInvite, setCreatedInvite] =
     useState<AdminInviteResponse | null>(null);
   const [editingBarber, setEditingBarber] = useState<BarberRecord | null>(null);
@@ -244,7 +247,6 @@ export default function AdminDashboard() {
   const hairHistoryPagingMeta = useAppSelector(selectHairHistoryPagingMeta);
   const barbersLoading = useAppSelector(selectBarbersLoading);
   const referenceDataLoading = useAppSelector(selectReferenceDataLoading);
-  const referenceDataSaving = useAppSelector(selectReferenceDataSaving);
   const serviceConfigsLoading = useAppSelector(selectServiceConfigsLoading);
   const safetyRulesLoading = useAppSelector(selectSafetyRulesLoading);
   const briefsLoading = useAppSelector(selectAppointmentBriefsLoading);
@@ -334,8 +336,12 @@ export default function AdminDashboard() {
     },
     [messageApi],
   );
-  const { hasFreshData, dismissFreshDataNotice, refreshKnownVersion } =
-    useAdminDataFreshness();
+  const {
+    hasFreshData,
+    dismissFreshDataNotice,
+    refreshKnownVersion,
+    markLocalDataChangePending,
+  } = useAdminDataFreshness();
 
   const configuredServiceConfigs = useMemo(
     () =>
@@ -646,6 +652,8 @@ export default function AdminDashboard() {
     const values = await barberForm.validateFields();
     const payload = createBarberPayload(values);
 
+    markLocalDataChangePending();
+
     try {
       if (editingBarber) {
         await dispatch(
@@ -665,6 +673,8 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteBarber = async (barber: BarberRecord) => {
+    markLocalDataChangePending();
+
     try {
       await dispatch(deleteBarberAction(barber.id)).unwrap();
       await dispatch(getBarbersAction(barbersPage)).unwrap();
@@ -677,6 +687,8 @@ export default function AdminDashboard() {
 
   const handleSaveServiceConfig = async () => {
     const values = await serviceConfigForm.validateFields();
+
+    markLocalDataChangePending();
 
     try {
       const payload = {
@@ -727,6 +739,8 @@ export default function AdminDashboard() {
     const values = await safetyRuleForm.validateFields();
     const payload = createSafetyPayload(values);
 
+    markLocalDataChangePending();
+
     try {
       if (editingSafetyRule) {
         await dispatch(
@@ -748,6 +762,9 @@ export default function AdminDashboard() {
   const handleSaveReferenceDataItem = async () => {
     const values = await referenceDataForm.validateFields();
 
+    setReferenceDataModalSaving(true);
+    markLocalDataChangePending();
+
     try {
       if (editingReferenceDataItem) {
         await dispatch(
@@ -767,39 +784,32 @@ export default function AdminDashboard() {
         ).unwrap();
       }
 
-      await dispatch(
-        getReferenceDataAction({
-          type: referenceDataType,
-          ...(referenceDataType === 'barber_capability'
-            ? barberCapabilityPage
-            : safetyTriggerPage),
-        }),
-      ).unwrap();
       await refreshKnownVersion();
       messageApi.success('Reference data saved.');
       setReferenceDataModalOpen(false);
     } catch (error) {
       showRequestError(error);
+    } finally {
+      setReferenceDataModalSaving(false);
     }
   };
 
   const handleDeleteReferenceDataItem = async (
     item: ReferenceDataItemRecord,
   ) => {
+    setDeletingReferenceDataItemId(item.id);
+    markLocalDataChangePending();
+
     try {
-      await dispatch(deleteReferenceDataItemAction(item.id)).unwrap();
-      await dispatch(
-        getReferenceDataAction({
-          type: item.type,
-          ...(item.type === 'barber_capability'
-            ? barberCapabilityPage
-            : safetyTriggerPage),
-        }),
-      ).unwrap();
+      await dispatch(deleteReferenceDataItemAction(item)).unwrap();
       await refreshKnownVersion();
       messageApi.success(`${item.label} deleted.`);
     } catch (error) {
       showRequestError(error);
+    } finally {
+      setDeletingReferenceDataItemId((currentItemId) =>
+        currentItemId === item.id ? null : currentItemId,
+      );
     }
   };
 
@@ -808,6 +818,7 @@ export default function AdminDashboard() {
 
     setInviteSubmitting(true);
     setCreatedInvite(null);
+    markLocalDataChangePending();
 
     try {
       const invite = await createAdminInvite({
@@ -872,6 +883,7 @@ export default function AdminDashboard() {
 
     const values = await hairHistoryFromBriefForm.validateFields();
     setHairHistorySaving(true);
+    markLocalDataChangePending();
 
     try {
       await createHairHistoryFromBrief(selectedBrief.id, {
@@ -1154,7 +1166,7 @@ export default function AdminDashboard() {
             <Button
               danger
               icon={<DeleteOutlined />}
-              loading={referenceDataSaving}
+              loading={deletingReferenceDataItemId === item.id}
             >
               Delete
             </Button>
@@ -1731,7 +1743,7 @@ export default function AdminDashboard() {
         onCancel={() => setReferenceDataModalOpen(false)}
         onOk={() => void handleSaveReferenceDataItem()}
         okText={editingReferenceDataItem ? 'Save changes' : 'Create item'}
-        confirmLoading={referenceDataSaving}
+        confirmLoading={referenceDataModalSaving}
         width={560}
       >
         <SAModalHeader

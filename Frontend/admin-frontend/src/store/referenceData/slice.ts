@@ -35,6 +35,44 @@ function upsertReferenceDataItem(
   items.unshift(item);
 }
 
+function incrementReferenceDataTotal(
+  state: ReferenceDataState,
+  item: ReferenceDataItemRecord,
+): void {
+  const typeMeta = state.pagingMetaByType[item.type];
+
+  if (typeMeta) {
+    typeMeta.totalItem += 1;
+    typeMeta.totalPage = Math.ceil(typeMeta.totalItem / typeMeta.limit);
+  }
+
+  if (state.pagingMeta) {
+    state.pagingMeta.totalItem += 1;
+    state.pagingMeta.totalPage = Math.ceil(
+      state.pagingMeta.totalItem / state.pagingMeta.limit,
+    );
+  }
+}
+
+function decrementReferenceDataTotal(
+  state: ReferenceDataState,
+  itemType: ReferenceDataItemRecord['type'],
+): void {
+  const typeMeta = state.pagingMetaByType[itemType];
+
+  if (typeMeta) {
+    typeMeta.totalItem = Math.max(0, typeMeta.totalItem - 1);
+    typeMeta.totalPage = Math.ceil(typeMeta.totalItem / typeMeta.limit);
+  }
+
+  if (state.pagingMeta) {
+    state.pagingMeta.totalItem = Math.max(0, state.pagingMeta.totalItem - 1);
+    state.pagingMeta.totalPage = Math.ceil(
+      state.pagingMeta.totalItem / state.pagingMeta.limit,
+    );
+  }
+}
+
 const referenceDataSlice = createSlice({
   name: 'referenceData',
   initialState,
@@ -71,6 +109,7 @@ const referenceDataSlice = createSlice({
       })
       .addCase(createReferenceDataItemAction.fulfilled, (state, action) => {
         upsertReferenceDataItem(state.items, action.payload);
+        incrementReferenceDataTotal(state, action.payload);
         state.saving = false;
       })
       .addCase(createReferenceDataItemAction.rejected, (state) => {
@@ -93,6 +132,7 @@ const referenceDataSlice = createSlice({
         state.items = state.items.filter(
           (item) => item.id !== action.payload.id,
         );
+        decrementReferenceDataTotal(state, action.meta.arg.type);
         state.saving = false;
       })
       .addCase(deleteReferenceDataItemAction.rejected, (state) => {

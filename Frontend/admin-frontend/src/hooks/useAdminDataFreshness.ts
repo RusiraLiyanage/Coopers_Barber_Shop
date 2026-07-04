@@ -6,6 +6,7 @@ import { getRuntimeConfigValue } from '../lib/runtimeConfig';
 const ADMIN_DATA_FRESHNESS_POLL_MS = 45_000;
 const ADMIN_REALTIME_URL = getRuntimeConfigValue('VITE_ADMIN_REALTIME_URL');
 const ADMIN_DATA_CHANGED_EVENT = 'admin.data.changed';
+const LOCAL_CHANGE_SUPPRESSION_MS = 6_000;
 
 type AdminDataChangedPayload = {
   version: string;
@@ -30,6 +31,7 @@ function isAdminDataChangedPayload(
 export function useAdminDataFreshness() {
   const currentVersionRef = useRef<string | null>(null);
   const latestSeenVersionRef = useRef<string | null>(null);
+  const suppressFreshDataNoticeUntilRef = useRef(0);
   const [hasFreshData, setHasFreshData] = useState(false);
 
   const refreshKnownVersion = useCallback(async () => {
@@ -37,6 +39,12 @@ export function useAdminDataFreshness() {
 
     currentVersionRef.current = response.version;
     latestSeenVersionRef.current = response.version;
+    setHasFreshData(false);
+  }, []);
+
+  const markLocalDataChangePending = useCallback(() => {
+    suppressFreshDataNoticeUntilRef.current =
+      Date.now() + LOCAL_CHANGE_SUPPRESSION_MS;
     setHasFreshData(false);
   }, []);
 
@@ -48,6 +56,12 @@ export function useAdminDataFreshness() {
 
     if (!currentVersion) {
       currentVersionRef.current = response.version;
+      return;
+    }
+
+    if (Date.now() <= suppressFreshDataNoticeUntilRef.current) {
+      currentVersionRef.current = response.version;
+      setHasFreshData(false);
       return;
     }
 
@@ -72,6 +86,12 @@ export function useAdminDataFreshness() {
 
     if (!currentVersion) {
       currentVersionRef.current = payload.version;
+      return;
+    }
+
+    if (Date.now() <= suppressFreshDataNoticeUntilRef.current) {
+      currentVersionRef.current = payload.version;
+      setHasFreshData(false);
       return;
     }
 
@@ -133,5 +153,6 @@ export function useAdminDataFreshness() {
     hasFreshData,
     dismissFreshDataNotice,
     refreshKnownVersion,
+    markLocalDataChangePending,
   };
 }

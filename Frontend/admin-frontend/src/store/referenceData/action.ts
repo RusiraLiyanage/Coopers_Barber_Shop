@@ -38,8 +38,8 @@ export const updateReferenceDataItemAction = createAppAsyncThunk<
 
 export const deleteReferenceDataItemAction = createAppAsyncThunk<
   DeleteReferenceDataItemResponse & { id: string },
-  string
->(`${SLICE_NAME}/deleteReferenceDataItem`, async (id) => ({
-  ...(await deleteReferenceDataItem(id)),
-  id,
+  Pick<ReferenceDataItemRecord, 'id' | 'type'>
+>(`${SLICE_NAME}/deleteReferenceDataItem`, async (item) => ({
+  ...(await deleteReferenceDataItem(item.id)),
+  id: item.id,
 }));

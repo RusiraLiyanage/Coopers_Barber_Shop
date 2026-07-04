@@ -10,11 +10,8 @@ import {
   canRestoreAdminAuthSession,
   clearAdminAuthSession,
   clearCurrentAdminTabAuthSession,
-  clearAdminSessionTimeoutTracking,
-  getAdminSessionTimeoutDeadlines,
   SESSION_EXPIRED_EVENT,
   SESSION_IDLE_EXPIRED_EVENT,
-  shouldShowAdminLoginAfterExpiry,
   isSessionExpiredError,
   isSessionIdleExpiredError,
 } from './lib/api';
@@ -85,86 +82,7 @@ function App() {
   }, [dispatch, navigate]);
 
   useEffect(() => {
-    if (!authResolved) {
-      return;
-    }
-
-    if (
-      !isAuthenticated &&
-      !isSessionTimeoutPromptOpen &&
-      !canRestoreAdminAuthSession()
-    ) {
-      return;
-    }
-
-    const deadlines = getAdminSessionTimeoutDeadlines();
-
-    if (!deadlines) {
-      return;
-    }
-
-    const now = Date.now();
-
-    if (now >= deadlines.graceExpiresAt) {
-      showSessionExpiredNotice();
-      return;
-    }
-
-    if (now >= deadlines.promptAt) {
-      showSessionExtensionPrompt();
-
-      const graceTimerId = window.setTimeout(() => {
-        showSessionExpiredNotice();
-      }, Math.max(deadlines.graceExpiresAt - now, 0));
-
-      return () => {
-        window.clearTimeout(graceTimerId);
-      };
-    }
-
-    const promptTimerId = window.setTimeout(() => {
-      showSessionExtensionPrompt();
-    }, deadlines.promptAt - now);
-    const graceTimerId = window.setTimeout(() => {
-      showSessionExpiredNotice();
-    }, deadlines.graceExpiresAt - now);
-
-    return () => {
-      window.clearTimeout(promptTimerId);
-      window.clearTimeout(graceTimerId);
-    };
-  }, [
-    authResolved,
-    isAuthenticated,
-    isSessionTimeoutPromptOpen,
-    showSessionExpiredNotice,
-    showSessionExtensionPrompt,
-  ]);
-
-  useEffect(() => {
     let isMounted = true;
-
-    if (shouldShowAdminLoginAfterExpiry()) {
-      showSessionExpiredNotice();
-
-      return () => {
-        isMounted = false;
-      };
-    }
-
-    const deadlines = getAdminSessionTimeoutDeadlines();
-
-    if (deadlines && Date.now() >= deadlines.promptAt) {
-      if (Date.now() >= deadlines.graceExpiresAt) {
-        showSessionExpiredNotice();
-      } else {
-        showSessionExtensionPrompt();
-      }
-
-      return () => {
-        isMounted = false;
-      };
-    }
 
     if (!canRestoreAdminAuthSession()) {
       dispatch(resetStore());
@@ -287,7 +205,6 @@ function App() {
   const handleSessionTimeoutLogout = useCallback(async () => {
     setLogoutLoading(true);
     setSessionTimeoutFlowState('none');
-    clearAdminSessionTimeoutTracking();
     dispatch(resetStore());
     setAuthError(ADMIN_SESSION_EXPIRED_MESSAGE);
     navigate('/login', { replace: true });
