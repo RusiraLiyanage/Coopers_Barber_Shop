@@ -15,6 +15,14 @@ interface HomePageProps {
   onMakeAppointment: () => void;
 }
 
+const SERVICES_LOAD_RETRY_DELAYS_MS = [300, 900];
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
 function getServiceEmoji(serviceName: string) {
   const normalizedName = serviceName.toLowerCase();
 
@@ -64,11 +72,35 @@ const HomePage: React.FC<HomePageProps> = ({ onMakeAppointment }) => {
   const servicesLoading = useAppSelector(selectServicesLoading);
 
   useEffect(() => {
-    dispatch(getServicesAction())
-      .unwrap()
-      .catch((error: unknown) => {
-        messageApi.error(getGenericErrorMessage('Load services', error));
-      });
+    let isMounted = true;
+
+    const loadServices = async () => {
+      for (
+        let attempt = 0;
+        attempt <= SERVICES_LOAD_RETRY_DELAYS_MS.length;
+        attempt += 1
+      ) {
+        try {
+          await dispatch(getServicesAction()).unwrap();
+          return;
+        } catch (error: unknown) {
+          if (attempt === SERVICES_LOAD_RETRY_DELAYS_MS.length) {
+            if (isMounted) {
+              messageApi.error(getGenericErrorMessage('Load services', error));
+            }
+            return;
+          }
+
+          await wait(SERVICES_LOAD_RETRY_DELAYS_MS[attempt]);
+        }
+      }
+    };
+
+    void loadServices();
+
+    return () => {
+      isMounted = false;
+    };
   }, [dispatch, messageApi]);
 
   return (

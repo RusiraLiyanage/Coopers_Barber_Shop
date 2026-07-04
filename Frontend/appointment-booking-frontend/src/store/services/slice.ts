@@ -23,7 +23,6 @@ const servicesSlice = createSlice({
         state.loading = false;
       })
       .addCase(getServicesAction.rejected, (state) => {
-        state.loaded = true;
         state.loading = false;
       });
   },
