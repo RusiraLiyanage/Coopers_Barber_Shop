@@ -38,6 +38,18 @@ function isStaticAssetRequest(originalUrl: string): boolean {
   return pathname.split('/').pop()?.includes('.') === true;
 }
 
+function isViteDevModuleRequest(originalUrl: string): boolean {
+  const pathname = new URL(originalUrl, 'http://guard.local').pathname;
+
+  return (
+    pathname.startsWith('/@vite/') ||
+    pathname.startsWith('/@react-refresh') ||
+    pathname.startsWith('/@id/') ||
+    pathname.startsWith('/src/') ||
+    pathname.startsWith('/node_modules/')
+  );
+}
+
 function normalizeFrontendPath(
   originalUrl: string,
   isAdminRequest: boolean,
@@ -46,7 +58,11 @@ function normalizeFrontendPath(
     return '/admin-console/';
   }
 
-  if (!isAdminRequest && !isStaticAssetRequest(originalUrl)) {
+  if (
+    !isAdminRequest &&
+    !isStaticAssetRequest(originalUrl) &&
+    !isViteDevModuleRequest(originalUrl)
+  ) {
     return '/';
   }
 

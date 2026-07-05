@@ -164,6 +164,7 @@ export class ProtectedProxyService {
       path: options.path,
       query: options.query,
       body: options.body,
+      timeoutMs: options.timeoutMs,
       headers: {
         ...createUserContextHeaders(context.authorizationHeader, context.user),
         ...options.forwardedHeaders,
@@ -190,6 +191,7 @@ export class ProtectedProxyService {
       path: options.path,
       query: options.query,
       body: options.body,
+      timeoutMs: options.timeoutMs,
       headers: {
         ...createUserContextHeaders(context.authorizationHeader, context.user),
         ...options.forwardedHeaders,

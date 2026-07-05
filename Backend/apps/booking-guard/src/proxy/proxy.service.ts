@@ -115,7 +115,7 @@ export class ProxyService {
               ? undefined
               : JSON.stringify(options.body),
         },
-        getUpstreamTimeoutMs(),
+        options.timeoutMs ?? getUpstreamTimeoutMs(),
       );
 
       return {
@@ -162,7 +162,7 @@ export class ProxyService {
               ? undefined
               : JSON.stringify(options.body),
         },
-        getUpstreamTimeoutMs(),
+        options.timeoutMs ?? getUpstreamTimeoutMs(),
       );
     } catch (error) {
       const detail = `${options.target} upstream stream request failed: ${options.method} ${url}`;

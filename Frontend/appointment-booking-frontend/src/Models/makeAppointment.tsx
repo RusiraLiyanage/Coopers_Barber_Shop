@@ -49,9 +49,7 @@ import {
   clearAvailabilitySlots,
   setAvailabilitySlots,
 } from '../store/appointments/slice';
-import {
-  startConsultationAction,
-} from '../store/consultation/action';
+import { startConsultationAction } from '../store/consultation/action';
 import {
   selectConsultationError,
   selectConsultationLoadingStart,
@@ -253,9 +251,7 @@ export default function MakeAppointmentModal({
   const slots = useAppSelector(selectAppointmentAvailabilitySlots);
   const slotsLoading = useAppSelector(selectAppointmentAvailabilityLoading);
   const confirmLoading = useAppSelector(selectAppointmentMutating);
-  const consultationStartResult = useAppSelector(
-    selectConsultationStartResult,
-  );
+  const consultationStartResult = useAppSelector(selectConsultationStartResult);
   const consultationResult = useAppSelector(selectConsultationResult);
   const consultationLoadingStart = useAppSelector(
     selectConsultationLoadingStart,
@@ -632,13 +628,11 @@ export default function MakeAppointmentModal({
       setConsultationStreaming(true);
       await getCurrentSession();
 
-      const result = await submitConsultationStream(
-        {
-          serviceId: selectedServiceId,
-          answers,
-          hairPhoto,
-        },
-      );
+      const result = await submitConsultationStream({
+        serviceId: selectedServiceId,
+        answers,
+        hairPhoto,
+      });
 
       dispatch(setConsultationResult(result));
 
@@ -907,176 +901,188 @@ export default function MakeAppointmentModal({
                     </div>
                   ) : (
                     <div className="appointment-consultation-questions">
-                    {currentConsultationStartResult.previousHairHistory.length >
-                    0 ? (
-                      <Alert
-                        type="info"
-                        showIcon
-                        message={`${currentConsultationStartResult.previousHairHistory.length} previous hair record(s) will be considered for this match.`}
-                      />
-                    ) : null}
+                      {currentConsultationStartResult.previousHairHistory
+                        .length > 0 ? (
+                        <Alert
+                          type="info"
+                          showIcon
+                          message={`${currentConsultationStartResult.previousHairHistory.length} previous hair record(s) will be considered for this match.`}
+                        />
+                      ) : null}
 
-                    {currentConsultationStartResult.questions.map(
-                      (question) => (
-                        <div
-                          key={question.id}
-                          className="appointment-consultation-question"
-                        >
-                          <span>
-                            {question.label}
-                            {question.required ? (
-                              <span className="appointment-consultation-required">
-                                *
-                              </span>
+                      {currentConsultationStartResult.questions.map(
+                        (question) => (
+                          <div
+                            key={question.id}
+                            className="appointment-consultation-question"
+                          >
+                            <span>
+                              {question.label}
+                              {question.required ? (
+                                <span className="appointment-consultation-required">
+                                  *
+                                </span>
+                              ) : null}
+                            </span>
+                            {question.helperText ? (
+                              <small>{question.helperText}</small>
                             ) : null}
-                          </span>
-                          {question.helperText ? (
-                            <small>{question.helperText}</small>
-                          ) : null}
-                          {question.answerType === 'single_choice' &&
-                          question.options?.length ? (
-                            <Select
-                              value={consultationAnswers[question.id]}
-                              onChange={(value) =>
-                                handleConsultationAnswerChange(
-                                  question.id,
-                                  value,
-                                )
-                              }
-                              placeholder="Choose one"
-                              options={question.options.map((option) => ({
-                                value: option,
-                                label: option,
-                              }))}
-                            />
-                          ) : question.answerType === 'multi_choice' &&
+                            {question.answerType === 'single_choice' &&
                             question.options?.length ? (
-                            <Checkbox.Group
-                              value={
-                                consultationAnswers[question.id]
-                                  ?.split(', ')
-                                  .filter(Boolean) ?? []
-                              }
-                              options={question.options.map((option) => ({
-                                value: option,
-                                label: option,
-                              }))}
-                              onChange={(values) =>
-                                handleConsultationAnswerChange(
-                                  question.id,
-                                  values.join(', '),
-                                )
-                              }
+                              <Select
+                                value={consultationAnswers[question.id]}
+                                onChange={(value) =>
+                                  handleConsultationAnswerChange(
+                                    question.id,
+                                    value,
+                                  )
+                                }
+                                placeholder="Choose one"
+                                options={question.options.map((option) => ({
+                                  value: option,
+                                  label: option,
+                                }))}
+                              />
+                            ) : question.answerType === 'multi_choice' &&
+                              question.options?.length ? (
+                              <Checkbox.Group
+                                value={
+                                  consultationAnswers[question.id]
+                                    ?.split(', ')
+                                    .filter(Boolean) ?? []
+                                }
+                                options={question.options.map((option) => ({
+                                  value: option,
+                                  label: option,
+                                }))}
+                                onChange={(values) =>
+                                  handleConsultationAnswerChange(
+                                    question.id,
+                                    values.join(', '),
+                                  )
+                                }
+                              />
+                            ) : (
+                              <Input.TextArea
+                                value={consultationAnswers[question.id] ?? ''}
+                                onChange={(event) =>
+                                  handleConsultationAnswerChange(
+                                    question.id,
+                                    event.target.value,
+                                  )
+                                }
+                                rows={2}
+                                maxLength={1000}
+                                showCount
+                                placeholder="Add your answer"
+                              />
+                            )}
+                          </div>
+                        ),
+                      )}
+
+                      <div className="appointment-consultation-question">
+                        <span>Upload a current hair photo</span>
+                        <small>
+                          Optional, but useful for color, length, and condition
+                          checks.
+                        </small>
+                        <div className="appointment-consultation-photo-row">
+                          <label className="appointment-consultation-photo-picker">
+                            Choose Photo
+                            <input
+                              type="file"
+                              disabled={true}
+                              accept={ACCEPTED_HAIR_PHOTO_TYPES.join(',')}
+                              onChange={handleHairPhotoChange}
                             />
-                          ) : (
-                            <Input.TextArea
-                              value={consultationAnswers[question.id] ?? ''}
-                              onChange={(event) =>
-                                handleConsultationAnswerChange(
-                                  question.id,
-                                  event.target.value,
-                                )
-                              }
-                              rows={2}
-                              maxLength={1000}
-                              showCount
-                              placeholder="Add your answer"
-                            />
-                          )}
+                          </label>
+                          {hairPhotoName ? (
+                            <>
+                              <span className="appointment-consultation-photo-name">
+                                {hairPhotoName}
+                              </span>
+                              <Button onClick={handleRemoveHairPhoto}>
+                                Remove
+                              </Button>
+                            </>
+                          ) : null}
                         </div>
-                      ),
-                    )}
-
-                    <div className="appointment-consultation-question">
-                      <span>Upload a current hair photo</span>
-                      <small>
-                        Optional, but useful for color, length, and condition
-                        checks.
-                      </small>
-                      <div className="appointment-consultation-photo-row">
-                        <label className="appointment-consultation-photo-picker">
-                          Choose Photo
-                          <input
-                            type="file"
-                            accept={ACCEPTED_HAIR_PHOTO_TYPES.join(',')}
-                            onChange={handleHairPhotoChange}
+                        {hairPhotoError ? (
+                          <Alert
+                            type="error"
+                            showIcon
+                            message={hairPhotoError}
                           />
-                        </label>
-                        {hairPhotoName ? (
-                          <>
-                            <span className="appointment-consultation-photo-name">
-                              {hairPhotoName}
-                            </span>
-                            <Button onClick={handleRemoveHairPhoto}>
-                              Remove
-                            </Button>
-                          </>
                         ) : null}
                       </div>
-                      {hairPhotoError ? (
-                        <Alert type="error" showIcon message={hairPhotoError} />
-                      ) : null}
-                    </div>
 
-                    <div className="appointment-consultation-question">
-                      <span>Upload a goal photo</span>
-                      <small>
-                        Optional reference image showing the look you want to
-                        achieve. This will be shared with the barber.
-                      </small>
-                      <div className="appointment-consultation-photo-row">
-                        <label className="appointment-consultation-photo-picker">
-                          Choose Goal Photo
-                          <input
-                            type="file"
-                            accept={ACCEPTED_HAIR_PHOTO_TYPES.join(',')}
-                            onChange={handleGoalPhotoChange}
+                      <div className="appointment-consultation-question">
+                        <span>Upload a goal photo</span>
+                        <small>
+                          Optional reference image showing the look you want to
+                          achieve. This will be shared with the barber.
+                        </small>
+                        <div className="appointment-consultation-photo-row">
+                          <label className="appointment-consultation-photo-picker">
+                            Choose Goal Photo
+                            <input
+                              type="file"
+                              disabled={true}
+                              accept={ACCEPTED_HAIR_PHOTO_TYPES.join(',')}
+                              onChange={handleGoalPhotoChange}
+                            />
+                          </label>
+                          {goalPhotoName ? (
+                            <>
+                              <span className="appointment-consultation-photo-name">
+                                {goalPhotoName}
+                              </span>
+                              <Button onClick={handleRemoveGoalPhoto}>
+                                Remove
+                              </Button>
+                            </>
+                          ) : null}
+                        </div>
+                        {goalPhotoError ? (
+                          <Alert
+                            type="error"
+                            showIcon
+                            message={goalPhotoError}
                           />
-                        </label>
-                        {goalPhotoName ? (
-                          <>
-                            <span className="appointment-consultation-photo-name">
-                              {goalPhotoName}
-                            </span>
-                            <Button onClick={handleRemoveGoalPhoto}>
-                              Remove
-                            </Button>
-                          </>
                         ) : null}
                       </div>
-                      {goalPhotoError ? (
-                        <Alert type="error" showIcon message={goalPhotoError} />
-                      ) : null}
+
+                      <label className="appointment-consultation-question">
+                        <span>Anything else the barber should know?</span>
+                        <small>
+                          Optional comments are included in the consultation
+                          result.
+                        </small>
+                        <Input.TextArea
+                          value={additionalComments}
+                          onChange={handleAdditionalCommentsChange}
+                          rows={2}
+                          maxLength={1000}
+                          showCount
+                          placeholder="Add extra context"
+                        />
+                      </label>
+
+                      <Button
+                        type="primary"
+                        loading={
+                          consultationSubmitting || consultationStreaming
+                        }
+                        disabled={
+                          !areConsultationAnswersComplete ||
+                          Boolean(hairPhotoError || goalPhotoError)
+                        }
+                        onClick={handleMatchBarber}
+                      >
+                        Match Barber
+                      </Button>
                     </div>
-
-                    <label className="appointment-consultation-question">
-                      <span>Anything else the barber should know?</span>
-                      <small>
-                        Optional comments are included in the consultation
-                        result.
-                      </small>
-                      <Input.TextArea
-                        value={additionalComments}
-                        onChange={handleAdditionalCommentsChange}
-                        rows={2}
-                        maxLength={1000}
-                        showCount
-                        placeholder="Add extra context"
-                      />
-                    </label>
-
-                    <Button
-                      type="primary"
-                      loading={consultationSubmitting || consultationStreaming}
-                      disabled={
-                        !areConsultationAnswersComplete ||
-                        Boolean(hairPhotoError || goalPhotoError)
-                      }
-                      onClick={handleMatchBarber}
-                    >
-                      Match Barber
-                    </Button>
-                  </div>
                   )
                 ) : currentConsultationResult ? (
                   <div className="appointment-consultation-result">
@@ -1098,8 +1104,7 @@ export default function MakeAppointmentModal({
                             }
                           </strong>
                           <span>
-                            Match score:{' '}
-                            {currentConsultationResult.matchScore}%
+                            Match score: {currentConsultationResult.matchScore}%
                           </span>
                           <span>
                             Gender:{' '}

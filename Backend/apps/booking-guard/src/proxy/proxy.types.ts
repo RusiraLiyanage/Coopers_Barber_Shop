@@ -9,6 +9,7 @@ export type ProxyRequestOptions = {
   query?: Record<string, string | string[] | undefined>;
   headers?: Record<string, string>;
   body?: unknown;
+  timeoutMs?: number;
 };
 
 export type ProxyResponse = {
