@@ -1,3 +1,4 @@
+export * from './alerts/runtime-alert';
 export * from './bootstrap';
 export * from './configs';
 export * from './filters';

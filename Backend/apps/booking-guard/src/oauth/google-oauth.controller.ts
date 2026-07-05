@@ -14,7 +14,11 @@ import {
   GoogleOAuthSessionService,
   OAuthRedirectResponse,
 } from './google-oauth-session.service';
-import { GuardConfigService, GoogleOAuthConfig } from '@coopers/common';
+import {
+  GuardConfigService,
+  GoogleOAuthConfig,
+  sendRuntimeAlert,
+} from '@coopers/common';
 import { clearAuthCookies } from '../proxy/auth-cookie.util';
 import { getConfiguredGoogleOAuth } from './oauth-config.util';
 import {
@@ -231,10 +235,18 @@ export class GoogleOAuthController {
         response,
       );
     } catch (error) {
-      this.logger.warn(
-        'Google OAuth callback failed.',
-        error instanceof Error ? error.stack : undefined,
-      );
+      const detail = 'Google OAuth callback failed.';
+
+      this.logger.warn(detail, error instanceof Error ? error.stack : undefined);
+      sendRuntimeAlert({
+        category: 'google-oauth-callback-failure',
+        detail,
+        error,
+        method: 'GET',
+        path: '/auth/google/callback',
+        severity: 'error',
+        throttleSeconds: 900,
+      });
       clearOAuthCookies(response);
       response.redirect(googleConfig.failureRedirectUrl);
     }

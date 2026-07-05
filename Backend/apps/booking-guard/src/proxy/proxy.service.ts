@@ -3,7 +3,7 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { GuardConfigService } from '@coopers/common';
+import { GuardConfigService, sendRuntimeAlert } from '@coopers/common';
 import { ProxyRequestOptions, ProxyResponse } from './proxy.types';
 
 const DEFAULT_UPSTREAM_TIMEOUT_MS = 8_000;
@@ -123,10 +123,18 @@ export class ProxyService {
         body: await parseResponseBody(response),
       };
     } catch (error) {
-      this.logger.warn(
-        `${options.target} upstream request failed: ${options.method} ${url}`,
-        error instanceof Error ? error.stack : undefined,
-      );
+      const detail = `${options.target} upstream request failed: ${options.method} ${url}`;
+
+      this.logger.warn(detail, error instanceof Error ? error.stack : undefined);
+      sendRuntimeAlert({
+        category: 'upstream-request-failure',
+        detail,
+        error,
+        method: options.method,
+        path: options.path,
+        severity: 'error',
+        throttleSeconds: 900,
+      });
       throw new ServiceUnavailableException(
         `${options.target} upstream is unavailable`,
       );
@@ -157,10 +165,18 @@ export class ProxyService {
         getUpstreamTimeoutMs(),
       );
     } catch (error) {
-      this.logger.warn(
-        `${options.target} upstream stream request failed: ${options.method} ${url}`,
-        error instanceof Error ? error.stack : undefined,
-      );
+      const detail = `${options.target} upstream stream request failed: ${options.method} ${url}`;
+
+      this.logger.warn(detail, error instanceof Error ? error.stack : undefined);
+      sendRuntimeAlert({
+        category: 'upstream-stream-request-failure',
+        detail,
+        error,
+        method: options.method,
+        path: options.path,
+        severity: 'error',
+        throttleSeconds: 900,
+      });
       throw new ServiceUnavailableException(
         `${options.target} upstream is unavailable`,
       );

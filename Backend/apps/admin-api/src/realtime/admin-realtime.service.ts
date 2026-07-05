@@ -3,6 +3,7 @@ import type { Server } from 'socket.io';
 import {
   ADMIN_DATA_CHANGED_EVENT,
   AdminDataChangedPayload,
+  sendRuntimeAlert,
 } from '@coopers/common';
 
 @Injectable()
@@ -16,9 +17,15 @@ export class AdminRealtimeService {
 
   emitAdminDataChanged(payload: AdminDataChangedPayload): boolean {
     if (!this.server) {
-      this.logger.warn(
-        `Skipped ${ADMIN_DATA_CHANGED_EVENT}; realtime server is not ready.`,
-      );
+      const detail = `Skipped ${ADMIN_DATA_CHANGED_EVENT}; realtime server is not ready.`;
+
+      this.logger.warn(detail);
+      sendRuntimeAlert({
+        category: 'admin-realtime-server-not-ready',
+        detail,
+        severity: 'warning',
+        throttleSeconds: 900,
+      });
       return false;
     }
 

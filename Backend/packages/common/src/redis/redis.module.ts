@@ -1,5 +1,6 @@
 import { DynamicModule, Global, Logger, Module } from '@nestjs/common';
 import Redis, { RedisOptions } from 'ioredis';
+import { sendRuntimeAlert } from '../alerts/runtime-alert';
 import { CacheService } from './cache.service';
 import {
   getRedisCacheRuntimeConfig,
@@ -79,7 +80,16 @@ export class RedisModule {
     } satisfies RedisOptions);
 
     client.on('error', (error: Error) => {
-      this.logger.warn(`${config.token} unavailable: ${error.message}`);
+      const detail = `${config.token} unavailable: ${error.message}`;
+
+      this.logger.warn(detail);
+      sendRuntimeAlert({
+        category: 'redis-client-unavailable',
+        detail,
+        error,
+        severity: 'warning',
+        throttleSeconds: 900,
+      });
     });
 
     return client;

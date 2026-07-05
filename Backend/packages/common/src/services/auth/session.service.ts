@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { AuthSession } from '@coopers/entities';
 import { DataSource, type EntityManager, type Repository } from 'typeorm';
+import { sendRuntimeAlert } from '../../alerts/runtime-alert';
 import { getRequiredConfigInteger } from '../../configs/env.util';
 import {
   SESSION_EXPIRED_CODE,
@@ -372,9 +373,15 @@ export class SessionService {
 
   private async containRefreshTokenReuse(session: AuthSession): Promise<void> {
     await this.revokeSessionFamily(session.tokenFamilyId);
-    this.logger.warn(
-      `Refresh token reuse detected for session ${session.id}; revoked family ${session.tokenFamilyId}.`,
-    );
+    const detail = `Refresh token reuse detected for session ${session.id}; revoked family ${session.tokenFamilyId}.`;
+
+    this.logger.warn(detail);
+    sendRuntimeAlert({
+      category: 'refresh-token-reuse',
+      detail,
+      severity: 'warning',
+      throttleSeconds: 900,
+    });
   }
 
   private hashRefreshToken(refreshToken: string): string {
