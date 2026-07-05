@@ -14,6 +14,10 @@ const initialState: ReferenceDataState = {
     barber_capability: null,
     safety_trigger: null,
   },
+  loadingByType: {
+    barber_capability: false,
+    safety_trigger: false,
+  },
   loading: false,
   saving: false,
   error: null,
@@ -79,8 +83,14 @@ const referenceDataSlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
-      .addCase(getReferenceDataAction.pending, (state) => {
-        state.loading = true;
+      .addCase(getReferenceDataAction.pending, (state, action) => {
+        const type = action.meta.arg?.type;
+
+        if (type) {
+          state.loadingByType[type] = true;
+        } else {
+          state.loading = true;
+        }
         state.error = null;
       })
       .addCase(getReferenceDataAction.fulfilled, (state, action) => {
@@ -97,10 +107,20 @@ const referenceDataSlice = createSlice({
           state.pagingMeta = action.payload.pagingMeta;
         }
         state.pagingMeta = action.payload.pagingMeta;
-        state.loading = false;
+        if (type) {
+          state.loadingByType[type] = false;
+        } else {
+          state.loading = false;
+        }
       })
       .addCase(getReferenceDataAction.rejected, (state, action) => {
-        state.loading = false;
+        const type = action.meta.arg?.type;
+
+        if (type) {
+          state.loadingByType[type] = false;
+        } else {
+          state.loading = false;
+        }
         state.error =
           action.error.message ?? 'Unable to load reference data.';
       })

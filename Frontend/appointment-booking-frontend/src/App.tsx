@@ -39,9 +39,12 @@ import './App.css';
 
 const { Content, Footer } = Layout;
 const LEGACY_AUTH_TOKEN_KEY = 'booking_auth_token';
-const MakeAppointmentModal = lazy(() => import('./Models/makeAppointment'));
-const MyAccount = lazy(() => import('./pages/MyAccount'));
-const MyAppointments = lazy(() => import('./pages/MyAppointments'));
+const loadMakeAppointmentModal = () => import('./Models/makeAppointment');
+const loadMyAccount = () => import('./pages/MyAccount');
+const loadMyAppointments = () => import('./pages/MyAppointments');
+const MakeAppointmentModal = lazy(loadMakeAppointmentModal);
+const MyAccount = lazy(loadMyAccount);
+const MyAppointments = lazy(loadMyAppointments);
 const SESSION_RESTORE_ROUTES = new Set([
   '/appointments',
   '/account',
@@ -98,13 +101,9 @@ function App() {
   );
 
   const showSessionExtensionPrompt = useCallback(() => {
-    setAuthSession(null);
-    setEditingAppointment(null);
-    setOpenAppointmentModal(false);
-    navigate('/');
     setOpenAuthModal(true);
     setSessionTimeoutFlowState('extend_prompt');
-  }, [navigate, setAuthSession]);
+  }, []);
 
   const showSessionExpiredNotice = useCallback(() => {
     setAuthSession(null);
@@ -114,35 +113,6 @@ function App() {
     setOpenAuthModal(true);
     setSessionTimeoutFlowState('expired_notice');
   }, [navigate, setAuthSession]);
-
-  const restoreCurrentSessionFromCookie =
-    useCallback(async (): Promise<AuthSession | null> => {
-      try {
-        const session = await dispatch(getCurrentSessionAction()).unwrap();
-        const restoredSession = toAuthSession(session);
-
-        setAuthSession(restoredSession);
-
-        return restoredSession;
-      } catch (error: unknown) {
-        if (isSessionIdleExpiredError(error)) {
-          showSessionExtensionPrompt();
-          return null;
-        }
-
-        if (isSessionExpiredError(error)) {
-          showSessionExpiredNotice();
-          return null;
-        }
-
-        return null;
-      }
-    }, [
-      dispatch,
-      setAuthSession,
-      showSessionExpiredNotice,
-      showSessionExtensionPrompt,
-    ]);
 
   useEffect(() => {
     let isMounted = true;
@@ -200,6 +170,18 @@ function App() {
     showSessionExpiredNotice,
     showSessionExtensionPrompt,
   ]);
+
+  useEffect(() => {
+    const preloadTimer = window.setTimeout(() => {
+      void loadMakeAppointmentModal();
+      void loadMyAccount();
+      void loadMyAppointments();
+    }, 1000);
+
+    return () => {
+      window.clearTimeout(preloadTimer);
+    };
+  }, []);
 
   useEffect(() => {
     if (
@@ -334,19 +316,13 @@ function App() {
       .catch(() => undefined);
   };
 
-  const requestAuthModal = async () => {
+  const requestAuthModal = () => {
     if (isAuthenticated) {
       setAuthSwitchPromptOpen(true);
       return;
     }
 
-    const restoredSession = await restoreCurrentSessionFromCookie();
-
-    if (restoredSession) {
-      setAuthSwitchPromptOpen(true);
-      return;
-    }
-
+    setSessionTimeoutFlowState('none');
     setOpenAuthModal(true);
   };
 
@@ -430,107 +406,107 @@ function App() {
     protectedActionRequestIdRef.current += 1;
   }, []);
 
-  const runProtectedAction = useCallback(
-    async (action: () => void): Promise<void> => {
-      const requestId = protectedActionRequestIdRef.current + 1;
-      protectedActionRequestIdRef.current = requestId;
-      const isLatestRequest = () =>
-        protectedActionRequestIdRef.current === requestId;
+  const validateActiveSessionInBackground = useCallback(async () => {
+    const requestId = protectedActionRequestIdRef.current + 1;
+    protectedActionRequestIdRef.current = requestId;
+    const isLatestRequest = () =>
+      protectedActionRequestIdRef.current === requestId;
 
-      if (isSessionTimeoutPromptOpen) {
-        return;
-      }
+    if (isSessionTimeoutPromptOpen || !isAuthenticated) {
+      return;
+    }
 
-      if (!isAuthenticated) {
-        const restoredSession = await restoreCurrentSessionFromCookie();
+    try {
+      const session = await dispatch(getCurrentSessionAction()).unwrap();
 
-        if (!isLatestRequest()) {
-          return;
-        }
-
-        if (restoredSession) {
-          action();
-          return;
-        }
-
-        setOpenAuthModal(true);
-        return;
-      }
-
-      try {
-        const session = await dispatch(getCurrentSessionAction()).unwrap();
-
-        if (!isLatestRequest()) {
-          return;
-        }
-
+      if (isLatestRequest()) {
         setAuthSession(toAuthSession(session));
-        action();
-      } catch (error: unknown) {
-        if (!isLatestRequest()) {
-          return;
-        }
-
-        if (isSessionIdleExpiredError(error)) {
-          showSessionExtensionPrompt();
-          return;
-        }
-
-        if (isSessionExpiredError(error)) {
-          showSessionExpiredNotice();
-          return;
-        }
-
-        setAuthSession(null);
-        setEditingAppointment(null);
-        setOpenAppointmentModal(false);
-        navigate('/');
-        setOpenAuthModal(true);
       }
-    },
-    [
-      isAuthenticated,
-      isSessionTimeoutPromptOpen,
-      dispatch,
-      navigate,
-      restoreCurrentSessionFromCookie,
-      setAuthSession,
-      showSessionExpiredNotice,
-      showSessionExtensionPrompt,
-    ],
-  );
+    } catch (error: unknown) {
+      if (!isLatestRequest()) {
+        return;
+      }
+
+      if (isSessionIdleExpiredError(error)) {
+        showSessionExtensionPrompt();
+        return;
+      }
+
+      if (isSessionExpiredError(error)) {
+        showSessionExpiredNotice();
+        return;
+      }
+
+      setAuthSession(null);
+      setEditingAppointment(null);
+      setOpenAppointmentModal(false);
+      navigate('/');
+      setOpenAuthModal(true);
+    }
+  }, [
+    dispatch,
+    isAuthenticated,
+    isSessionTimeoutPromptOpen,
+    navigate,
+    setAuthSession,
+    showSessionExpiredNotice,
+    showSessionExtensionPrompt,
+  ]);
 
   const openBookingFlow = () => {
+    void loadMakeAppointmentModal();
     setEditingAppointment(null);
-    setOpenAppointmentModal(false);
+
+    if (!isAuthenticated) {
+      setOpenAppointmentModal(false);
+      setOpenAuthModal(true);
+      return;
+    }
+
+    setOpenAuthModal(false);
+    setOpenAppointmentModal(true);
+    navigate('/new-appointment');
+    void validateActiveSessionInBackground();
+  };
+
+  const openMyAppointmentsFlow = () => {
+    void loadMyAppointments();
 
     if (!isAuthenticated) {
       setOpenAuthModal(true);
       return;
     }
 
-    void runProtectedAction(() => {
-      navigate('/new-appointment');
-    });
-  };
-
-  const openMyAppointmentsFlow = () => {
-    void runProtectedAction(() => {
-      navigate('/appointments');
-    });
+    setOpenAuthModal(false);
+    navigate('/appointments');
+    void validateActiveSessionInBackground();
   };
 
   const openMyAccountFlow = () => {
-    void runProtectedAction(() => {
-      navigate('/account');
-    });
+    void loadMyAccount();
+
+    if (!isAuthenticated) {
+      setOpenAuthModal(true);
+      return;
+    }
+
+    setOpenAuthModal(false);
+    navigate('/account');
+    void validateActiveSessionInBackground();
   };
 
   const openUpdateAppointmentFlow = (appointment: AppointmentRecord) => {
-    void runProtectedAction(() => {
-      setEditingAppointment(appointment);
-      setOpenAppointmentModal(true);
-    });
+    void loadMakeAppointmentModal();
+
+    if (!isAuthenticated) {
+      setOpenAuthModal(true);
+      return;
+    }
+
+    setOpenAuthModal(false);
+    setEditingAppointment(appointment);
+    setOpenAppointmentModal(true);
+    void validateActiveSessionInBackground();
   };
 
   return (
@@ -539,7 +515,7 @@ function App() {
         isAuthenticated={isAuthenticated}
         onLogout={handleLogout}
         onOpenAuthModal={() => {
-          void requestAuthModal();
+          requestAuthModal();
         }}
         onOpenMyAccount={openMyAccountFlow}
         onOpenMyAppointments={openMyAppointmentsFlow}

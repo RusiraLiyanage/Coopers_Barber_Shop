@@ -13,6 +13,7 @@ import {
 
 const SESSION_EXPIRED_MESSAGE = 'Session expired. Please login again.';
 const SESSION_IDLE_EXPIRED_MESSAGE = 'Session expired due to inactivity';
+const REFRESH_TOKEN_ROTATION_GRACE_SECONDS = 60;
 
 type CreateAuthSessionInput = {
   userId: string;
@@ -76,19 +77,25 @@ export class SessionService {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
-    if (await this.detectAndContainReuse(session)) {
+    const resolvedSession = await this.resolveRecentlyRotatedSession(
+      session,
+      now,
+    );
+
+    if (!resolvedSession) {
+      await this.containRefreshTokenReuse(session);
       throw new UnauthorizedException(
         'Refresh token reuse detected. Please login again.',
       );
     }
 
-    if (this.isSessionExpired(session, now)) {
-      await this.revokeSessionById(session.id, now);
+    if (this.isSessionExpired(resolvedSession, now)) {
+      await this.revokeSessionById(resolvedSession.id, now);
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
-    if (this.isSessionPastExtensionGrace(session, now)) {
-      await this.revokeSessionById(session.id, now);
+    if (this.isSessionPastExtensionGrace(resolvedSession, now)) {
+      await this.revokeSessionById(resolvedSession.id, now);
       throw new UnauthorizedException({
         code: SESSION_EXPIRED_CODE,
         message: SESSION_EXPIRED_MESSAGE,
@@ -96,11 +103,11 @@ export class SessionService {
       });
     }
 
-    if (this.isSessionIdleExpired(session, now)) {
+    if (this.isSessionIdleExpired(resolvedSession, now)) {
       throw new SessionIdleExpiredException();
     }
 
-    return session;
+    return resolvedSession;
   }
 
   async findExtendableSession(refreshToken: string): Promise<AuthSession> {
@@ -119,19 +126,25 @@ export class SessionService {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
-    if (await this.detectAndContainReuse(session)) {
+    const resolvedSession = await this.resolveRecentlyRotatedSession(
+      session,
+      now,
+    );
+
+    if (!resolvedSession) {
+      await this.containRefreshTokenReuse(session);
       throw new UnauthorizedException(
         'Refresh token reuse detected. Please login again.',
       );
     }
 
-    if (this.isSessionExpired(session, now)) {
-      await this.revokeSessionById(session.id, now);
+    if (this.isSessionExpired(resolvedSession, now)) {
+      await this.revokeSessionById(resolvedSession.id, now);
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
-    if (this.isSessionPastExtensionGrace(session, now)) {
-      await this.revokeSessionById(session.id, now);
+    if (this.isSessionPastExtensionGrace(resolvedSession, now)) {
+      await this.revokeSessionById(resolvedSession.id, now);
       throw new UnauthorizedException({
         code: SESSION_EXPIRED_CODE,
         message: SESSION_EXPIRED_MESSAGE,
@@ -139,7 +152,7 @@ export class SessionService {
       });
     }
 
-    return session;
+    return resolvedSession;
   }
 
   async markSessionUsed(sessionId: string): Promise<void> {
@@ -324,20 +337,44 @@ export class SessionService {
       .execute();
   }
 
-  // A refresh token whose session is already revoked is being replayed. In normal
-  // flows the guard's coordinator returns the rotated token, so the old one is
-  // never re-presented — treat this as theft and revoke the whole family.
-  private async detectAndContainReuse(session: AuthSession): Promise<boolean> {
+  // A revoked refresh token can briefly reappear when browser requests race while
+  // cookies are being rotated. Reuse outside this small window is treated as a
+  // replay and the token family is revoked.
+  private async resolveRecentlyRotatedSession(
+    session: AuthSession,
+    now: Date,
+  ): Promise<AuthSession | null> {
     if (!session.revokedAt) {
-      return false;
+      return session;
     }
 
+    const rotatedForMs = now.getTime() - session.revokedAt.getTime();
+
+    if (rotatedForMs > REFRESH_TOKEN_ROTATION_GRACE_SECONDS * 1000) {
+      return null;
+    }
+
+    const successor = await this.sessionsRepo.findOne({
+      where: {
+        tokenFamilyId: session.tokenFamilyId,
+        revokedAt: null,
+      },
+      relations: {
+        user: true,
+      },
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+
+    return successor ?? null;
+  }
+
+  private async containRefreshTokenReuse(session: AuthSession): Promise<void> {
     await this.revokeSessionFamily(session.tokenFamilyId);
     this.logger.warn(
       `Refresh token reuse detected for session ${session.id}; revoked family ${session.tokenFamilyId}.`,
     );
-
-    return true;
   }
 
   private hashRefreshToken(refreshToken: string): string {

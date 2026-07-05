@@ -1,5 +1,6 @@
 import { createAppAsyncThunk } from '../createAppAsyncThunk';
 import {
+  ApiRequestError,
   extendAdminSession,
   getAccountProfile,
   getCurrentSession,
@@ -11,9 +12,35 @@ import {
 import type { AuthSession } from './types';
 
 const SLICE_NAME = 'auth';
+const PROFILE_RESTORE_RETRY_DELAY_MS = 300;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+function shouldRetryProfileRestore(error: unknown): boolean {
+  if (!(error instanceof ApiRequestError)) {
+    return true;
+  }
+
+  return error.statusCode !== 401 && error.statusCode !== 403;
+}
 
 async function createAdminSession(): Promise<AuthSession> {
-  const profile = await getAccountProfile();
+  let profile: AccountProfileResponse;
+
+  try {
+    profile = await getAccountProfile();
+  } catch (error) {
+    if (!shouldRetryProfileRestore(error)) {
+      throw error;
+    }
+
+    await delay(PROFILE_RESTORE_RETRY_DELAY_MS);
+    profile = await getAccountProfile();
+  }
 
   return createAdminSessionFromProfile(profile);
 }

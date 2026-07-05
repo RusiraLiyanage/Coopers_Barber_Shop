@@ -67,6 +67,7 @@ import {
 import {
   selectReferenceData,
   selectReferenceDataLoading,
+  selectReferenceDataLoadingByType,
   selectReferenceDataPagingMetaByType,
 } from '../../store/referenceData/selector';
 import {
@@ -247,6 +248,12 @@ export default function AdminDashboard() {
   const hairHistoryPagingMeta = useAppSelector(selectHairHistoryPagingMeta);
   const barbersLoading = useAppSelector(selectBarbersLoading);
   const referenceDataLoading = useAppSelector(selectReferenceDataLoading);
+  const barberCapabilityLoading = useAppSelector(
+    selectReferenceDataLoadingByType('barber_capability'),
+  );
+  const safetyTriggerLoading = useAppSelector(
+    selectReferenceDataLoadingByType('safety_trigger'),
+  );
   const serviceConfigsLoading = useAppSelector(selectServiceConfigsLoading);
   const safetyRulesLoading = useAppSelector(selectSafetyRulesLoading);
   const briefsLoading = useAppSelector(selectAppointmentBriefsLoading);
@@ -419,29 +426,52 @@ export default function AdminDashboard() {
   );
 
   const loadAdminData = useCallback(async () => {
+    const results = await Promise.allSettled([
+      dispatch(getBarbersAction(barbersPage)).unwrap(),
+      dispatch(
+        getReferenceDataAction({
+          type: 'barber_capability',
+          ...barberCapabilityPage,
+        }),
+      ).unwrap(),
+      dispatch(
+        getReferenceDataAction({
+          type: 'safety_trigger',
+          ...safetyTriggerPage,
+        }),
+      ).unwrap(),
+      dispatch(getServiceConfigsAction(servicesPage)).unwrap(),
+      dispatch(getSafetyRulesAction(safetyPage)).unwrap(),
+      dispatch(getAppointmentBriefsAction(briefsPage)).unwrap(),
+      dispatch(getHairHistoryAction(hairHistoryPage)).unwrap(),
+    ]);
+
+    const failures = results.filter(
+      (result): result is PromiseRejectedResult =>
+        result.status === 'rejected',
+    );
+
+    const sessionFailure = failures.find((failure) =>
+      isSessionExpiredError(failure.reason),
+    );
+
+    if (sessionFailure) {
+      showRequestError(sessionFailure.reason);
+      return;
+    }
+
+    if (failures.length > 0) {
+      messageApi.warning(
+        'Some admin data could not be loaded. Please refresh.',
+      );
+    }
+
     try {
-      await Promise.all([
-        dispatch(getBarbersAction(barbersPage)).unwrap(),
-        dispatch(
-          getReferenceDataAction({
-            type: 'barber_capability',
-            ...barberCapabilityPage,
-          }),
-        ).unwrap(),
-        dispatch(
-          getReferenceDataAction({
-            type: 'safety_trigger',
-            ...safetyTriggerPage,
-          }),
-        ).unwrap(),
-        dispatch(getServiceConfigsAction(servicesPage)).unwrap(),
-        dispatch(getSafetyRulesAction(safetyPage)).unwrap(),
-        dispatch(getAppointmentBriefsAction(briefsPage)).unwrap(),
-        dispatch(getHairHistoryAction(hairHistoryPage)).unwrap(),
-      ]);
       await refreshKnownVersion();
     } catch (error) {
-      showRequestError(error);
+      if (isSessionExpiredError(error)) {
+        showRequestError(error);
+      }
     }
   }, [
     barberCapabilityPage,
@@ -452,6 +482,7 @@ export default function AdminDashboard() {
     safetyPage,
     safetyTriggerPage,
     servicesPage,
+    messageApi,
     showRequestError,
     refreshKnownVersion,
   ]);
@@ -1410,7 +1441,12 @@ export default function AdminDashboard() {
                 columns={referenceDataColumns}
                 barberCapabilityItems={barberCapabilityItems}
                 safetyTriggerItems={safetyTriggerItems}
-                loading={referenceDataLoading}
+                barberCapabilityLoading={
+                  referenceDataLoading || barberCapabilityLoading
+                }
+                safetyTriggerLoading={
+                  referenceDataLoading || safetyTriggerLoading
+                }
                 barberCapabilityPagingMeta={barberCapabilityPagingMeta}
                 safetyTriggerPagingMeta={safetyTriggerPagingMeta}
                 barberCapabilityPage={barberCapabilityPage}

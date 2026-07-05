@@ -13,6 +13,7 @@ export const ADMIN_SESSION_REPLACED_SIGNAL_KEY =
   'coopers_admin_auth_session_replaced';
 const DEFAULT_SESSION_IDLE_TIMEOUT_SECONDS = 300;
 const DEFAULT_SESSION_EXTENSION_GRACE_SECONDS = 300;
+const IDEMPOTENT_REQUEST_RETRY_DELAY_MS = 300;
 export const SESSION_EXPIRED_CODE = 'SESSION_EXPIRED';
 export const SESSION_IDLE_EXPIRED_CODE = 'SESSION_IDLE_EXPIRED';
 export const ACTIVE_ACCOUNT_SESSION_EXISTS_CODE =
@@ -635,7 +636,31 @@ function dispatchSessionExpiredEvent(): void {
   window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
 }
 
-async function request<T>(
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+function isIdempotentRequest(options: RequestInit): boolean {
+  const method = options.method?.toUpperCase() ?? 'GET';
+
+  return method === 'GET' || method === 'HEAD';
+}
+
+function shouldRetryRequest(error: unknown): boolean {
+  if (!(error instanceof ApiRequestError)) {
+    return true;
+  }
+
+  return (
+    error.statusCode === 502 ||
+    error.statusCode === 503 ||
+    error.statusCode === 504
+  );
+}
+
+async function requestOnce<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
@@ -670,6 +695,22 @@ async function request<T>(
   }
 
   return data as T;
+}
+
+async function request<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  try {
+    return await requestOnce<T>(path, options);
+  } catch (error) {
+    if (!isIdempotentRequest(options) || !shouldRetryRequest(error)) {
+      throw error;
+    }
+
+    await delay(IDEMPOTENT_REQUEST_RETRY_DELAY_MS);
+    return requestOnce<T>(path, options);
+  }
 }
 
 function toFiniteNumber(value: unknown, fallback = 0): number {

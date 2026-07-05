@@ -22,6 +22,7 @@ import {
 import dayjs, { type Dayjs } from 'dayjs';
 import {
   ApiRequestError,
+  getCurrentSession,
   isSessionIdleExpiredError,
   type AppointmentRecord,
   type AuthSession,
@@ -629,6 +630,7 @@ export default function MakeAppointmentModal({
 
     try {
       setConsultationStreaming(true);
+      await getCurrentSession();
 
       const result = await submitConsultationStream(
         {

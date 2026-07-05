@@ -236,6 +236,14 @@ export class ProtectedProxyService {
     });
 
     if (result.statusCode === 401) {
+      if (isIdleExpiredErrorResponse(result.body)) {
+        throw createIdleExpiredException();
+      }
+
+      if (isExpiredErrorResponse(result.body)) {
+        throw createSessionExpiredException();
+      }
+
       throw new UnauthorizedException('Session expired. Please login again.');
     }
 

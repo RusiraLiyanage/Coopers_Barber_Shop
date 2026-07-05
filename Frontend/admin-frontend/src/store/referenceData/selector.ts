@@ -13,6 +13,11 @@ export const selectReferenceDataPagingMetaByType = (type: ReferenceDataType) =>
   );
 export const selectReferenceDataLoading = (state: RootState) =>
   state.referenceData.loading;
+export const selectReferenceDataLoadingByType = (type: ReferenceDataType) =>
+  createSelector(
+    [(state: RootState) => state.referenceData.loadingByType],
+    (loadingByType) => loadingByType[type],
+  );
 export const selectReferenceDataSaving = (state: RootState) =>
   state.referenceData.saving;
 

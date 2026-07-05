@@ -14,7 +14,8 @@ type ReferenceDataTabProps = {
   columns: ColumnsType<ReferenceDataItemRecord>;
   barberCapabilityItems: ReferenceDataItemRecord[];
   safetyTriggerItems: ReferenceDataItemRecord[];
-  loading: boolean;
+  barberCapabilityLoading: boolean;
+  safetyTriggerLoading: boolean;
   barberCapabilityPagingMeta: PagingMeta | null;
   safetyTriggerPagingMeta: PagingMeta | null;
   barberCapabilityPage: TablePage;
@@ -28,7 +29,8 @@ export function ReferenceDataTab({
   columns,
   barberCapabilityItems,
   safetyTriggerItems,
-  loading,
+  barberCapabilityLoading,
+  safetyTriggerLoading,
   barberCapabilityPagingMeta,
   safetyTriggerPagingMeta,
   barberCapabilityPage,
@@ -67,7 +69,7 @@ export function ReferenceDataTab({
             rowKey="id"
             columns={columns}
             dataSource={barberCapabilityItems}
-            loading={loading}
+            loading={barberCapabilityLoading}
             pagination={{
               current:
                 barberCapabilityPagingMeta?.page ?? barberCapabilityPage.page,
@@ -106,7 +108,7 @@ export function ReferenceDataTab({
             rowKey="id"
             columns={columns}
             dataSource={safetyTriggerItems}
-            loading={loading}
+            loading={safetyTriggerLoading}
             pagination={{
               current: safetyTriggerPagingMeta?.page ?? safetyTriggerPage.page,
               pageSize:
