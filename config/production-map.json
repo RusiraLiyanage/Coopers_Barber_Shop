@@ -10,6 +10,7 @@
     "docker_context": "Backend",
     "dockerfile": "Backend/apps/booking-api/docker/Dockerfile",
     "app_name": "@coopers/booking.api",
+    "service_config_name": "coopers.booking.api",
     "app_folder": "apps/booking-api",
     "container_port": 7310
   },
@@ -24,6 +25,7 @@
     "docker_context": "Backend",
     "dockerfile": "Backend/apps/auth-api/docker/Dockerfile",
     "app_name": "@coopers/auth.api",
+    "service_config_name": "coopers.auth.api",
     "app_folder": "apps/auth-api",
     "container_port": 7312
   },
@@ -38,6 +40,7 @@
     "docker_context": "Backend",
     "dockerfile": "Backend/apps/admin-api/docker/Dockerfile",
     "app_name": "@coopers/admin.api",
+    "service_config_name": "coopers.admin.api",
     "app_folder": "apps/admin-api",
     "container_port": 7313
   },
@@ -52,6 +55,7 @@
     "docker_context": "Backend",
     "dockerfile": "Backend/apps/booking-guard/docker/Dockerfile",
     "app_name": "@coopers/booking.guard",
+    "service_config_name": "coopers.booking.guard",
     "app_folder": "apps/booking-guard",
     "container_port": 7311
   },
