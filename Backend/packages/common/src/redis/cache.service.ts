@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import Redis from 'ioredis';
+import { sendRuntimeAlert } from '../alerts/runtime-alert';
 import { getRedisCacheRuntimeConfig } from './redis.config';
 import { REDIS_CLUSTER } from './redis.constants';
 
@@ -227,9 +228,15 @@ export class CacheService {
   }
 
   private logRedisClientMissing(operation: string, key: string): void {
-    this.logger.warn(
-      `Redis cache ${operation} skipped for ${key}: Redis clients are not configured.`,
-    );
+    const detail = `Redis cache ${operation} skipped for ${key}: Redis clients are not configured.`;
+
+    this.logger.warn(detail);
+    sendRuntimeAlert({
+      category: 'redis-cache-client-missing',
+      detail,
+      severity: 'warning',
+      throttleSeconds: 900,
+    });
   }
 
   private logRedisFailure(
@@ -238,7 +245,16 @@ export class CacheService {
     error: unknown,
   ): void {
     const message = this.formatErrorMessage(error);
-    this.logger.warn(`Redis cache ${operation} failed for ${key}: ${message}`);
+    const detail = `Redis cache ${operation} failed for ${key}: ${message}`;
+
+    this.logger.warn(detail);
+    sendRuntimeAlert({
+      category: 'redis-cache-failure',
+      detail,
+      error,
+      severity: 'warning',
+      throttleSeconds: 900,
+    });
   }
 
   private formatErrorMessage(error: unknown): string {

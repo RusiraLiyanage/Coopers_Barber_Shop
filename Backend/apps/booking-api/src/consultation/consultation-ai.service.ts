@@ -17,7 +17,11 @@ import {
   StaffGender,
   StaffRole,
 } from '@coopers/entities';
-import { CacheService, REDIS_CACHE_KEYS } from '@coopers/common';
+import {
+  CacheService,
+  REDIS_CACHE_KEYS,
+  sendRuntimeAlert,
+} from '@coopers/common';
 import type { Repository } from 'typeorm';
 import { ConsultationAnswerDto } from './dto/consultation-answer.dto';
 import { HairPhotoDto } from './dto/hair-photo.dto';
@@ -1562,8 +1566,15 @@ export class ConsultationAiService {
 
   private logAiFallback(operation: string, error: unknown): void {
     const message = error instanceof Error ? error.message : String(error);
-    this.logger.warn(
-      `Claude consultation ${operation} failed; using deterministic fallback. ${message}`,
-    );
+    const detail = `Claude consultation ${operation} failed; using deterministic fallback. ${message}`;
+
+    this.logger.warn(detail);
+    sendRuntimeAlert({
+      category: 'claude-consultation-fallback',
+      detail,
+      error,
+      severity: 'warning',
+      throttleSeconds: 900,
+    });
   }
 }

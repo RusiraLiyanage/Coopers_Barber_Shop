@@ -6,6 +6,16 @@ const guardOnlyDevServer: Plugin = {
   name: 'coopers-guard-only-dev-server',
   configureServer(server: ViteDevServer) {
     server.middlewares.use((request, response, next) => {
+      if (request.url === '/runtime-config.js') {
+        response.statusCode = 200
+        response.setHeader('content-type', 'text/javascript')
+        response.end(`window.__COOPERS_RUNTIME_CONFIG__ = Object.freeze({
+  VITE_API_URL: 'http://localhost:7311',
+});
+`)
+        return
+      }
+
       if (process.env.VITE_ALLOW_DIRECT_ACCESS === 'true') {
         next()
         return

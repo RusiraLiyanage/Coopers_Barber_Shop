@@ -4,6 +4,10 @@
   "packageManager": "pnpm@10.17.1",
   "scripts": {
     "hooks:install": "git config core.hooksPath .husky",
+    "local:customer": "scripts/local/customer-stack.sh start",
+    "local:customer:restart": "scripts/local/customer-stack.sh restart",
+    "local:customer:status": "scripts/local/customer-stack.sh status",
+    "local:customer:stop": "scripts/local/customer-stack.sh stop",
     "frontend:lint": "pnpm --dir Frontend/admin-frontend lint && pnpm --dir Frontend/appointment-booking-frontend lint",
     "frontend:build": "pnpm --dir Frontend/admin-frontend build && pnpm --dir Frontend/appointment-booking-frontend build",
     "frontend:check": "pnpm run frontend:lint && pnpm run frontend:build",

@@ -5,6 +5,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { sendRuntimeAlert } from '../../alerts/runtime-alert';
 import { getRequiredConfigInteger } from '../../configs/env.util';
 import { IdempotencyService } from './idempotency.service';
 
@@ -42,10 +43,19 @@ export class IdempotencyCleanupService
         this.logger.log(`Deleted ${deletedCount} expired idempotency key(s).`);
       }
     } catch (error) {
+      const detail = 'Failed to delete expired idempotency keys.';
+
       this.logger.error(
-        'Failed to delete expired idempotency keys.',
+        detail,
         error instanceof Error ? error.stack : String(error),
       );
+      sendRuntimeAlert({
+        category: 'idempotency-cleanup-failure',
+        detail,
+        error,
+        severity: 'error',
+        throttleSeconds: 900,
+      });
     }
   }
 

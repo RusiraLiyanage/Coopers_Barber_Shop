@@ -5,7 +5,11 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { getRequiredConfigInteger, SessionService } from '@coopers/common';
+import {
+  getRequiredConfigInteger,
+  sendRuntimeAlert,
+  SessionService,
+} from '@coopers/common';
 
 @Injectable()
 export class AuthSessionCleanupService
@@ -41,10 +45,19 @@ export class AuthSessionCleanupService
         this.logger.log(`Revoked ${revokedCount} expired auth session(s).`);
       }
     } catch (error) {
+      const detail = 'Failed to revoke expired auth sessions.';
+
       this.logger.error(
-        'Failed to revoke expired auth sessions.',
+        detail,
         error instanceof Error ? error.stack : String(error),
       );
+      sendRuntimeAlert({
+        category: 'auth-session-cleanup-failure',
+        detail,
+        error,
+        severity: 'error',
+        throttleSeconds: 900,
+      });
     }
   }
 

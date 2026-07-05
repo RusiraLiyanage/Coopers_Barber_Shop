@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AdminDataChangedReason } from '@coopers/common';
+import { AdminDataChangedReason, sendRuntimeAlert } from '@coopers/common';
 import { DataVersionService } from '../data-version/data-version.service';
 import { AdminRealtimeService } from './admin-realtime.service';
 
@@ -22,8 +22,16 @@ export class AdminRealtimeNotifierService {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      const detail = `Failed to emit admin data change event: ${message}`;
 
-      this.logger.warn(`Failed to emit admin data change event: ${message}`);
+      this.logger.warn(detail);
+      sendRuntimeAlert({
+        category: 'admin-realtime-emit-failure',
+        detail,
+        error,
+        severity: 'warning',
+        throttleSeconds: 900,
+      });
     }
   }
 }

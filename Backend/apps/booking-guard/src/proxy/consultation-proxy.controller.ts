@@ -12,6 +12,8 @@ import {
 } from './auth-cookie.util';
 import { getRefreshTokenFromRequest } from './refresh-token.util';
 
+const CONSULTATION_UPSTREAM_TIMEOUT_MS = 30_000;
+
 type StartConsultationRequestBody = {
   serviceId: string;
 };
@@ -133,6 +135,7 @@ export class ConsultationProxyController {
       method: 'POST',
       path: '/consultation/start',
       body,
+      timeoutMs: CONSULTATION_UPSTREAM_TIMEOUT_MS,
     });
 
     writeProxyResponse(
@@ -188,6 +191,7 @@ export class ConsultationProxyController {
       method: 'POST',
       path: '/consultation/submit',
       body,
+      timeoutMs: CONSULTATION_UPSTREAM_TIMEOUT_MS,
     });
 
     writeProxyResponse(
@@ -243,6 +247,7 @@ export class ConsultationProxyController {
       method: 'POST',
       path: '/consultation/submit/stream',
       body,
+      timeoutMs: CONSULTATION_UPSTREAM_TIMEOUT_MS,
     });
 
     if (result.refreshedTokens) {
