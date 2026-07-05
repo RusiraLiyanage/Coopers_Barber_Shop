@@ -37,6 +37,10 @@ type HttpExceptionResponse = {
   message?: unknown;
 };
 
+const DEFAULT_SLACK_ALERT_MIN_STATUS = 400;
+const DEFAULT_SLACK_ALERT_THROTTLE_SECONDS = 300;
+const slackAlertLastSentAt = new Map<string, number>();
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -76,6 +80,10 @@ function shouldLogDetailedError(exception: unknown): boolean {
     return true;
   }
 
+  if (exception.getStatus() >= HttpStatus.BAD_REQUEST) {
+    return true;
+  }
+
   return (
     process.env.ENV === 'develop' || process.env.NODE_ENV === 'development'
   );
@@ -96,6 +104,164 @@ function logException(
     method: request.method ?? '',
     path: request.originalUrl ?? request.url ?? '',
     exception,
+  });
+}
+
+function parsePositiveInteger(
+  value: string | undefined,
+  fallback: number,
+): number {
+  const parsed = Number(value);
+
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function normalizeSlackText(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value.join(', ');
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  return 'Something went wrong';
+}
+
+function getExceptionDetail(exception: unknown, message: string | string[]): string {
+  if (exception instanceof Error && exception.message) {
+    return exception.message;
+  }
+
+  return normalizeSlackText(message);
+}
+
+function getRuntimeServiceName(): string {
+  return (
+    process.env.SLACK_RUNTIME_ERROR_SERVICE_NAME ||
+    process.env.SERVICE_CONFIG_NAME ||
+    process.env.APP_CONFIG_APPLICATION ||
+    process.env.npm_package_name ||
+    'unknown-service'
+  );
+}
+
+function shouldSendSlackAlert(
+  statusCode: number,
+  request: HttpRequestLike,
+  detail: string,
+): boolean {
+  const webhookUrl = process.env.SLACK_RUNTIME_ERROR_WEBHOOK_URL;
+
+  if (!webhookUrl) {
+    return false;
+  }
+
+  const minStatus = parsePositiveInteger(
+    process.env.SLACK_RUNTIME_ERROR_MIN_STATUS,
+    DEFAULT_SLACK_ALERT_MIN_STATUS,
+  );
+
+  if (statusCode < minStatus) {
+    return false;
+  }
+
+  const throttleSeconds = parsePositiveInteger(
+    process.env.SLACK_RUNTIME_ERROR_THROTTLE_SECONDS,
+    DEFAULT_SLACK_ALERT_THROTTLE_SECONDS,
+  );
+  const alertKey = [
+    getRuntimeServiceName(),
+    statusCode,
+    request.method ?? '',
+    request.originalUrl ?? request.url ?? '',
+    detail,
+  ].join('|');
+  const now = Date.now();
+  const lastSentAt = slackAlertLastSentAt.get(alertKey) ?? 0;
+
+  if (now - lastSentAt < throttleSeconds * 1000) {
+    return false;
+  }
+
+  slackAlertLastSentAt.set(alertKey, now);
+  return true;
+}
+
+function truncateSlackValue(value: string, maxLength = 600): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  return `${value.slice(0, maxLength - 3)}...`;
+}
+
+function sendSlackRuntimeErrorAlert(
+  exception: unknown,
+  request: HttpRequestLike,
+  statusCode: number,
+  error: string,
+  message: string | string[],
+): void {
+  const webhookUrl = process.env.SLACK_RUNTIME_ERROR_WEBHOOK_URL;
+  const detail = getExceptionDetail(exception, message);
+
+  if (!webhookUrl || !shouldSendSlackAlert(statusCode, request, detail)) {
+    return;
+  }
+
+  const method = request.method ?? '';
+  const path = request.originalUrl ?? request.url ?? '';
+  const environment = process.env.ENV || process.env.NODE_ENV || 'unknown';
+  const payload = {
+    blocks: [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: ':rotating_light: *Runtime Server Error* :rotating_light:',
+        },
+      },
+      {
+        type: 'section',
+        fields: [
+          {
+            type: 'mrkdwn',
+            text: `*Service:*\n${getRuntimeServiceName()}`,
+          },
+          {
+            type: 'mrkdwn',
+            text: `*Environment:*\n${environment}`,
+          },
+          {
+            type: 'mrkdwn',
+            text: `*Status:*\n${statusCode} ${error}`,
+          },
+          {
+            type: 'mrkdwn',
+            text: `*Route:*\n${method} ${path}`,
+          },
+        ],
+      },
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `*Problem:*\n\`${truncateSlackValue(detail).replace(/`/g, "'")}\``,
+        },
+      },
+    ],
+  };
+
+  void fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).catch((alertError: unknown) => {
+    const alertMessage =
+      alertError instanceof Error ? alertError.message : String(alertError);
+
+    console.error('Slack runtime error alert failed:', alertMessage);
   });
 }
 
@@ -128,6 +294,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
 
     logException(exception, request, statusCode);
+    sendSlackRuntimeErrorAlert(exception, request, statusCode, error, message);
 
     // this is how the response looks like to the user. (when exception is there)
     response.status(statusCode).json({
