@@ -48,7 +48,10 @@ if [[ "$BEFORE_SHA" =~ ^0+$ ]]; then
 fi
 
 # Read changed files between the previous and current commit.
-mapfile -t CHANGED_FILES < <(git diff --name-only "$BEFORE_SHA" "$AFTER_SHA")
+CHANGED_FILES=()
+while IFS= read -r changed_file; do
+  CHANGED_FILES+=("$changed_file")
+done < <(git diff --name-only "$BEFORE_SHA" "$AFTER_SHA")
 
 # No changed files means there is nothing to deploy.
 if [ "${#CHANGED_FILES[@]}" -eq 0 ]; then
@@ -79,7 +82,7 @@ if [ "$DEPLOYMENT_CHANGED" = "true" ]; then
 fi
 
 # Build a JSON array of app keys whose work_directory changed.
-jq -n \
+jq -c -n \
   --argjson map "$(cat "$MAP_FILE")" \
   --argjson backendShared "$BACKEND_SHARED_CHANGED" \
   '
