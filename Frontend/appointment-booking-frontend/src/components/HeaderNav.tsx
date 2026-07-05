@@ -61,7 +61,7 @@ export default function HeaderNav({
     <>
       <Header className="app-header">
         <div className="app-header-brand" onClick={() => navigate('/')}>
-          Cooper's BarberShop
+          Cooper's Barber Shop
         </div>
 
         <Menu
