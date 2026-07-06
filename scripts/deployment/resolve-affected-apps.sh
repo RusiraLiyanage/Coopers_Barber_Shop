@@ -61,6 +61,8 @@ fi
 
 # Shared backend changes affect every backend app.
 BACKEND_SHARED_CHANGED=false
+# Frontend runtime injection changes affect only frontend apps.
+FRONTEND_DEPLOYMENT_CHANGED=false
 # Deployment workflow/config changes affect every mapped app.
 DEPLOYMENT_CHANGED=false
 
@@ -68,6 +70,11 @@ for changed_file in "${CHANGED_FILES[@]}"; do
   case "$changed_file" in
     Backend/packages/*|Backend/package.json|Backend/pnpm-lock.yaml|Backend/turbo.json|Backend/.dockerignore)
       BACKEND_SHARED_CHANGED=true
+      ;;
+    scripts/deployment/inject-frontend-runtime-env.sh)
+      FRONTEND_DEPLOYMENT_CHANGED=true
+      ;;
+    scripts/deployment/resolve-affected-apps.sh)
       ;;
     config/*|scripts/deployment/*|.github/workflows/*)
       DEPLOYMENT_CHANGED=true
@@ -85,6 +92,7 @@ fi
 jq -c -n \
   --argjson map "$(cat "$MAP_FILE")" \
   --argjson backendShared "$BACKEND_SHARED_CHANGED" \
+  --argjson frontendDeployment "$FRONTEND_DEPLOYMENT_CHANGED" \
   '
     $map
     | to_entries
@@ -95,6 +103,10 @@ jq -c -n \
             or (
               $backendShared
               and ($entry.value.work_directory | startswith("Backend/apps/"))
+            )
+            or (
+              $frontendDeployment
+              and ($entry.value.work_directory | startswith("Frontend/"))
             )
           )
         | $entry.key
