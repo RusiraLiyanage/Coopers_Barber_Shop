@@ -28,7 +28,12 @@ import {
 import { SAModalHeader } from '../../components/common';
 import { useAdminDataFreshness } from '../../hooks/useAdminDataFreshness';
 import { getServiceAiStarterConfig } from '../../lib/adminOptions';
-import { createAdminInvite, createHairHistoryFromBrief } from '../../lib/api';
+import {
+  createAdminInvite,
+  createHairHistoryFromBrief,
+  getAllReferenceData,
+  getAllServiceAiConfigs,
+} from '../../lib/api';
 import {
   getUserFriendlyErrorMessage,
   isSessionExpiredError,
@@ -66,7 +71,6 @@ import {
 } from '../../store/referenceData/action';
 import {
   selectReferenceData,
-  selectReferenceDataLoading,
   selectReferenceDataLoadingByType,
   selectReferenceDataPagingMetaByType,
 } from '../../store/referenceData/selector';
@@ -182,6 +186,15 @@ export default function AdminDashboard() {
     useState(false);
   const [deletingReferenceDataItemId, setDeletingReferenceDataItemId] =
     useState<string | null>(null);
+  const [allBarberCapabilities, setAllBarberCapabilities] = useState<
+    ReferenceDataItemRecord[]
+  >([]);
+  const [allSafetyTriggers, setAllSafetyTriggers] = useState<
+    ReferenceDataItemRecord[]
+  >([]);
+  const [allServiceConfigs, setAllServiceConfigs] = useState<
+    ServiceAiConfigRecord[]
+  >([]);
   const [createdInvite, setCreatedInvite] =
     useState<AdminInviteResponse | null>(null);
   const [editingBarber, setEditingBarber] = useState<BarberRecord | null>(null);
@@ -247,7 +260,6 @@ export default function AdminDashboard() {
   const briefsPagingMeta = useAppSelector(selectAppointmentBriefsPagingMeta);
   const hairHistoryPagingMeta = useAppSelector(selectHairHistoryPagingMeta);
   const barbersLoading = useAppSelector(selectBarbersLoading);
-  const referenceDataLoading = useAppSelector(selectReferenceDataLoading);
   const barberCapabilityLoading = useAppSelector(
     selectReferenceDataLoadingByType('barber_capability'),
   );
@@ -265,7 +277,7 @@ export default function AdminDashboard() {
   const serviceNameById = useMemo(
     () => {
       const serviceNames = new Map(
-        serviceConfigs.map((service) => [service.id, service.name] as const),
+        allServiceConfigs.map((service) => [service.id, service.name] as const),
       );
 
       safetyRules.forEach((rule) => {
@@ -276,7 +288,7 @@ export default function AdminDashboard() {
 
       return serviceNames;
     },
-    [safetyRules, serviceConfigs],
+    [allServiceConfigs, safetyRules],
   );
 
   const barberCapabilityItems = useMemo(
@@ -291,41 +303,41 @@ export default function AdminDashboard() {
 
   const barberCapabilityOptions = useMemo(
     () =>
-      barberCapabilityItems.map((item) => ({
+      allBarberCapabilities.map((item) => ({
         label: item.label,
         value: item.value,
       })),
-    [barberCapabilityItems],
+    [allBarberCapabilities],
   );
 
   const safetyTriggerOptions = useMemo(
     () =>
-      safetyTriggerItems.map((item) => ({
+      allSafetyTriggers.map((item) => ({
         label: item.label,
         value: item.value,
       })),
-    [safetyTriggerItems],
+    [allSafetyTriggers],
   );
 
   const barberCapabilityLabelByValue = useMemo(
     () =>
       new Map(
-        barberCapabilityItems.map((item) => [item.value, item.label] as const),
+        allBarberCapabilities.map((item) => [item.value, item.label] as const),
       ),
-    [barberCapabilityItems],
+    [allBarberCapabilities],
   );
 
   const safetyTriggerLabelByValue = useMemo(
     () =>
       new Map(
-        safetyTriggerItems.map((item) => [item.value, item.label] as const),
+        allSafetyTriggers.map((item) => [item.value, item.label] as const),
       ),
-    [safetyTriggerItems],
+    [allSafetyTriggers],
   );
 
   const knownBarberCapabilities = useMemo(
-    () => new Set(barberCapabilityItems.map((item) => item.value)),
-    [barberCapabilityItems],
+    () => new Set(allBarberCapabilities.map((item) => item.value)),
+    [allBarberCapabilities],
   );
 
   const visibleBarbers = useMemo(
@@ -352,18 +364,18 @@ export default function AdminDashboard() {
 
   const configuredServiceConfigs = useMemo(
     () =>
-      serviceConfigs.filter((service) =>
+      allServiceConfigs.filter((service) =>
         isConfiguredService(service, knownBarberCapabilities),
       ),
-    [knownBarberCapabilities, serviceConfigs],
+    [allServiceConfigs, knownBarberCapabilities],
   );
 
   const servicesNeedingSetup = useMemo(
     () =>
-      serviceConfigs.filter(
+      allServiceConfigs.filter(
         (service) => !isConfiguredService(service, knownBarberCapabilities),
       ),
-    [knownBarberCapabilities, serviceConfigs],
+    [allServiceConfigs, knownBarberCapabilities],
   );
 
   const sortedServiceConfigs = useMemo(
@@ -390,7 +402,7 @@ export default function AdminDashboard() {
   const serviceOptions = useMemo(
     () => {
       const optionsById = new Map(
-        configuredServiceConfigs.map((service) => [
+        allServiceConfigs.map((service) => [
           service.id,
           {
             label: service.name,
@@ -408,7 +420,7 @@ export default function AdminDashboard() {
 
       return Array.from(optionsById.values());
     },
-    [configuredServiceConfigs, editingSafetyRule],
+    [allServiceConfigs, editingSafetyRule],
   );
 
   const unconfiguredServiceOptions = useMemo(
@@ -444,6 +456,9 @@ export default function AdminDashboard() {
       dispatch(getSafetyRulesAction(safetyPage)).unwrap(),
       dispatch(getAppointmentBriefsAction(briefsPage)).unwrap(),
       dispatch(getHairHistoryAction(hairHistoryPage)).unwrap(),
+      getAllReferenceData('barber_capability'),
+      getAllReferenceData('safety_trigger'),
+      getAllServiceAiConfigs(),
     ]);
 
     const failures = results.filter(
@@ -464,6 +479,31 @@ export default function AdminDashboard() {
       messageApi.warning(
         'Some admin data could not be loaded. Please refresh.',
       );
+    }
+
+    const [
+      ,
+      ,
+      ,
+      ,
+      ,
+      ,
+      ,
+      allBarberCapabilitiesResult,
+      allSafetyTriggersResult,
+      allServiceConfigsResult,
+    ] = results;
+
+    if (allBarberCapabilitiesResult.status === 'fulfilled') {
+      setAllBarberCapabilities(allBarberCapabilitiesResult.value);
+    }
+
+    if (allSafetyTriggersResult.status === 'fulfilled') {
+      setAllSafetyTriggers(allSafetyTriggersResult.value);
+    }
+
+    if (allServiceConfigsResult.status === 'fulfilled') {
+      setAllServiceConfigs(allServiceConfigsResult.value);
     }
 
     try {
@@ -487,9 +527,83 @@ export default function AdminDashboard() {
     refreshKnownVersion,
   ]);
 
+  const loadDropdownData = useCallback(async () => {
+    const [
+      barberCapabilities,
+      safetyTriggers,
+      fullServiceConfigs,
+    ] = await Promise.all([
+      getAllReferenceData('barber_capability'),
+      getAllReferenceData('safety_trigger'),
+      getAllServiceAiConfigs(),
+    ]);
+
+    setAllBarberCapabilities(barberCapabilities);
+    setAllSafetyTriggers(safetyTriggers);
+    setAllServiceConfigs(fullServiceConfigs);
+  }, []);
+
   useEffect(() => {
-    void loadAdminData();
-  }, [loadAdminData]);
+    void dispatch(getBarbersAction(barbersPage)).unwrap().catch(showRequestError);
+  }, [barbersPage, dispatch, showRequestError]);
+
+  useEffect(() => {
+    void dispatch(
+      getReferenceDataAction({
+        type: 'barber_capability',
+        ...barberCapabilityPage,
+      }),
+    )
+      .unwrap()
+      .catch(showRequestError);
+  }, [barberCapabilityPage, dispatch, showRequestError]);
+
+  useEffect(() => {
+    void dispatch(
+      getReferenceDataAction({
+        type: 'safety_trigger',
+        ...safetyTriggerPage,
+      }),
+    )
+      .unwrap()
+      .catch(showRequestError);
+  }, [dispatch, safetyTriggerPage, showRequestError]);
+
+  useEffect(() => {
+    void dispatch(getServiceConfigsAction(servicesPage))
+      .unwrap()
+      .catch(showRequestError);
+  }, [dispatch, servicesPage, showRequestError]);
+
+  useEffect(() => {
+    void dispatch(getSafetyRulesAction(safetyPage))
+      .unwrap()
+      .catch(showRequestError);
+  }, [dispatch, safetyPage, showRequestError]);
+
+  useEffect(() => {
+    void dispatch(getAppointmentBriefsAction(briefsPage))
+      .unwrap()
+      .catch(showRequestError);
+  }, [briefsPage, dispatch, showRequestError]);
+
+  useEffect(() => {
+    void dispatch(getHairHistoryAction(hairHistoryPage))
+      .unwrap()
+      .catch(showRequestError);
+  }, [dispatch, hairHistoryPage, showRequestError]);
+
+  useEffect(() => {
+    void loadDropdownData().catch(showRequestError);
+  }, [loadDropdownData, showRequestError]);
+
+  useEffect(() => {
+    void refreshKnownVersion().catch((error) => {
+      if (isSessionExpiredError(error)) {
+        showRequestError(error);
+      }
+    });
+  }, [refreshKnownVersion, showRequestError]);
 
   useEffect(() => {
     if (!selectedBrief) {
@@ -743,6 +857,7 @@ export default function AdminDashboard() {
       }
 
       await dispatch(getServiceConfigsAction(servicesPage)).unwrap();
+      setAllServiceConfigs(await getAllServiceAiConfigs());
       await refreshKnownVersion();
       messageApi.success('Service saved.');
       setServiceModalOpen(false);
@@ -816,6 +931,9 @@ export default function AdminDashboard() {
       }
 
       await refreshKnownVersion();
+      setAllBarberCapabilities(await getAllReferenceData('barber_capability'));
+      setAllSafetyTriggers(await getAllReferenceData('safety_trigger'));
+      setAllServiceConfigs(await getAllServiceAiConfigs());
       messageApi.success('Reference data saved.');
       setReferenceDataModalOpen(false);
     } catch (error) {
@@ -834,6 +952,9 @@ export default function AdminDashboard() {
     try {
       await dispatch(deleteReferenceDataItemAction(item)).unwrap();
       await refreshKnownVersion();
+      setAllBarberCapabilities(await getAllReferenceData('barber_capability'));
+      setAllSafetyTriggers(await getAllReferenceData('safety_trigger'));
+      setAllServiceConfigs(await getAllServiceAiConfigs());
       messageApi.success(`${item.label} deleted.`);
     } catch (error) {
       showRequestError(error);
@@ -1442,10 +1563,10 @@ export default function AdminDashboard() {
                 barberCapabilityItems={barberCapabilityItems}
                 safetyTriggerItems={safetyTriggerItems}
                 barberCapabilityLoading={
-                  referenceDataLoading || barberCapabilityLoading
+                  barberCapabilityLoading
                 }
                 safetyTriggerLoading={
-                  referenceDataLoading || safetyTriggerLoading
+                  safetyTriggerLoading
                 }
                 barberCapabilityPagingMeta={barberCapabilityPagingMeta}
                 safetyTriggerPagingMeta={safetyTriggerPagingMeta}
@@ -1845,12 +1966,12 @@ export default function AdminDashboard() {
             rules={[
               { required: true, message: 'At least one service is required.' },
             ]}
-            extra="Only configured service AI records are available here."
+            extra="Choose the services this safety rule can apply to."
           >
             <Select
               mode="multiple"
               options={serviceOptions}
-              placeholder="Select configured services"
+              placeholder="Select services"
               showSearch
               filterOption={filterSelectOption}
               optionFilterProp="label"
