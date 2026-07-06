@@ -177,6 +177,17 @@ jobs:
             "$container_name" \
             "${{ matrix.app_key }}"
 
+      # Backend env vars come from AppConfig; Secrets Manager entries stay attached as ECS secrets.
+      - name: Inject backend AppConfig environment
+        if: ${{ matrix.app_key != 'coopers.customer.frontend' && matrix.app_key != 'coopers.admin.frontend' }}
+        shell: bash
+        run: |
+          chmod +x scripts/deployment/inject-backend-env.sh
+          scripts/deployment/inject-backend-env.sh \
+            "$work_directory/task-definition.json" \
+            "$container_name" \
+            "$work_directory/.env.$DEPLOY_ENV"
+
       # Replace only the configured container image in the task definition.
       - name: Render task definition with new image
         id: task-def
