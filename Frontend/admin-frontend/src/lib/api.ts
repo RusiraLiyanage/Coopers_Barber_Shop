@@ -716,6 +716,24 @@ export function getServiceAiConfigs(pagination: PaginationRequest = {}) {
   );
 }
 
+export async function getAllServiceAiConfigs() {
+  const limit = 30;
+  const firstPage = await getServiceAiConfigs({ page: 1, limit });
+  const remainingPages = Array.from(
+    { length: Math.max(0, firstPage.pagingMeta.totalPage - 1) },
+    (_, index) => index + 2,
+  );
+
+  const remainingResponses = await Promise.all(
+    remainingPages.map((page) => getServiceAiConfigs({ page, limit })),
+  );
+
+  return [
+    ...firstPage.data,
+    ...remainingResponses.flatMap((response) => response.data),
+  ];
+}
+
 export function createService(payload: CreateServicePayload) {
   return request<ServiceAiConfigRecord>('/admin/services', {
     method: 'POST',
@@ -780,6 +798,24 @@ export function getReferenceData(
       headers: buildHeaders(),
     },
   );
+}
+
+export async function getAllReferenceData(type: ReferenceDataType) {
+  const limit = 30;
+  const firstPage = await getReferenceData(type, { page: 1, limit });
+  const remainingPages = Array.from(
+    { length: Math.max(0, firstPage.pagingMeta.totalPage - 1) },
+    (_, index) => index + 2,
+  );
+
+  const remainingResponses = await Promise.all(
+    remainingPages.map((page) => getReferenceData(type, { page, limit })),
+  );
+
+  return [
+    ...firstPage.data,
+    ...remainingResponses.flatMap((response) => response.data),
+  ];
 }
 
 export function createReferenceDataItem(payload: CreateReferenceDataItemPayload) {
