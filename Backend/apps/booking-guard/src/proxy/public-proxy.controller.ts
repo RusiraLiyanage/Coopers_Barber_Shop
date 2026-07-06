@@ -10,7 +10,10 @@ import {
 } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { createLoginThrottleOptions } from '@coopers/common';
+import {
+  createLoginThrottleOptions,
+  SESSION_IDLE_EXPIRED_CODE,
+} from '@coopers/common';
 import type { AuthTokensResponse } from '@coopers/common';
 import { ProxyService } from './proxy.service';
 import {
@@ -102,6 +105,27 @@ function isAuthTokensResponse(value: unknown): value is AuthTokensResponse {
 
 function isSuccessStatus(statusCode: number): boolean {
   return statusCode >= 200 && statusCode < 300;
+}
+
+function isExtendableIdleExpiredException(error: unknown): boolean {
+  if (!(error instanceof UnauthorizedException)) {
+    return false;
+  }
+
+  const exceptionResponse = error.getResponse();
+
+  if (typeof exceptionResponse !== 'object' || exceptionResponse === null) {
+    return false;
+  }
+
+  const response = exceptionResponse as {
+    code?: unknown;
+    canExtend?: unknown;
+  };
+
+  return (
+    response.code === SESSION_IDLE_EXPIRED_CODE && response.canExtend === true
+  );
 }
 
 function writeAuthResponse(
@@ -276,7 +300,10 @@ export class PublicProxyController {
         ).refresh_token,
       });
     } catch (error) {
-      if (error instanceof UnauthorizedException) {
+      if (
+        error instanceof UnauthorizedException &&
+        !isExtendableIdleExpiredException(error)
+      ) {
         clearAuthCookies(response);
       }
 
