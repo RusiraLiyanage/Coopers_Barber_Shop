@@ -1,7 +1,5 @@
 type RuntimeConfigKey =
-  | 'VITE_API_URL'
-  | 'VITE_SESSION_IDLE_TIMEOUT_SECONDS'
-  | 'VITE_SESSION_EXTENSION_GRACE_SECONDS';
+  | 'VITE_API_URL';
 
 type RuntimeConfig = Partial<Record<RuntimeConfigKey, string>>;
 

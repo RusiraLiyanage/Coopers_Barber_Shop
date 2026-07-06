@@ -15,16 +15,12 @@ case "$APP_KEY" in
   coopers.customer.frontend)
     RUNTIME_KEYS=(
       VITE_API_URL
-      VITE_SESSION_IDLE_TIMEOUT_SECONDS
-      VITE_SESSION_EXTENSION_GRACE_SECONDS
     )
     ;;
   coopers.admin.frontend)
     RUNTIME_KEYS=(
       VITE_API_URL
       VITE_ADMIN_REALTIME_URL
-      VITE_SESSION_IDLE_TIMEOUT_SECONDS
-      VITE_SESSION_EXTENSION_GRACE_SECONDS
     )
     ;;
   *)
