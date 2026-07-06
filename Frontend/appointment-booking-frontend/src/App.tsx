@@ -89,6 +89,7 @@ function App() {
     : sessionTimeoutFlowState;
   const isNewAppointmentRoute = location.pathname === '/new-appointment';
   const isAppointmentModalOpen =
+    !isSessionTimeoutPromptOpen &&
     !isSessionSwitchPromptOpen &&
     (openAppointmentModal || (isNewAppointmentRoute && isAuthenticated));
 
@@ -286,6 +287,15 @@ function App() {
       window.removeEventListener('storage', handleClientSessionReplaced);
     };
   }, [dispatch, navigate, setAuthSession]);
+
+  useEffect(() => {
+    if (!isSessionTimeoutPromptOpen) {
+      return;
+    }
+
+    setOpenAppointmentModal(false);
+    setEditingAppointment(null);
+  }, [isSessionTimeoutPromptOpen]);
 
   useEffect(() => {
     if (
@@ -543,7 +553,9 @@ function App() {
           />
         </Routes>
 
-        {!isSessionSwitchPromptOpen && location.pathname === '/appointments' ? (
+        {!isSessionTimeoutPromptOpen &&
+        !isSessionSwitchPromptOpen &&
+        location.pathname === '/appointments' ? (
           <Suspense fallback={<SALoadingPanel />}>
             <MyAppointments
               open
@@ -559,7 +571,9 @@ function App() {
           </Suspense>
         ) : null}
 
-        {!isSessionSwitchPromptOpen && location.pathname === '/account' ? (
+        {!isSessionTimeoutPromptOpen &&
+        !isSessionSwitchPromptOpen &&
+        location.pathname === '/account' ? (
           <Suspense fallback={<SALoadingPanel />}>
             <MyAccount
               open
