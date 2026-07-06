@@ -106,6 +106,7 @@ function App() {
   }, []);
 
   const showSessionExpiredNotice = useCallback(() => {
+    clearClientAuthSession();
     setAuthSession(null);
     setEditingAppointment(null);
     setOpenAppointmentModal(false);

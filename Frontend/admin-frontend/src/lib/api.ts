@@ -7,12 +7,8 @@ const API_BASE_URL = getRuntimeConfigValue(
 const ADMIN_BROWSER_SESSION_KEY = 'coopers_admin_auth_browser_session';
 const ADMIN_REMEMBERED_SESSION_KEY = 'coopers_admin_auth_remembered_session';
 const ADMIN_HAD_SESSION_KEY = 'coopers_admin_auth_had_session';
-const ADMIN_IDLE_PROMPT_AT_KEY = 'coopers_admin_idle_prompt_at';
-const ADMIN_GRACE_EXPIRES_AT_KEY = 'coopers_admin_grace_expires_at';
 export const ADMIN_SESSION_REPLACED_SIGNAL_KEY =
   'coopers_admin_auth_session_replaced';
-const DEFAULT_SESSION_IDLE_TIMEOUT_SECONDS = 300;
-const DEFAULT_SESSION_EXTENSION_GRACE_SECONDS = 300;
 const IDEMPOTENT_REQUEST_RETRY_DELAY_MS = 300;
 export const SESSION_EXPIRED_CODE = 'SESSION_EXPIRED';
 export const SESSION_IDLE_EXPIRED_CODE = 'SESSION_IDLE_EXPIRED';
@@ -54,11 +50,6 @@ type ApiErrorPayload = {
 };
 
 type ParsedResponse<T> = T | ApiErrorPayload | string | null;
-
-type AdminSessionTimeoutDeadlines = {
-  promptAt: number;
-  graceExpiresAt: number;
-};
 
 export class ApiRequestError extends Error {
   constructor(
@@ -352,14 +343,6 @@ function buildQueryString(params: Record<string, string | number | undefined>) {
   return value ? `?${value}` : '';
 }
 
-function toPositiveNumber(value: unknown, fallback: number): number {
-  const numericValue = Number(value);
-
-  return Number.isFinite(numericValue) && numericValue > 0
-    ? Math.floor(numericValue)
-    : fallback;
-}
-
 function getSessionStorageValue(key: string): string | null {
   try {
     return window.sessionStorage.getItem(key);
@@ -408,51 +391,6 @@ function removeLocalStorageValue(key: string): void {
   }
 }
 
-function getAdminSessionIdleTimeoutMs(): number {
-  const configuredSeconds = getRuntimeConfigValue(
-    'VITE_SESSION_IDLE_TIMEOUT_SECONDS',
-  );
-
-  return (
-    toPositiveNumber(
-      configuredSeconds,
-      DEFAULT_SESSION_IDLE_TIMEOUT_SECONDS,
-    ) * 1000
-  );
-}
-
-function getAdminSessionExtensionGraceMs(): number {
-  const configuredSeconds = getRuntimeConfigValue(
-    'VITE_SESSION_EXTENSION_GRACE_SECONDS',
-  );
-
-  return (
-    toPositiveNumber(
-      configuredSeconds,
-      DEFAULT_SESSION_EXTENSION_GRACE_SECONDS,
-    ) * 1000
-  );
-}
-
-function shouldPersistAdminSessionAcrossBrowserRestarts(): boolean {
-  return getLocalStorageValue(ADMIN_REMEMBERED_SESSION_KEY) === 'true';
-}
-
-function writeAdminSessionDeadlineValue(key: string, value: string): void {
-  setSessionStorageValue(key, value);
-
-  if (shouldPersistAdminSessionAcrossBrowserRestarts()) {
-    setLocalStorageValue(key, value);
-    return;
-  }
-
-  removeLocalStorageValue(key);
-}
-
-function readAdminSessionDeadlineValue(key: string): string | null {
-  return getSessionStorageValue(key) ?? getLocalStorageValue(key);
-}
-
 function rememberAdminAuthSession(remember: boolean): void {
   setSessionStorageValue(ADMIN_BROWSER_SESSION_KEY, 'true');
   setLocalStorageValue(ADMIN_HAD_SESSION_KEY, 'true');
@@ -493,86 +431,16 @@ export function clearAdminAuthSession(): void {
   removeSessionStorageValue(ADMIN_BROWSER_SESSION_KEY);
   removeLocalStorageValue(ADMIN_REMEMBERED_SESSION_KEY);
   removeLocalStorageValue(ADMIN_HAD_SESSION_KEY);
-  removeSessionStorageValue(ADMIN_IDLE_PROMPT_AT_KEY);
-  removeSessionStorageValue(ADMIN_GRACE_EXPIRES_AT_KEY);
-  removeLocalStorageValue(ADMIN_IDLE_PROMPT_AT_KEY);
-  removeLocalStorageValue(ADMIN_GRACE_EXPIRES_AT_KEY);
 }
 
 export function clearCurrentAdminTabAuthSession(): void {
   removeSessionStorageValue(ADMIN_BROWSER_SESSION_KEY);
-  removeSessionStorageValue(ADMIN_IDLE_PROMPT_AT_KEY);
-  removeSessionStorageValue(ADMIN_GRACE_EXPIRES_AT_KEY);
 }
 
 function broadcastAdminSessionReplacement(): void {
   setLocalStorageValue(
     ADMIN_SESSION_REPLACED_SIGNAL_KEY,
     `${Date.now()}:${Math.random()}`,
-  );
-}
-
-export function hasAdminSessionTimeoutState(): boolean {
-  return (
-    canRestoreAdminAuthSession() &&
-    Boolean(
-      readAdminSessionDeadlineValue(ADMIN_IDLE_PROMPT_AT_KEY) &&
-        readAdminSessionDeadlineValue(ADMIN_GRACE_EXPIRES_AT_KEY),
-    )
-  );
-}
-
-export function shouldShowAdminLoginAfterExpiry(): boolean {
-  if (!hasTrackedAdminSession()) {
-    return false;
-  }
-
-  const deadlines = getAdminSessionTimeoutDeadlines();
-
-  return deadlines !== null && Date.now() >= deadlines.graceExpiresAt;
-}
-
-export function clearAdminSessionTimeoutTracking(): void {
-  removeSessionStorageValue(ADMIN_IDLE_PROMPT_AT_KEY);
-  removeSessionStorageValue(ADMIN_GRACE_EXPIRES_AT_KEY);
-  removeLocalStorageValue(ADMIN_IDLE_PROMPT_AT_KEY);
-  removeLocalStorageValue(ADMIN_GRACE_EXPIRES_AT_KEY);
-}
-
-export function getAdminSessionTimeoutDeadlines(): AdminSessionTimeoutDeadlines | null {
-  const promptAtValue = readAdminSessionDeadlineValue(ADMIN_IDLE_PROMPT_AT_KEY);
-  const graceExpiresAtValue = readAdminSessionDeadlineValue(
-    ADMIN_GRACE_EXPIRES_AT_KEY,
-  );
-
-  if (!promptAtValue || !graceExpiresAtValue) {
-    return null;
-  }
-
-  const promptAt = Number(promptAtValue);
-  const graceExpiresAt = Number(graceExpiresAtValue);
-
-  if (!Number.isFinite(promptAt) || !Number.isFinite(graceExpiresAt)) {
-    return null;
-  }
-
-  return {
-    promptAt,
-    graceExpiresAt,
-  };
-}
-
-export function recordAdminSessionActivity(): void {
-  markRestoredAdminAuthSession();
-
-  const now = Date.now();
-  const promptAt = now + getAdminSessionIdleTimeoutMs();
-  const graceExpiresAt = promptAt + getAdminSessionExtensionGraceMs();
-
-  writeAdminSessionDeadlineValue(ADMIN_IDLE_PROMPT_AT_KEY, String(promptAt));
-  writeAdminSessionDeadlineValue(
-    ADMIN_GRACE_EXPIRES_AT_KEY,
-    String(graceExpiresAt),
   );
 }
 
@@ -737,7 +605,7 @@ export function getCurrentSession() {
     headers: buildHeaders(),
   }).then((response) => {
     if (response.authenticated) {
-      recordAdminSessionActivity();
+      markRestoredAdminAuthSession();
     }
 
     return response;
@@ -752,7 +620,6 @@ export function loginAdmin(payload: AdminLoginPayload) {
   }).then((response) => {
     if (response.authenticated) {
       rememberAdminAuthSession(payload.remember === true);
-      recordAdminSessionActivity();
 
       if (payload.endExistingSessions === true) {
         broadcastAdminSessionReplacement();
@@ -770,7 +637,7 @@ export function extendAdminSession() {
     body: JSON.stringify({}),
   }).then((response) => {
     if (response.authenticated) {
-      recordAdminSessionActivity();
+      markRestoredAdminAuthSession();
     }
 
     return response;
@@ -780,10 +647,6 @@ export function extendAdminSession() {
 export function getAccountProfile() {
   return request<AccountProfileResponse>('/admin-auth/me', {
     headers: buildHeaders(),
-  }).then((response) => {
-    recordAdminSessionActivity();
-
-    return response;
   });
 }
 
@@ -810,8 +673,6 @@ export function getBarbers(pagination: PaginationRequest = {}) {
       headers: buildHeaders(),
     },
   ).then((response) => {
-    recordAdminSessionActivity();
-
     return {
       ...response,
       data: response.data.map(normalizeBarberRecord),
@@ -825,8 +686,6 @@ export function createBarber(payload: CreateBarberPayload) {
     headers: buildHeaders(),
     body: JSON.stringify(payload),
   }).then((barber) => {
-    recordAdminSessionActivity();
-
     return normalizeBarberRecord(barber);
   });
 }
@@ -837,8 +696,6 @@ export function updateBarber(id: string, payload: UpdateBarberPayload) {
     headers: buildHeaders(),
     body: JSON.stringify(payload),
   }).then((barber) => {
-    recordAdminSessionActivity();
-
     return normalizeBarberRecord(barber);
   });
 }
@@ -847,10 +704,6 @@ export function deleteBarber(id: string) {
   return request<DeleteBarberResponse>(`/admin/barbers/${id}`, {
     method: 'DELETE',
     headers: buildHeaders(),
-  }).then((response) => {
-    recordAdminSessionActivity();
-
-    return response;
   });
 }
 
@@ -860,11 +713,7 @@ export function getServiceAiConfigs(pagination: PaginationRequest = {}) {
     {
       headers: buildHeaders(),
     },
-  ).then((response) => {
-    recordAdminSessionActivity();
-
-    return response;
-  });
+  );
 }
 
 export function createService(payload: CreateServicePayload) {
@@ -872,10 +721,6 @@ export function createService(payload: CreateServicePayload) {
     method: 'POST',
     headers: buildHeaders(),
     body: JSON.stringify(payload),
-  }).then((response) => {
-    recordAdminSessionActivity();
-
-    return response;
   });
 }
 
@@ -884,10 +729,6 @@ export function updateService(id: string, payload: UpdateServicePayload) {
     method: 'PATCH',
     headers: buildHeaders(),
     body: JSON.stringify(payload),
-  }).then((response) => {
-    recordAdminSessionActivity();
-
-    return response;
   });
 }
 
@@ -899,10 +740,6 @@ export function updateServiceAiConfig(
     method: 'PATCH',
     headers: buildHeaders(),
     body: JSON.stringify(payload),
-  }).then((response) => {
-    recordAdminSessionActivity();
-
-    return response;
   });
 }
 
@@ -912,11 +749,7 @@ export function getSafetyRules(pagination: PaginationRequest = {}) {
     {
       headers: buildHeaders(),
     },
-  ).then((response) => {
-    recordAdminSessionActivity();
-
-    return response;
-  });
+  );
 }
 
 export function createSafetyRule(payload: CreateSafetyRulePayload) {
@@ -924,10 +757,6 @@ export function createSafetyRule(payload: CreateSafetyRulePayload) {
     method: 'POST',
     headers: buildHeaders(),
     body: JSON.stringify(payload),
-  }).then((response) => {
-    recordAdminSessionActivity();
-
-    return response;
   });
 }
 
@@ -936,10 +765,6 @@ export function updateSafetyRule(id: string, payload: UpdateSafetyRulePayload) {
     method: 'PATCH',
     headers: buildHeaders(),
     body: JSON.stringify(payload),
-  }).then((response) => {
-    recordAdminSessionActivity();
-
-    return response;
   });
 }
 
@@ -954,11 +779,7 @@ export function getReferenceData(
     {
       headers: buildHeaders(),
     },
-  ).then((response) => {
-    recordAdminSessionActivity();
-
-    return response;
-  });
+  );
 }
 
 export function createReferenceDataItem(payload: CreateReferenceDataItemPayload) {
@@ -966,10 +787,6 @@ export function createReferenceDataItem(payload: CreateReferenceDataItemPayload)
     method: 'POST',
     headers: buildHeaders(),
     body: JSON.stringify(payload),
-  }).then((response) => {
-    recordAdminSessionActivity();
-
-    return response;
   });
 }
 
@@ -981,10 +798,6 @@ export function updateReferenceDataItem(
     method: 'PATCH',
     headers: buildHeaders(),
     body: JSON.stringify(payload),
-  }).then((response) => {
-    recordAdminSessionActivity();
-
-    return response;
   });
 }
 
@@ -995,11 +808,7 @@ export function deleteReferenceDataItem(id: string) {
       method: 'DELETE',
       headers: buildHeaders(),
     },
-  ).then((response) => {
-    recordAdminSessionActivity();
-
-    return response;
-  });
+  );
 }
 
 export function getAppointmentBriefs(pagination: PaginationRequest = {}) {
@@ -1008,11 +817,7 @@ export function getAppointmentBriefs(pagination: PaginationRequest = {}) {
     {
       headers: buildHeaders(),
     },
-  ).then((response) => {
-    recordAdminSessionActivity();
-
-    return response;
-  });
+  );
 }
 
 export function getHairHistory(pagination: PaginationRequest = {}) {
@@ -1021,11 +826,7 @@ export function getHairHistory(pagination: PaginationRequest = {}) {
     {
       headers: buildHeaders(),
     },
-  ).then((response) => {
-    recordAdminSessionActivity();
-
-    return response;
-  });
+  );
 }
 
 export function createHairHistoryFromBrief(
@@ -1036,10 +837,6 @@ export function createHairHistoryFromBrief(
     method: 'POST',
     headers: buildHeaders(),
     body: JSON.stringify(payload),
-  }).then((response) => {
-    recordAdminSessionActivity();
-
-    return response;
   });
 }
 
@@ -1048,10 +845,6 @@ export function createAdminInvite(payload: CreateAdminInvitePayload) {
     method: 'POST',
     headers: buildHeaders(),
     body: JSON.stringify(payload),
-  }).then((response) => {
-    recordAdminSessionActivity();
-
-    return response;
   });
 }
 
