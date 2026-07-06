@@ -3,7 +3,6 @@ import { io, type Socket } from 'socket.io-client';
 import { getAdminDataVersion } from '../lib/api';
 import { getRuntimeConfigValue } from '../lib/runtimeConfig';
 
-const ADMIN_DATA_FRESHNESS_POLL_MS = 45_000;
 const ADMIN_REALTIME_URL = getRuntimeConfigValue('VITE_ADMIN_REALTIME_URL');
 const ADMIN_DATA_CHANGED_EVENT = 'admin.data.changed';
 const LOCAL_CHANGE_SUPPRESSION_MS = 6_000;
@@ -135,16 +134,10 @@ export function useAdminDataFreshness() {
 
     checkWhenVisible();
 
-    const intervalId = window.setInterval(
-      checkWhenVisible,
-      ADMIN_DATA_FRESHNESS_POLL_MS,
-    );
-
     document.addEventListener('visibilitychange', checkWhenVisible);
 
     return () => {
       isActive = false;
-      window.clearInterval(intervalId);
       document.removeEventListener('visibilitychange', checkWhenVisible);
     };
   }, [checkForFreshData, hasFreshData]);
