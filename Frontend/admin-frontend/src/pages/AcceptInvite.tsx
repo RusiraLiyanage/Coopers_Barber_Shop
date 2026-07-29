@@ -62,7 +62,7 @@ export default function AcceptInvite() {
       <main className="admin-auth-page">
         <Result
           status="success"
-          title="Admin account created"
+          title="Admin account created Updated"
           subTitle={`You can now sign in as ${acceptedEmail}.`}
           extra={<Link to="/login">Go to login</Link>}
         />
